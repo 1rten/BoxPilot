@@ -9,7 +9,7 @@ web:
 
 # Build Go server (expects web/dist to exist for embed)
 server:
-	cd server && go build -o ../bin/boxpilot ./cmd/boxpilot-api
+	cd server && go build -o ../bin/boxpilot .
 
 # Run server locally (dev: run web separately with npm run dev)
 run: server

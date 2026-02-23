@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch BoxPilot API",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/server",
+      "cwd": "${workspaceFolder}/server",
+      "env": {
+        "ADDR": ":8080",
+        "DB_PATH": "./data/app.db"
+      }
+    }
+  ]
+}

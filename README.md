@@ -252,7 +252,7 @@ npm run dev
 
 ```bash
 cd server
-go run cmd/boxpilot-api/main.go
+go run .
 ```
 
 ## Frontend

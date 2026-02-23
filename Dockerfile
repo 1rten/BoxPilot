@@ -13,7 +13,7 @@ WORKDIR /app
 COPY server/go.mod server/go.sum* ./
 RUN go mod download 2>/dev/null || true
 COPY server/ ./
-RUN CGO_ENABLED=0 go build -o /boxpilot ./cmd/boxpilot-api
+RUN CGO_ENABLED=0 go build -o /boxpilot .
 
 # Stage 3: runtime
 FROM alpine:3.19

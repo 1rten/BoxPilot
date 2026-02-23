@@ -149,9 +149,7 @@ boxpilot/
 │   └── migrations.md        # migration 规范
 │
 ├── server/
-│   ├── cmd/
-│   │   └── boxpilot-api/
-│   │       └── main.go
+│   ├── main.go
 │   ├── internal/
 │   │   ├── api/
 │   │   │   ├── router.go
