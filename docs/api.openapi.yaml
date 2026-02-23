@@ -1,0 +1,424 @@
+openapi: 3.0.3
+info:
+  title: BoxPilot API
+  version: 0.1.0
+  description: Control plane for sing-box. RPC-style GET/POST only.
+servers:
+  - url: /
+
+tags:
+  - name: System
+  - name: Subscriptions
+  - name: Nodes
+  - name: Runtime
+
+paths:
+
+  /healthz:
+    get:
+      tags: [System]
+      summary: Liveness probe
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+
+  /api/v1/runtime/status:
+    get:
+      tags: [Runtime]
+      summary: Get runtime status
+      responses:
+        '200':
+          description: Runtime status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeStatusResponse'
+
+  /api/v1/runtime/plan:
+    post:
+      tags: [Runtime]
+      summary: Dry-run build config
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuntimePlanRequest'
+      responses:
+        '200':
+          description: Plan result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimePlanResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/runtime/reload:
+    post:
+      tags: [Runtime]
+      summary: Build config and restart sing-box
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuntimeReloadRequest'
+      responses:
+        '200':
+          description: Reload result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeReloadResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/subscriptions:
+    get:
+      tags: [Subscriptions]
+      summary: List subscriptions
+      responses:
+        '200':
+          description: Subscription list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Subscription'
+                required: [data]
+
+  /api/v1/subscriptions/create:
+    post:
+      tags: [Subscriptions]
+      summary: Create subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubscriptionRequest'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Subscription'
+                required: [data]
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/subscriptions/update:
+    post:
+      tags: [Subscriptions]
+      summary: Update subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSubscriptionRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Subscription'
+                required: [data]
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/subscriptions/delete:
+    post:
+      tags: [Subscriptions]
+      summary: Delete subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+              required: [id]
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/subscriptions/refresh:
+    post:
+      tags: [Subscriptions]
+      summary: Refresh subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+              required: [id]
+      responses:
+        '200':
+          description: Refresh result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshSubscriptionResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/nodes:
+    get:
+      tags: [Nodes]
+      summary: List nodes
+      parameters:
+        - name: enabled
+          in: query
+          required: false
+          schema:
+            type: integer
+            enum: [0, 1]
+        - name: sub_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Node list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Node'
+                required: [data]
+
+  /api/v1/nodes/update:
+    post:
+      tags: [Nodes]
+      summary: Update node
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNodeRequest'
+      responses:
+        '200':
+          description: Updated node
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Node'
+                required: [data]
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+
+  responses:
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+  schemas:
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorObject'
+      required: [error]
+
+    ErrorObject:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+      required: [code, message]
+
+    Subscription:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        url: { type: string }
+        type:
+          type: string
+          enum: [singbox]
+        enabled: { type: boolean }
+        refresh_interval_sec: { type: integer }
+        created_at: { type: string }
+        updated_at: { type: string }
+      required: [id, name, url, type, enabled, created_at, updated_at]
+
+    CreateSubscriptionRequest:
+      type: object
+      properties:
+        name: { type: string }
+        url: { type: string }
+        type:
+          type: string
+          enum: [singbox]
+          default: singbox
+        refresh_interval_sec:
+          type: integer
+          minimum: 60
+          default: 3600
+      required: [url]
+
+    UpdateSubscriptionRequest:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        enabled: { type: boolean }
+        refresh_interval_sec:
+          type: integer
+          minimum: 60
+      required: [id]
+
+    RefreshSubscriptionResponse:
+      type: object
+      properties:
+        sub_id: { type: string }
+        not_modified: { type: boolean }
+        nodes_total: { type: integer }
+        nodes_enabled: { type: integer }
+        fetched_at: { type: string }
+
+    Node:
+      type: object
+      properties:
+        id: { type: string }
+        sub_id: { type: string }
+        tag: { type: string }
+        name: { type: string }
+        type: { type: string }
+        enabled: { type: boolean }
+        created_at: { type: string }
+      required: [id, sub_id, tag, name, type, enabled, created_at]
+
+    UpdateNodeRequest:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        enabled: { type: boolean }
+      required: [id]
+
+    RuntimeStatusResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            config_version: { type: integer }
+            config_hash: { type: string }
+            last_reload_at: { type: string }
+            last_reload_error: { type: string }
+            runtime_mode:
+              type: string
+              enum: [docker, process]
+            ports:
+              type: object
+              properties:
+                http: { type: integer }
+                socks: { type: integer }
+          required: [config_version, config_hash, ports]
+      required: [data]
+
+    RuntimePlanRequest:
+      type: object
+      properties:
+        include_disabled_nodes:
+          type: boolean
+          default: false
+
+    RuntimePlanResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            nodes_included: { type: integer }
+            tags:
+              type: array
+              items:
+                type: string
+            config_hash: { type: string }
+          required: [nodes_included, tags, config_hash]
+      required: [data]
+
+    RuntimeReloadRequest:
+      type: object
+      properties:
+        force_restart:
+          type: boolean
+          default: true
+
+    RuntimeReloadResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            config_version: { type: integer }
+            config_hash: { type: string }
+            nodes_included: { type: integer }
+            restart_output: { type: string }
+            reloaded_at: { type: string }
+          required: [config_version, config_hash, nodes_included, reloaded_at]
+      required: [data]

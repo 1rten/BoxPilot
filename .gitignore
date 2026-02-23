@@ -1,0 +1,43 @@
+# Data
+data/
+*.db
+
+# Build
+dist/
+web/dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Go
+vendor/
+*.test
+coverage.out
+
+# Generated
+web/src/api/types.ts
+web/src/api/generated/
