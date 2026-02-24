@@ -95,8 +95,8 @@ func (h *Subscriptions) Update(c *gin.Context) {
 		enabled = &v
 	}
 	var refresh *int
-	if req.RefreshIntervalSec > 0 {
-		refresh = &req.RefreshIntervalSec
+	if req.RefreshIntervalSec != nil && *req.RefreshIntervalSec > 0 {
+		refresh = req.RefreshIntervalSec
 	}
 	if err := repo.UpdateSubscription(h.DB, req.ID, name, enabled, refresh); err != nil {
 		writeError(c, errorx.New(errorx.DBError, "update subscription"))

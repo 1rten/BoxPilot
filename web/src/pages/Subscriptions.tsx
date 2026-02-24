@@ -1,30 +1,254 @@
-import { useSubscriptions, useCreateSubscription } from "../hooks/useSubscriptions";
-import { useState } from "react";
+import {
+  useSubscriptions,
+  useCreateSubscription,
+  useUpdateSubscription,
+  useDeleteSubscription,
+  useRefreshSubscription,
+} from "../hooks/useSubscriptions";
+import { useEffect, useMemo, useState } from "react";
+import type { Subscription } from "../api/types";
+import { ErrorState } from "../components/common/ErrorState";
+import { EmptyState } from "../components/common/EmptyState";
+import { SubscriptionTable } from "../components/subscriptions/SubscriptionTable";
+import {
+  SubscriptionModal,
+  type SubscriptionModalMode,
+} from "../components/subscriptions/SubscriptionModal";
+import { Button, Card, Input, Modal, Skeleton, Switch } from "antd";
 
 export default function Subscriptions() {
-  const { data: list, isLoading } = useSubscriptions();
+  const {
+    data: list,
+    isLoading,
+    error,
+    refetch,
+    isFetching,
+  } = useSubscriptions();
   const create = useCreateSubscription();
-  const [url, setUrl] = useState("");
+  const update = useUpdateSubscription();
+  const del = useDeleteSubscription();
+  const refresh = useRefreshSubscription();
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<SubscriptionModalMode>("edit");
+  const [editingSub, setEditingSub] = useState<Subscription | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [rowRefreshingId, setRowRefreshingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [autoRefresh, setAutoRefresh] = useState(false);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = window.setInterval(() => {
+      refetch();
+    }, 30000);
+    return () => window.clearInterval(id);
+  }, [autoRefresh, refetch]);
+
+  const filteredList = useMemo(() => {
+    if (!list) return list;
+    const q = search.trim().toLowerCase();
+    const base = !q
+      ? list
+      : list.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.url.toLowerCase().includes(q)
+        );
+    return [...base].sort((a, b) => {
+      const va = a.updated_at;
+      const vb = b.updated_at;
+      if (va === vb) return 0;
+      const cmp = va > vb ? 1 : -1;
+      return sortOrder === "asc" ? cmp : -cmp;
+    });
+  }, [list, search, sortOrder]);
 
   const handleCreate = () => {
-    if (!url.trim()) return;
-    create.mutate({ url: url.trim() }, { onSuccess: () => setUrl("") });
+    setModalMode("create");
+    setEditingSub(null);
+    setModalOpen(true);
   };
-
-  if (isLoading) return <p>Loading...</p>;
 
   return (
     <div>
-      <h1>Subscriptions</h1>
-      <div>
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Subscription URL" />
-        <button onClick={handleCreate} disabled={create.isPending}>Add</button>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 16,
+        }}
+      >
+        <h1 className="bp-page-title" style={{ marginBottom: 0 }}>
+          Subscriptions
+        </h1>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button type="primary" onClick={handleCreate} loading={create.isPending}>
+            New Subscription
+          </Button>
+          <Button onClick={() => refetch()} loading={isLoading}>
+            Refresh List
+          </Button>
+        </div>
       </div>
-      <ul>
-        {(list || []).map((s) => (
-          <li key={s.id}>{s.name || s.url} ({s.enabled ? "on" : "off"})</li>
-        ))}
-      </ul>
+
+      <Card>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+            gap: 12,
+          }}
+        >
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or URL"
+          />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              fontSize: 12,
+              color: "#64748B",
+            }}
+          >
+            {filteredList && (
+              <span>
+                Showing {filteredList.length} of {list?.length ?? 0} subscriptions
+              </span>
+            )}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <Switch
+                size="small"
+                checked={autoRefresh}
+                onChange={(checked) => setAutoRefresh(checked)}
+              />
+              Auto refresh every 30s
+            </span>
+          </div>
+        </div>
+
+        {isLoading && !list && <Skeleton active paragraph={{ rows: 4 }} />}
+        {error && (
+          <ErrorState
+            message={`Failed to load subscriptions: ${(error as Error).message}`}
+            onRetry={() => refetch()}
+          />
+        )}
+
+        {filteredList && filteredList.length > 0 ? (
+          <SubscriptionTable
+            list={filteredList}
+            loading={isFetching}
+            rowRefreshingId={rowRefreshingId}
+            sortOrder={sortOrder}
+            onToggleSort={() =>
+              setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))
+            }
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              showTotal: (total, range) =>
+                `${range[0]}-${range[1]} of ${total} subscriptions`,
+            }}
+            onEdit={(row) => {
+              setEditingSub(row);
+              setModalMode("edit");
+              setModalOpen(true);
+            }}
+            onDelete={(row) => setDeleteId(row.id)}
+            onRefreshRow={(row) => {
+              setRowRefreshingId(row.id);
+              refresh.mutate(row.id, {
+                onSettled: () => setRowRefreshingId(null),
+              });
+            }}
+          />
+        ) : (
+          !isLoading && (
+            <EmptyState
+              title={list && list.length > 0 ? "No results" : "No subscriptions yet"}
+              description={
+                list && list.length > 0
+                  ? "Try adjusting your search keywords."
+                  : "Create your first subscription to start syncing."
+              }
+              actionLabel={list && list.length > 0 ? undefined : "New Subscription"}
+              onActionClick={list && list.length > 0 ? undefined : handleCreate}
+            />
+          )
+        )}
+      </Card>
+
+      {/* Edit / Create modal */}
+      <SubscriptionModal
+        open={modalOpen}
+        mode={modalMode}
+        initialValues={
+          editingSub
+            ? { name: editingSub.name || editingSub.url, url: editingSub.url }
+            : undefined
+        }
+        submitting={
+          modalMode === "create" ? create.isPending : update.isPending
+        }
+        onCancel={() => {
+          setModalOpen(false);
+          setEditingSub(null);
+        }}
+        onSubmit={(values) => {
+          if (modalMode === "create") {
+            if (!values.url) return;
+            create.mutate(
+              { url: values.url, name: values.name || undefined },
+              {
+                onSuccess: () => {
+                  setModalOpen(false);
+                },
+              }
+            );
+          } else {
+            if (!editingSub) return;
+            update.mutate(
+              { id: editingSub.id, name: values.name },
+              {
+                onSuccess: () => {
+                  setModalOpen(false);
+                  setEditingSub(null);
+                },
+              }
+            );
+          }
+        }}
+      />
+
+      {/* Delete confirm */}
+      {deleteId && (
+        <Modal
+          open={!!deleteId}
+          title="Delete Subscription"
+          okText="Delete"
+          okButtonProps={{ danger: true, loading: del.isPending }}
+          cancelText="Cancel"
+          onCancel={() => setDeleteId(null)}
+          onOk={() => {
+            if (!deleteId) return;
+            del.mutate(deleteId, {
+              onSuccess: () => setDeleteId(null),
+            });
+          }}
+        >
+          <p className="bp-text-danger" style={{ fontSize: 14 }}>
+            This will remove the subscription and its nodes from DB. Continue?
+          </p>
+        </Modal>
+      )}
     </div>
   );
 }

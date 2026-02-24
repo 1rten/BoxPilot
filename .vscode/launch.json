@@ -10,7 +10,7 @@
       "cwd": "${workspaceFolder}/server",
       "env": {
         "ADDR": ":8080",
-        "DB_PATH": "./data/app.db"
+        "DB_PATH": "${workspaceFolder}/data/app.db"
       }
     }
   ]

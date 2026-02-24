@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"net/http"
 	"github.com/gin-gonic/gin"
+
 	"boxpilot/server/internal/api/dto"
 	"boxpilot/server/internal/util/errorx"
 )

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Subscriptions from "./pages/Subscriptions";
 import Nodes from "./pages/Nodes";
@@ -6,18 +6,42 @@ import Nodes from "./pages/Nodes";
 export default function App() {
   return (
     <BrowserRouter>
-      <nav style={{ padding: "1rem", borderBottom: "1px solid #eee" }}>
-        <Link to="/" style={{ marginRight: "1rem" }}>Dashboard</Link>
-        <Link to="/subscriptions" style={{ marginRight: "1rem" }}>Subscriptions</Link>
-        <Link to="/nodes">Nodes</Link>
-      </nav>
-      <main style={{ padding: "1rem" }}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/subscriptions" element={<Subscriptions />} />
-          <Route path="/nodes" element={<Nodes />} />
-        </Routes>
-      </main>
+      <div className="bp-shell">
+        <nav className="bp-nav">
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) =>
+              isActive ? "bp-nav-link bp-nav-link-active" : "bp-nav-link"
+            }
+          >
+            Dashboard
+          </NavLink>
+          <NavLink
+            to="/subscriptions"
+            className={({ isActive }) =>
+              isActive ? "bp-nav-link bp-nav-link-active" : "bp-nav-link"
+            }
+          >
+            Subscriptions
+          </NavLink>
+          <NavLink
+            to="/nodes"
+            className={({ isActive }) =>
+              isActive ? "bp-nav-link bp-nav-link-active" : "bp-nav-link"
+            }
+          >
+            Nodes
+          </NavLink>
+        </nav>
+        <main className="bp-main">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/subscriptions" element={<Subscriptions />} />
+            <Route path="/nodes" element={<Nodes />} />
+          </Routes>
+        </main>
+      </div>
     </BrowserRouter>
   );
 }

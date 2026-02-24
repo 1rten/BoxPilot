@@ -2,7 +2,7 @@ package repo
 
 import (
 	"database/sql"
-	"boxpilot/server/internal/util"
+
 	"boxpilot/server/internal/util/errorx"
 )
 
@@ -77,7 +77,6 @@ func ReplaceNodesForSubscription(db *sql.DB, subID string, nodes []NodeRow) erro
 }
 
 func UpdateNode(db *sql.DB, id string, name *string, enabled *int) (bool, error) {
-	now := util.NowRFC3339()
 	res, err := db.Exec("UPDATE nodes SET name = COALESCE(?, name), enabled = COALESCE(?, enabled) WHERE id = ?", name, enabled, id)
 	if err != nil {
 		return false, err

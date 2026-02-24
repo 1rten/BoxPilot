@@ -1,6 +1,7 @@
 # Data
 data/
 *.db
+.cursor/
 
 # Build
 dist/
@@ -37,6 +38,7 @@ yarn-error.log*
 vendor/
 *.test
 coverage.out
+*debug*
 
 # Generated
 web/src/api/types.ts
