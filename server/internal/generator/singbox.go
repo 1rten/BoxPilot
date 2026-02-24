@@ -2,13 +2,27 @@ package generator
 
 import (
 	"encoding/json"
+
 	"boxpilot/server/internal/util/errorx"
 )
 
-func BuildConfig(httpPort, socksPort int, nodeOutboundJSONs []string) ([]byte, error) {
-	inbounds := []map[string]any{
-		{"type": "http", "tag": "http-in", "listen": "0.0.0.0", "listen_port": httpPort, "sniff": true},
-		{"type": "socks", "tag": "socks-in", "listen": "0.0.0.0", "listen_port": socksPort, "sniff": true},
+type ProxyInbound struct {
+	Type          string
+	ListenAddress string
+	Port          int
+	Enabled       bool
+	AuthMode      string
+	Username      string
+	Password      string
+}
+
+func BuildConfig(httpProxy ProxyInbound, socksProxy ProxyInbound, nodeOutboundJSONs []string) ([]byte, error) {
+	inbounds := []map[string]any{}
+	if httpProxy.Enabled {
+		inbounds = append(inbounds, buildInbound("http", "http-in", httpProxy))
+	}
+	if socksProxy.Enabled {
+		inbounds = append(inbounds, buildInbound("socks", "socks-in", socksProxy))
 	}
 	outbounds := []map[string]any{
 		{"type": "direct", "tag": "direct"},
@@ -35,4 +49,20 @@ func BuildConfig(httpPort, socksPort int, nodeOutboundJSONs []string) ([]byte, e
 		return nil, errorx.New(errorx.CFGJSONInvalid, "marshal config")
 	}
 	return b, nil
+}
+
+func buildInbound(inType, tag string, p ProxyInbound) map[string]any {
+	inb := map[string]any{
+		"type":        inType,
+		"tag":         tag,
+		"listen":      p.ListenAddress,
+		"listen_port": p.Port,
+		"sniff":       true,
+	}
+	if p.AuthMode == "basic" && p.Username != "" && p.Password != "" {
+		inb["users"] = []map[string]any{
+			{"username": p.Username, "password": p.Password},
+		}
+	}
+	return inb
 }

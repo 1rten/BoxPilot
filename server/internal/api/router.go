@@ -31,11 +31,19 @@ func Router(db *sql.DB) *gin.Engine {
 		node := &handlers.Nodes{DB: db}
 		v1.GET("/nodes", node.List)
 		v1.POST("/nodes/update", node.Update)
+		v1.GET("/nodes/forwarding", node.Forwarding)
+		v1.POST("/nodes/forwarding/update", node.UpdateForwarding)
+		v1.POST("/nodes/forwarding/restart", node.RestartForwarding)
 
 		rt := &handlers.Runtime{DB: db}
 		v1.GET("/runtime/status", rt.Status)
 		v1.POST("/runtime/plan", rt.Plan)
 		v1.POST("/runtime/reload", rt.Reload)
+
+		settings := &handlers.Settings{DB: db}
+		v1.GET("/settings/proxy", settings.GetProxySettings)
+		v1.POST("/settings/proxy/update", settings.UpdateProxySettings)
+		v1.POST("/settings/proxy/apply", settings.ApplyProxySettings)
 	}
 
 	// Static files when WEB_ROOT is set (e.g. production)

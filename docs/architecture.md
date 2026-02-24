@@ -307,6 +307,36 @@ boxpilot/
 | last_reload_at | TEXT | 上次重载时间 |
 | last_reload_error | TEXT | 上次重载错误 |
 
+### 5.5 表：proxy_settings
+用途：HTTP/SOCKS 代理设置（全局）。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| proxy_type | TEXT PK | `http` / `socks` |
+| enabled | INTEGER | 1/0 |
+| listen_address | TEXT | `127.0.0.1` / `0.0.0.0` |
+| port | INTEGER | 端口 |
+| auth_mode | TEXT | `none` / `basic` |
+| username | TEXT | 可选 |
+| password | TEXT | 可选 |
+| updated_at | TEXT | 更新时间 |
+
+### 5.6 表：node_proxy_overrides
+用途：节点级代理覆盖（用于 Forwarding）。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| id | TEXT PK | UUID |
+| node_id | TEXT | 节点 ID（FK） |
+| proxy_type | TEXT | `http` / `socks` |
+| enabled | INTEGER | 1/0 |
+| port | INTEGER | 端口 |
+| auth_mode | TEXT | `none` / `basic` |
+| username | TEXT | 可选 |
+| password | TEXT | 可选 |
+| created_at | TEXT | RFC3339 |
+| updated_at | TEXT | RFC3339 |
+
 ---
 
 ## 6. 核心业务流程设计
@@ -390,10 +420,11 @@ sing-box 的 selector outbounds 依赖 tag，tag 冲突会导致 selector 指向
 - **outbounds**：direct/block + 节点 outbounds + selector(proxy)
 - **route**：final=proxy（MVP）
 
-### 7.2 Inbounds（固定）
+### 7.2 Inbounds（可配置）
 
-- HTTP inbound：:7890（支持 CONNECT）
-- SOCKS inbound：:7891
+- HTTP inbound：listen/address/port 可配置（默认 0.0.0.0:7890）
+- SOCKS inbound：listen/address/port 可配置（默认 0.0.0.0:7891）
+- 可选 Basic 认证（HTTP/SOCKS）
 - 建议开启 sniff（提升体验）
 
 示例（片段）：
@@ -545,6 +576,12 @@ docker.sock 权限较大，部分用户不愿挂载；提供 process mode 可提
 | GET | `/api/v1/runtime/status` | 运行时状态，200 返回 `RuntimeStatusResponse`（config_version、config_hash、last_reload_at/error、ports.http/socks、runtime_mode、singbox_container） |
 | POST | `/api/v1/runtime/plan` | **Dry Run**：不落盘、不重启；body 可选 `RuntimePlanRequest`（include_disabled_nodes），200 返回 nodes_included、tags、config_hash |
 | POST | `/api/v1/runtime/reload` | 写盘并重启 sing-box；body 可选 `RuntimeReloadRequest`（force_restart，默认 true），200 返回 config_version、config_hash、nodes_included、restart_output、reloaded_at |
+| GET | `/api/v1/settings/proxy` | 代理设置（HTTP/SOCKS）与状态，返回 `ProxySettingsResponse` |
+| POST | `/api/v1/settings/proxy/update` | 保存代理设置，返回 `ProxySettingsResponse` |
+| POST | `/api/v1/settings/proxy/apply` | 写盘并重启 sing-box，使代理配置生效，返回 `ProxyApplyResponse` |
+| GET | `/api/v1/nodes/forwarding` | 节点代理信息（global/override），query: `node_id` |
+| POST | `/api/v1/nodes/forwarding/update` | 保存节点代理 override（或 `use_global=true` 清除 override） |
+| POST | `/api/v1/nodes/forwarding/restart` | 重启该节点代理（MVP 触发整体重启） |
 
 ### 9.6 Health
 

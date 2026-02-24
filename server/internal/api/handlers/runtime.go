@@ -1,14 +1,17 @@
 package handlers
 
 import (
-	"net/http"
 	"database/sql"
+	"net/http"
 	"os"
-	"strconv"
-	"github.com/gin-gonic/gin"
+
 	"boxpilot/server/internal/api/dto"
+	"boxpilot/server/internal/service"
 	"boxpilot/server/internal/store/repo"
+	"boxpilot/server/internal/util"
 	"boxpilot/server/internal/util/errorx"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Runtime struct {
@@ -36,14 +39,12 @@ func (h *Runtime) Status(c *gin.Context) {
 	}
 	httpPort := 7890
 	socksPort := 7891
-	if p := os.Getenv("HTTP_PROXY_PORT"); p != "" {
-		if v, err := parseInt(p); err == nil {
-			httpPort = v
+	if settings, err := repo.GetProxySettings(h.DB); err == nil {
+		if httpRow, ok := settings["http"]; ok && httpRow.Port > 0 {
+			httpPort = httpRow.Port
 		}
-	}
-	if p := os.Getenv("SOCKS_PROXY_PORT"); p != "" {
-		if v, err := parseInt(p); err == nil {
-			socksPort = v
+		if socksRow, ok := settings["socks"]; ok && socksRow.Port > 0 {
+			socksPort = socksRow.Port
 		}
 	}
 	mode := "docker"
@@ -56,13 +57,13 @@ func (h *Runtime) Status(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, dto.RuntimeStatusResponse{
 		Data: dto.RuntimeStatusData{
-			ConfigVersion:     cfgVersion,
-			ConfigHash:        cfgHash,
-			LastReloadAt:      lastReloadAt,
-			LastReloadError:   lastReloadError,
-			Ports:             dto.RuntimePorts{HTTP: httpPort, Socks: socksPort},
-			RuntimeMode:       mode,
-			SingboxContainer:  container,
+			ConfigVersion:    cfgVersion,
+			ConfigHash:       cfgHash,
+			LastReloadAt:     lastReloadAt,
+			LastReloadError:  lastReloadError,
+			Ports:            dto.RuntimePorts{HTTP: httpPort, Socks: socksPort},
+			RuntimeMode:      mode,
+			SingboxContainer: container,
 		},
 	})
 }
@@ -79,18 +80,22 @@ func (h *Runtime) Plan(c *gin.Context) {
 }
 
 func (h *Runtime) Reload(c *gin.Context) {
-	// TODO: config build + atomic write + docker restart
+	configPath := os.Getenv("SINGBOX_CONFIG")
+	if configPath == "" {
+		configPath = "/data/sing-box.json"
+	}
+	v, hsh, out, err := service.Reload(c.Request.Context(), h.DB, configPath)
+	if err != nil {
+		writeError(c, errorx.New(errorx.RTRestartFailed, err.Error()))
+		return
+	}
 	c.JSON(http.StatusOK, dto.RuntimeReloadResponse{
 		Data: dto.RuntimeReloadData{
-			ConfigVersion: 0,
-			ConfigHash:    "",
+			ConfigVersion: v,
+			ConfigHash:    hsh,
 			NodesIncluded: 0,
-			RestartOutput:  "",
-			ReloadedAt:    "", // util.NowRFC3339() when implemented
+			RestartOutput: out,
+			ReloadedAt:    util.NowRFC3339(),
 		},
 	})
-}
-
-func parseInt(s string) (int, error) {
-	return strconv.Atoi(s)
 }

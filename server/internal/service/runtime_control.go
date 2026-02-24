@@ -5,27 +5,19 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
-	"strconv"
 
+	"boxpilot/server/internal/generator"
 	"boxpilot/server/internal/runtime"
 	"boxpilot/server/internal/store/repo"
 	"boxpilot/server/internal/util"
 )
 
 func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, hash string, output string, err error) {
-	httpPort := 7890
-	if p := os.Getenv("HTTP_PROXY_PORT"); p != "" {
-		if v, e := parseInt(p); e == nil {
-			httpPort = v
-		}
+	httpProxy, socksProxy, err := loadProxySettings(db)
+	if err != nil {
+		return 0, "", "", err
 	}
-	socksPort := 7891
-	if p := os.Getenv("SOCKS_PROXY_PORT"); p != "" {
-		if v, e := parseInt(p); e == nil {
-			socksPort = v
-		}
-	}
-	cfg, _, h, err := BuildConfigFromDB(db, httpPort, socksPort)
+	cfg, _, h, err := BuildConfigFromDB(db, httpProxy, socksProxy)
 	if err != nil {
 		return 0, "", "", err
 	}
@@ -50,6 +42,42 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 	return v, h, string(out), nil
 }
 
-func parseInt(s string) (int, error) {
-	return strconv.Atoi(s)
+func loadProxySettings(db *sql.DB) (generator.ProxyInbound, generator.ProxyInbound, error) {
+	rows, err := repo.GetProxySettings(db)
+	if err != nil {
+		return generator.ProxyInbound{}, generator.ProxyInbound{}, err
+	}
+	httpRow := rows["http"]
+	socksRow := rows["socks"]
+	httpProxy := generator.ProxyInbound{
+		Type:          "http",
+		ListenAddress: httpRow.ListenAddress,
+		Port:          httpRow.Port,
+		Enabled:       httpRow.Enabled == 1,
+		AuthMode:      httpRow.AuthMode,
+		Username:      httpRow.Username,
+		Password:      httpRow.Password,
+	}
+	socksProxy := generator.ProxyInbound{
+		Type:          "socks",
+		ListenAddress: socksRow.ListenAddress,
+		Port:          socksRow.Port,
+		Enabled:       socksRow.Enabled == 1,
+		AuthMode:      socksRow.AuthMode,
+		Username:      socksRow.Username,
+		Password:      socksRow.Password,
+	}
+	if httpProxy.ListenAddress == "" {
+		httpProxy.ListenAddress = "0.0.0.0"
+	}
+	if httpProxy.Port == 0 {
+		httpProxy.Port = 7890
+	}
+	if socksProxy.ListenAddress == "" {
+		socksProxy.ListenAddress = "0.0.0.0"
+	}
+	if socksProxy.Port == 0 {
+		socksProxy.Port = 7891
+	}
+	return httpProxy, socksProxy, nil
 }

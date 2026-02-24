@@ -73,18 +73,9 @@ export default function Subscriptions() {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <h1 className="bp-page-title" style={{ marginBottom: 0 }}>
-          Subscriptions
-        </h1>
-        <div style={{ display: "flex", gap: 8 }}>
+      <div className="bp-page-header">
+        <h1 className="bp-page-title">Subscriptions</h1>
+        <div className="bp-page-actions">
           <Button type="primary" onClick={handleCreate} loading={create.isPending}>
             New Subscription
           </Button>
@@ -95,29 +86,14 @@ export default function Subscriptions() {
       </div>
 
       <Card>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 16,
-            gap: 12,
-          }}
-        >
+        <div className="bp-card-toolbar">
           <Input
+            className="bp-input"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or URL"
           />
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              fontSize: 12,
-              color: "#64748B",
-            }}
-          >
+          <div className="bp-card-toolbar-meta">
             {filteredList && (
               <span>
                 Showing {filteredList.length} of {list?.length ?? 0} subscriptions
