@@ -96,6 +96,7 @@ export default function Nodes() {
           <Table<Node>
             rowKey="id"
             size="middle"
+            scroll={{ x: 710 }}
             dataSource={filtered}
             loading={isLoading}
             onRow={(record) => ({
@@ -366,13 +367,22 @@ function buildColumns(
       title: "Name",
       dataIndex: "name",
       key: "name",
+      width: 180,
+      ellipsis: true,
       render: (_value, record) => record.name || record.tag,
     },
-    { title: "Type", dataIndex: "type", key: "type" },
+    {
+      title: "Type",
+      dataIndex: "type",
+      key: "type",
+      width: 100,
+      ellipsis: true,
+    },
     {
       title: "Status",
       dataIndex: "enabled",
       key: "status",
+      width: 90,
       render: (value: boolean) => (
         <Tag color={value ? "success" : "error"}>
           {value ? "Online" : "Offline"}
@@ -383,6 +393,7 @@ function buildColumns(
       title: "Created at",
       dataIndex: "created_at",
       key: "created_at",
+      width: 160,
       render: (value: string) => (
         <span className="bp-table-mono">{formatDateTime(value)}</span>
       ),
@@ -391,6 +402,7 @@ function buildColumns(
       title: "Actions",
       key: "actions",
       align: "right",
+      width: 180,
       render: (_value, record) => (
         <div
           className="bp-row-actions"

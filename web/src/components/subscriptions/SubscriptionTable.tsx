@@ -33,12 +33,16 @@ export function SubscriptionTable({
       title: "Name",
       dataIndex: "name",
       key: "name",
+      width: 140,
+      ellipsis: true,
       render: (_value, record) => record.name || record.url,
     },
     {
       title: "URL",
       dataIndex: "url",
       key: "url",
+      width: 260,
+      ellipsis: true,
       render: (value: string) => (
         <span className="bp-table-mono" title={value}>
           {truncate(value)}
@@ -49,6 +53,7 @@ export function SubscriptionTable({
       title: "Status",
       dataIndex: "status",
       key: "status",
+      width: 90,
       render: (_value, record) => renderStatusTag(record),
     },
     {
@@ -63,6 +68,7 @@ export function SubscriptionTable({
       ),
       dataIndex: "updated_at",
       key: "updated_at",
+      width: 160,
       render: (value: string) => (
         <span className="bp-table-mono">{formatDateTime(value)}</span>
       ),
@@ -71,8 +77,10 @@ export function SubscriptionTable({
       title: "Last error",
       dataIndex: "last_error",
       key: "last_error",
+      width: 180,
+      ellipsis: true,
       render: (value: string | null | undefined) => (
-        <span style={{ color: value ? "#DC2626" : "#64748B" }}>
+        <span style={{ color: value ? "#DC2626" : "#64748B" }} title={value ?? undefined}>
           {value || "-"}
         </span>
       ),
@@ -81,6 +89,7 @@ export function SubscriptionTable({
       title: "Actions",
       key: "actions",
       align: "right",
+      width: 200,
       render: (_value, record) => {
         const refreshing = rowRefreshingId === record.id;
         return (
@@ -112,6 +121,7 @@ export function SubscriptionTable({
   return (
     <Table<Subscription>
       rowKey="id"
+      scroll={{ x: 1030 }}
       dataSource={list}
       columns={columns}
       pagination={pagination}
