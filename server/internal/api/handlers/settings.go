@@ -27,7 +27,7 @@ func (h *Settings) GetProxySettings(c *gin.Context) {
 	}
 	httpRow := settings["http"]
 	socksRow := settings["socks"]
-	status, errMsg := runtimeStatus(h.DB)
+	_, status, errMsg := runtimeStatus(h.DB)
 	c.JSON(http.StatusOK, dto.ProxySettingsResponse{
 		Data: dto.ProxySettingsData{
 			HTTP:  proxyRowToDTO(httpRow, status, errMsg, "global"),
@@ -98,7 +98,7 @@ func (h *Settings) UpdateProxySettings(c *gin.Context) {
 		writeError(c, errorx.New(errorx.DBError, "update proxy settings"))
 		return
 	}
-	status, errMsg := runtimeStatus(h.DB)
+	_, status, errMsg := runtimeStatus(h.DB)
 	c.JSON(http.StatusOK, dto.ProxySettingsResponse{
 		Data: dto.ProxySettingsData{
 			HTTP:  proxyRowToDTO(mustGetProxy(h.DB, "http"), status, errMsg, "global"),
@@ -127,6 +127,88 @@ func (h *Settings) ApplyProxySettings(c *gin.Context) {
 	})
 }
 
+func (h *Settings) ForwardingStatus(c *gin.Context) {
+	running, status, errMsg := runtimeStatus(h.DB)
+	c.JSON(http.StatusOK, dto.ForwardingRuntimeStatusResponse{
+		Data: dto.ForwardingRuntimeStatus{
+			Running:      running,
+			Status:       status,
+			ErrorMessage: errMsg,
+		},
+	})
+}
+
+func (h *Settings) StartForwarding(c *gin.Context) {
+	nodes, err := repo.ListEnabledForwardingNodes(h.DB)
+	if err != nil {
+		writeError(c, errorx.New(errorx.DBError, "list forwarding nodes"))
+		return
+	}
+	if len(nodes) == 0 {
+		writeError(c, errorx.New(errorx.CFGNoEnabledNodes, "no forwarding nodes selected"))
+		return
+	}
+	settings, err := repo.GetProxySettings(h.DB)
+	if err != nil {
+		writeError(c, errorx.New(errorx.DBError, "get proxy settings"))
+		return
+	}
+	httpRow := settings["http"]
+	socksRow := settings["socks"]
+	if httpRow.Enabled != 1 && socksRow.Enabled != 1 {
+		writeError(c, errorx.New(errorx.REQInvalidField, "no proxy inbound enabled"))
+		return
+	}
+	if err := h.setForwardingRunningAndReload(c, true); err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.RTRestartFailed, err.Error()))
+		return
+	}
+	h.ForwardingStatus(c)
+}
+
+func (h *Settings) StopForwarding(c *gin.Context) {
+	if err := h.setForwardingRunningAndReload(c, false); err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.RTRestartFailed, err.Error()))
+		return
+	}
+	h.ForwardingStatus(c)
+}
+
+func (h *Settings) setForwardingRunningAndReload(c *gin.Context, running bool) error {
+	row, err := repo.GetRuntimeState(h.DB)
+	if err != nil {
+		return errorx.New(errorx.DBError, "get runtime state")
+	}
+	prev := 0
+	if row != nil {
+		prev = row.ForwardingRunning
+	}
+	next := 0
+	if running {
+		next = 1
+	}
+	if err := repo.SetForwardingRunning(h.DB, next); err != nil {
+		return errorx.New(errorx.DBError, "update forwarding state")
+	}
+	configPath := os.Getenv("SINGBOX_CONFIG")
+	if configPath == "" {
+		configPath = "/data/sing-box.json"
+	}
+	if _, _, _, err := service.Reload(c.Request.Context(), h.DB, configPath); err != nil {
+		_ = repo.SetForwardingRunning(h.DB, prev)
+		return errorx.New(errorx.RTRestartFailed, err.Error())
+	}
+	return nil
+}
+
 func proxyRowToDTO(row repo.ProxySettingsRow, status string, errMsg *string, source string) dto.ProxyConfig {
 	return dto.ProxyConfig{
 		ProxyType:     row.ProxyType,
@@ -149,16 +231,19 @@ func statusFor(enabled bool, runtimeStatus string) string {
 	return runtimeStatus
 }
 
-func runtimeStatus(db *sql.DB) (string, *string) {
+func runtimeStatus(db *sql.DB) (bool, string, *string) {
 	row, err := repo.GetRuntimeState(db)
 	if err != nil || row == nil {
-		return "running", nil
+		return false, "stopped", nil
 	}
 	if row.LastReloadError.Valid && row.LastReloadError.String != "" {
 		msg := row.LastReloadError.String
-		return "error", &msg
+		return row.ForwardingRunning == 1, "error", &msg
 	}
-	return "running", nil
+	if row.ForwardingRunning != 1 {
+		return false, "stopped", nil
+	}
+	return true, "running", nil
 }
 
 func mustGetProxy(db *sql.DB, proxyType string) repo.ProxySettingsRow {

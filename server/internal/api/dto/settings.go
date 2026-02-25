@@ -43,6 +43,16 @@ type ProxyApplyData struct {
 	ReloadedAt    string `json:"reloaded_at"`
 }
 
+type ForwardingRuntimeStatusResponse struct {
+	Data ForwardingRuntimeStatus `json:"data"`
+}
+
+type ForwardingRuntimeStatus struct {
+	Running      bool    `json:"running"`
+	Status       string  `json:"status"`
+	ErrorMessage *string `json:"error_message,omitempty"`
+}
+
 type NodeForwardingResponse struct {
 	Data NodeForwardingData `json:"data"`
 }

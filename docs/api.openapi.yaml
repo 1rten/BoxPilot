@@ -11,6 +11,7 @@ tags:
   - name: Subscriptions
   - name: Nodes
   - name: Runtime
+  - name: Settings
 
 paths:
 
@@ -76,6 +77,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RuntimeReloadResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/settings/forwarding/status:
+    get:
+      tags: [Settings]
+      summary: Get forwarding runtime status
+      responses:
+        '200':
+          description: Forwarding runtime status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForwardingRuntimeStatusResponse'
+
+  /api/v1/settings/forwarding/start:
+    post:
+      tags: [Settings]
+      summary: Start forwarding runtime
+      responses:
+        '200':
+          description: Forwarding started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForwardingRuntimeStatusResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/settings/forwarding/stop:
+    post:
+      tags: [Settings]
+      summary: Stop forwarding runtime
+      responses:
+        '200':
+          description: Forwarding stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForwardingRuntimeStatusResponse'
         '500':
           $ref: '#/components/responses/ErrorResponse'
 
@@ -449,6 +494,7 @@ components:
           properties:
             config_version: { type: integer }
             config_hash: { type: string }
+            forwarding_running: { type: boolean }
             last_reload_at: { type: string }
             last_reload_error: { type: string }
             runtime_mode:
@@ -459,7 +505,21 @@ components:
               properties:
                 http: { type: integer }
                 socks: { type: integer }
-          required: [config_version, config_hash, ports]
+          required: [config_version, config_hash, forwarding_running, ports]
+      required: [data]
+
+    ForwardingRuntimeStatusResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            running: { type: boolean }
+            status:
+              type: string
+              enum: [running, stopped, error]
+            error_message: { type: string, nullable: true }
+          required: [running, status]
       required: [data]
 
     RuntimePlanRequest:

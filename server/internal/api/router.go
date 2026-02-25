@@ -46,6 +46,9 @@ func Router(db *sql.DB) *gin.Engine {
 		v1.GET("/settings/proxy", settings.GetProxySettings)
 		v1.POST("/settings/proxy/update", settings.UpdateProxySettings)
 		v1.POST("/settings/proxy/apply", settings.ApplyProxySettings)
+		v1.GET("/settings/forwarding/status", settings.ForwardingStatus)
+		v1.POST("/settings/forwarding/start", settings.StartForwarding)
+		v1.POST("/settings/forwarding/stop", settings.StopForwarding)
 	}
 
 	// Static files when WEB_ROOT is set (e.g. production)

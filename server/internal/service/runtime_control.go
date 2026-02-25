@@ -17,7 +17,11 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 	if err != nil {
 		return 0, "", "", err
 	}
-	cfg, _, h, err := BuildConfigFromDB(db, httpProxy, socksProxy)
+	forwardingRunning, err := loadForwardingRunning(db)
+	if err != nil {
+		return 0, "", "", err
+	}
+	cfg, _, h, err := BuildConfigFromDB(db, httpProxy, socksProxy, forwardingRunning)
 	if err != nil {
 		return 0, "", "", err
 	}
@@ -40,6 +44,17 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 	}
 	repo.UpdateRuntimeState(db, v, h, "")
 	return v, h, string(out), nil
+}
+
+func loadForwardingRunning(db *sql.DB) (bool, error) {
+	row, err := repo.GetRuntimeState(db)
+	if err != nil {
+		return false, err
+	}
+	if row == nil {
+		return false, nil
+	}
+	return row.ForwardingRunning == 1, nil
 }
 
 func loadProxySettings(db *sql.DB) (generator.ProxyInbound, generator.ProxyInbound, error) {

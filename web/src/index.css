@@ -122,6 +122,41 @@ a {
   gap: 10px;
 }
 
+.bp-forwarding-toggle {
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid #cdd7ee;
+  background: #f8faff;
+  color: #1f2a44;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+
+.bp-forwarding-toggle:hover {
+  border-color: #a9bce9;
+  background: #eef3ff;
+}
+
+.bp-forwarding-toggle-running {
+  border-color: #8dd9b0;
+  background: #e8f8ef;
+  color: #166534;
+}
+
+.bp-forwarding-toggle-error {
+  border-color: #f0b0b0;
+  background: #fff1f1;
+  color: #b91c1c;
+}
+
+.bp-forwarding-toggle:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 .bp-settings-link {
   width: 36px;
   height: 36px;

@@ -228,7 +228,7 @@ func (h *Nodes) Forwarding(c *gin.Context) {
 		writeError(c, errorx.New(errorx.DBError, "get node proxy overrides"))
 		return
 	}
-	status, errMsg := runtimeStatus(h.DB)
+	_, status, errMsg := runtimeStatus(h.DB)
 	httpCfg := buildForwardingConfig(settings["http"], overrides["http"], status, errMsg)
 	socksCfg := buildForwardingConfig(settings["socks"], overrides["socks"], status, errMsg)
 	c.JSON(http.StatusOK, dto.NodeForwardingResponse{

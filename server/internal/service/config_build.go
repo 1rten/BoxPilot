@@ -9,12 +9,16 @@ import (
 	"boxpilot/server/internal/util/errorx"
 )
 
-func BuildConfigFromDB(db *sql.DB, httpProxy, socksProxy generator.ProxyInbound) ([]byte, []string, string, error) {
+func BuildConfigFromDB(db *sql.DB, httpProxy, socksProxy generator.ProxyInbound, forwardingRunning bool) ([]byte, []string, string, error) {
+	if !forwardingRunning {
+		httpProxy.Enabled = false
+		socksProxy.Enabled = false
+	}
 	nodes, err := repo.ListEnabledForwardingNodes(db)
 	if err != nil {
 		return nil, nil, "", err
 	}
-	if (httpProxy.Enabled || socksProxy.Enabled) && len(nodes) == 0 {
+	if forwardingRunning && (httpProxy.Enabled || socksProxy.Enabled) && len(nodes) == 0 {
 		return nil, nil, "", errorx.New(errorx.CFGNoEnabledNodes, "no forwarding nodes enabled")
 	}
 	var jsons []string

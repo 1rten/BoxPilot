@@ -26,10 +26,12 @@ func (h *Runtime) Status(c *gin.Context) {
 	}
 	cfgVersion := 0
 	cfgHash := ""
+	forwardingRunning := false
 	var lastReloadAt, lastReloadError *string
 	if row != nil {
 		cfgVersion = row.ConfigVersion
 		cfgHash = row.ConfigHash
+		forwardingRunning = row.ForwardingRunning == 1
 		if row.LastReloadAt.Valid {
 			lastReloadAt = &row.LastReloadAt.String
 		}
@@ -57,13 +59,14 @@ func (h *Runtime) Status(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, dto.RuntimeStatusResponse{
 		Data: dto.RuntimeStatusData{
-			ConfigVersion:    cfgVersion,
-			ConfigHash:       cfgHash,
-			LastReloadAt:     lastReloadAt,
-			LastReloadError:  lastReloadError,
-			Ports:            dto.RuntimePorts{HTTP: httpPort, Socks: socksPort},
-			RuntimeMode:      mode,
-			SingboxContainer: container,
+			ConfigVersion:     cfgVersion,
+			ConfigHash:        cfgHash,
+			ForwardingRunning: forwardingRunning,
+			LastReloadAt:      lastReloadAt,
+			LastReloadError:   lastReloadError,
+			Ports:             dto.RuntimePorts{HTTP: httpPort, Socks: socksPort},
+			RuntimeMode:       mode,
+			SingboxContainer:  container,
 		},
 	})
 }

@@ -3,8 +3,20 @@ import Dashboard from "./pages/Dashboard";
 import Subscriptions from "./pages/Subscriptions";
 import Nodes from "./pages/Nodes";
 import Settings from "./pages/Settings";
+import {
+  useForwardingRuntimeStatus,
+  useStartForwardingRuntime,
+  useStopForwardingRuntime,
+} from "./hooks/useProxySettings";
 
 export default function App() {
+  const { data: runtime } = useForwardingRuntimeStatus();
+  const startForwarding = useStartForwardingRuntime();
+  const stopForwarding = useStopForwardingRuntime();
+  const toggling = startForwarding.isPending || stopForwarding.isPending;
+  const isRunning = !!runtime?.running;
+  const runtimeStatus = runtime?.status ?? "stopped";
+
   return (
     <BrowserRouter>
       <div className="bp-shell">
@@ -43,6 +55,27 @@ export default function App() {
             </div>
           </div>
           <div className="bp-nav-right">
+            <button
+              type="button"
+              className={
+                runtimeStatus === "running"
+                  ? "bp-forwarding-toggle bp-forwarding-toggle-running"
+                  : runtimeStatus === "error"
+                  ? "bp-forwarding-toggle bp-forwarding-toggle-error"
+                  : "bp-forwarding-toggle"
+              }
+              disabled={toggling}
+              onClick={() => {
+                if (isRunning) {
+                  stopForwarding.mutate();
+                } else {
+                  startForwarding.mutate();
+                }
+              }}
+              title={runtime?.error_message || "Forwarding runtime control"}
+            >
+              {toggling ? "Applying..." : isRunning ? "Stop Forwarding" : "Start Forwarding"}
+            </button>
             <NavLink
               to="/settings"
               className={({ isActive }) =>

@@ -5,13 +5,14 @@ type RuntimeStatusResponse struct {
 }
 
 type RuntimeStatusData struct {
-	ConfigVersion   int              `json:"config_version"`
-	ConfigHash      string           `json:"config_hash"`
-	LastReloadAt    *string          `json:"last_reload_at,omitempty"`
-	LastReloadError *string          `json:"last_reload_error,omitempty"`
-	Ports           RuntimePorts     `json:"ports"`
-	RuntimeMode     string           `json:"runtime_mode"`
-	SingboxContainer string          `json:"singbox_container"`
+	ConfigVersion     int          `json:"config_version"`
+	ConfigHash        string       `json:"config_hash"`
+	ForwardingRunning bool         `json:"forwarding_running"`
+	LastReloadAt      *string      `json:"last_reload_at,omitempty"`
+	LastReloadError   *string      `json:"last_reload_error,omitempty"`
+	Ports             RuntimePorts `json:"ports"`
+	RuntimeMode       string       `json:"runtime_mode"`
+	SingboxContainer  string       `json:"singbox_container"`
 }
 
 type RuntimePorts struct {
@@ -42,9 +43,9 @@ type RuntimeReloadResponse struct {
 }
 
 type RuntimeReloadData struct {
-	ConfigVersion  int    `json:"config_version"`
-	ConfigHash     string `json:"config_hash"`
-	NodesIncluded  int    `json:"nodes_included"`
-	RestartOutput  string `json:"restart_output"`
-	ReloadedAt     string `json:"reloaded_at"`
+	ConfigVersion int    `json:"config_version"`
+	ConfigHash    string `json:"config_hash"`
+	NodesIncluded int    `json:"nodes_included"`
+	RestartOutput string `json:"restart_output"`
+	ReloadedAt    string `json:"reloaded_at"`
 }
