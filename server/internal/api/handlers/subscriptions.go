@@ -46,11 +46,15 @@ func (h *Subscriptions) Create(c *gin.Context) {
 	if req.RefreshIntervalSec < 60 {
 		req.RefreshIntervalSec = 3600
 	}
+	autoUpdateEnabled := 0
+	if req.AutoUpdateEnabled != nil && *req.AutoUpdateEnabled {
+		autoUpdateEnabled = 1
+	}
 	if req.Name == "" {
 		req.Name = req.URL
 	}
 	id := util.NewID()
-	if err := repo.CreateSubscription(h.DB, id, req.Name, req.URL, req.Type, 1, req.RefreshIntervalSec); err != nil {
+	if err := repo.CreateSubscription(h.DB, id, req.Name, req.URL, req.Type, 1, autoUpdateEnabled, req.RefreshIntervalSec); err != nil {
 		writeError(c, errorx.New(errorx.DBError, "create subscription"))
 		return
 	}
@@ -61,7 +65,8 @@ func (h *Subscriptions) Create(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": dto.Subscription{
 		ID: id, Name: req.Name, URL: req.URL, Type: req.Type, Enabled: true,
-		RefreshIntervalSec: req.RefreshIntervalSec, CreatedAt: util.NowRFC3339(), UpdatedAt: util.NowRFC3339(),
+		AutoUpdateEnabled: autoUpdateEnabled == 1, RefreshIntervalSec: req.RefreshIntervalSec,
+		CreatedAt: util.NowRFC3339(), UpdatedAt: util.NowRFC3339(),
 	}})
 }
 
@@ -87,6 +92,7 @@ func (h *Subscriptions) Update(c *gin.Context) {
 	var name *string
 	var subURL *string
 	var enabled *int
+	var autoUpdateEnabled *int
 	if req.Name != "" {
 		name = &req.Name
 	}
@@ -100,11 +106,22 @@ func (h *Subscriptions) Update(c *gin.Context) {
 		}
 		enabled = &v
 	}
+	if req.AutoUpdateEnabled != nil {
+		v := 0
+		if *req.AutoUpdateEnabled {
+			v = 1
+		}
+		autoUpdateEnabled = &v
+	}
 	var refresh *int
 	if req.RefreshIntervalSec != nil && *req.RefreshIntervalSec > 0 {
+		if *req.RefreshIntervalSec < 60 {
+			writeError(c, errorx.New(errorx.REQInvalidField, "refresh_interval_sec must be >= 60"))
+			return
+		}
 		refresh = req.RefreshIntervalSec
 	}
-	if err := repo.UpdateSubscription(h.DB, req.ID, name, subURL, enabled, refresh); err != nil {
+	if err := repo.UpdateSubscription(h.DB, req.ID, name, subURL, enabled, autoUpdateEnabled, refresh); err != nil {
 		writeError(c, errorx.New(errorx.DBError, "update subscription"))
 		return
 	}
@@ -113,7 +130,7 @@ func (h *Subscriptions) Update(c *gin.Context) {
 	if urlChanged {
 		if _, _, _, err := service.RefreshSubscription(h.DB, req.ID); err != nil {
 			oldURL := before.URL
-			_ = repo.UpdateSubscription(h.DB, req.ID, nil, &oldURL, nil, nil)
+			_ = repo.UpdateSubscription(h.DB, req.ID, nil, &oldURL, nil, nil, nil)
 			if appErr, ok := err.(*errorx.AppError); ok {
 				writeError(c, appErr)
 				return
@@ -191,6 +208,7 @@ func (h *Subscriptions) Refresh(c *gin.Context) {
 func subRowToDTO(r repo.SubscriptionRow) dto.Subscription {
 	d := dto.Subscription{
 		ID: r.ID, Name: r.Name, URL: r.URL, Type: r.Type, Enabled: r.Enabled == 1,
+		AutoUpdateEnabled:  r.AutoUpdateEnabled == 1,
 		RefreshIntervalSec: r.RefreshIntervalSec, Etag: r.Etag, LastModified: r.LastModified,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}

@@ -10,6 +10,7 @@ export interface CreateSubscriptionBody {
   url: string;
   name?: string;
   type?: string;
+  auto_update_enabled?: boolean;
   refresh_interval_sec?: number;
 }
 
@@ -26,15 +27,17 @@ export interface UpdateSubscriptionBody {
   name?: string;
   url?: string;
   enabled?: boolean;
+  auto_update_enabled?: boolean;
   refresh_interval_sec?: number;
 }
 
 export async function updateSubscription(body: UpdateSubscriptionBody): Promise<Subscription> {
-  const { id, name, url, enabled, refresh_interval_sec } = body;
+  const { id, name, url, enabled, auto_update_enabled, refresh_interval_sec } = body;
   const payload: any = { id };
   if (name !== undefined) payload.name = name;
   if (url !== undefined) payload.url = url;
   if (enabled !== undefined) payload.enabled = enabled;
+  if (auto_update_enabled !== undefined) payload.auto_update_enabled = auto_update_enabled;
   if (refresh_interval_sec !== undefined) payload.refresh_interval_sec = refresh_interval_sec;
   const { data } = await api.post<{ data: Subscription }>("/subscriptions/update", payload);
   return data.data;

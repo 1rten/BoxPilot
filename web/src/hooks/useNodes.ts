@@ -69,3 +69,28 @@ export function useTestNodes() {
     },
   });
 }
+
+export function useBatchForwarding() {
+  const q = useQueryClient();
+  const { addToast } = useToast();
+  return useMutation({
+    mutationFn: async (body: { node_ids: string[]; forwarding_enabled: boolean }) => {
+      const { data } = await api.post<{ data: { updated: number } }>("/nodes/forwarding/batch", body);
+      return data.data;
+    },
+    onSuccess: (result, variables) => {
+      q.invalidateQueries({ queryKey: ["nodes"] });
+      const action = variables.forwarding_enabled ? "Enabled" : "Disabled";
+      addToast("success", `${action} forwarding for ${result.updated} node${result.updated === 1 ? "" : "s"}`);
+    },
+    onError: (error: unknown) => {
+      const anyErr = error as any;
+      const message =
+        anyErr?.appError?.message ||
+        anyErr?.response?.data?.error?.message ||
+        anyErr?.message ||
+        "Unknown error";
+      addToast("error", `Batch forwarding update failed: ${message}`);
+    },
+  });
+}

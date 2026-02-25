@@ -169,7 +169,12 @@ export default function Subscriptions() {
         mode={modalMode}
         initialValues={
           editingSub
-            ? { name: editingSub.name || editingSub.url, url: editingSub.url }
+            ? {
+                name: editingSub.name || editingSub.url,
+                url: editingSub.url,
+                auto_update_enabled: editingSub.auto_update_enabled,
+                refresh_interval_sec: editingSub.refresh_interval_sec,
+              }
             : undefined
         }
         submitting={
@@ -183,7 +188,12 @@ export default function Subscriptions() {
           if (modalMode === "create") {
             if (!values.url) return;
             create.mutate(
-              { url: values.url, name: values.name || undefined },
+              {
+                url: values.url,
+                name: values.name || undefined,
+                auto_update_enabled: values.auto_update_enabled,
+                refresh_interval_sec: values.refresh_interval_sec,
+              },
               {
                 onSuccess: () => {
                   setModalOpen(false);
@@ -193,7 +203,13 @@ export default function Subscriptions() {
           } else {
             if (!editingSub) return;
             update.mutate(
-              { id: editingSub.id, name: values.name, url: values.url },
+              {
+                id: editingSub.id,
+                name: values.name,
+                url: values.url,
+                auto_update_enabled: values.auto_update_enabled,
+                refresh_interval_sec: values.refresh_interval_sec,
+              },
               {
                 onSuccess: () => {
                   setModalOpen(false);

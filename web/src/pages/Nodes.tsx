@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { useNodes, useUpdateNode, useTestNodes } from "../hooks/useNodes";
+import { useBatchForwarding, useNodes, useUpdateNode, useTestNodes } from "../hooks/useNodes";
 import { ErrorState } from "../components/common/ErrorState";
 import { EmptyState } from "../components/common/EmptyState";
 import { formatDateTime } from "../utils/datetime";
-import { Button, Card, Drawer, Input, Select, Switch, Table, Tag } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
+import { Button, Card, Drawer, Input, Select, Table, Tag } from "antd";
 import type { ColumnsType, TableRowSelection } from "antd/es/table/interface";
 import type { Node } from "../api/types";
 
@@ -11,6 +12,7 @@ export default function Nodes() {
   const { data: list, isLoading, error, refetch } = useNodes({});
   const update = useUpdateNode();
   const testNodes = useTestNodes();
+  const batchForwarding = useBatchForwarding();
   const [search, setSearch] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -73,20 +75,35 @@ export default function Nodes() {
       </div>
 
       <Card className="bp-data-card">
-        <div className="bp-card-toolbar">
+        <div className="bp-toolbar-inline">
           <Input
             className="bp-input bp-search-input"
+            prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
             allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search nodes by name/tag/type/server"
+            placeholder="Search by name or address"
           />
-          <div className="bp-card-toolbar-meta">
+          <div className="bp-page-actions">
             {filtered && (
               <span>
                 Showing {filtered.length} of {list?.length ?? 0} nodes
               </span>
             )}
+            <Button
+              disabled={selectedRowKeys.length === 0}
+              loading={batchForwarding.isPending}
+              onClick={() => batchSetForwarding(true)}
+            >
+              Enable Forwarding
+            </Button>
+            <Button
+              disabled={selectedRowKeys.length === 0}
+              loading={batchForwarding.isPending}
+              onClick={() => batchSetForwarding(false)}
+            >
+              Disable Forwarding
+            </Button>
           </div>
         </div>
 
@@ -115,8 +132,8 @@ export default function Nodes() {
                 `${range[0]}-${range[1]} of ${total} nodes`,
             }}
             columns={buildColumns({
-              onToggleForwarding: (row, checked) =>
-                update.mutate({ id: row.id, forwarding_enabled: checked }),
+              onToggleForwarding: (row) =>
+                update.mutate({ id: row.id, forwarding_enabled: !row.forwarding_enabled }),
               onToggleEnabled: (row) =>
                 update.mutate({
                   id: row.id,
@@ -242,22 +259,9 @@ export default function Nodes() {
               <p className="bp-muted">
                 Forwarding configuration is global in Settings. This node only controls whether it participates in forwarding.
               </p>
-              <div className="bp-inline-control" style={{ marginTop: 10 }}>
-                <Switch
-                  checked={selectedNode.forwarding_enabled}
-                  onChange={(checked) => {
-                    update.mutate(
-                      { id: selectedNode.id, forwarding_enabled: checked },
-                      {
-                        onSuccess: (updated) => {
-                          setSelectedNode(updated);
-                        },
-                      }
-                    );
-                  }}
-                />
-                <span>{selectedNode.forwarding_enabled ? "Forwarding enabled" : "Forwarding disabled"}</span>
-              </div>
+              <p className="bp-kv-value" style={{ marginTop: 10 }}>
+                {selectedNode.forwarding_enabled ? "Forwarding enabled" : "Forwarding disabled"}
+              </p>
             </div>
           </>
         )}
@@ -268,6 +272,14 @@ export default function Nodes() {
   function openDetails(row: Node) {
     setSelectedNode(row);
     setDetailOpen(true);
+  }
+
+  async function batchSetForwarding(enabled: boolean) {
+    if (selectedRowKeys.length === 0) return;
+    await batchForwarding.mutateAsync({
+      node_ids: selectedRowKeys,
+      forwarding_enabled: enabled,
+    });
   }
 }
 
@@ -281,7 +293,7 @@ function buildColumns({
 }: {
   updating: boolean;
   testing: boolean;
-  onToggleForwarding: (row: Node, checked: boolean) => void;
+  onToggleForwarding: (row: Node) => void;
   onToggleEnabled: (row: Node) => void;
   onTest: (row: Node) => void;
   onShowDetails: (row: Node) => void;
@@ -298,19 +310,8 @@ function buildColumns({
       title: "Forwarding",
       dataIndex: "forwarding_enabled",
       key: "forwarding_enabled",
-      render: (value: boolean, record) => (
-        <div
-          onClick={(event) => {
-            event.stopPropagation();
-          }}
-        >
-          <Switch
-            size="small"
-            checked={value}
-            disabled={updating}
-            onChange={(checked) => onToggleForwarding(record, checked)}
-          />
-        </div>
+      render: (value: boolean) => (
+        <Tag color={value ? "blue" : "default"}>{value ? "Enabled" : "Disabled"}</Tag>
       ),
     },
     {
@@ -364,6 +365,13 @@ function buildColumns({
             disabled={updating}
           >
             {record.enabled ? "Disable" : "Enable"}
+          </Button>
+          <Button
+            type="link"
+            onClick={() => onToggleForwarding(record)}
+            disabled={updating}
+          >
+            {record.forwarding_enabled ? "Disable Forwarding" : "Enable Forwarding"}
           </Button>
         </div>
       ),

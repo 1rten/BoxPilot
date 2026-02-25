@@ -92,9 +92,6 @@ func ReplaceNodesForSubscription(db *sql.DB, subID string, nodes []NodeRow) erro
 	}
 	for _, n := range nodes {
 		forwardingEnabled := n.ForwardingEnabled
-		if forwardingEnabled == 0 {
-			forwardingEnabled = 1
-		}
 		if old, ok := oldForwarding[n.Tag]; ok {
 			forwardingEnabled = old
 		}
@@ -150,4 +147,26 @@ func EnsureNodeExists(db *sql.DB, id string) error {
 func ListEnabledNodes(db *sql.DB) ([]NodeRow, error) {
 	one := 1
 	return ListNodes(db, "", &one)
+}
+
+func ListEnabledForwardingNodes(db *sql.DB) ([]NodeRow, error) {
+	rows, err := db.Query(
+		"SELECT id, sub_id, tag, name, type, enabled, forwarding_enabled, outbound_json, created_at, last_test_at, last_latency_ms, last_test_status, last_test_error FROM nodes WHERE enabled = 1 AND forwarding_enabled = 1 ORDER BY created_at",
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []NodeRow
+	for rows.Next() {
+		var r NodeRow
+		if err := rows.Scan(
+			&r.ID, &r.SubID, &r.Tag, &r.Name, &r.Type, &r.Enabled, &r.ForwardingEnabled,
+			&r.OutboundJSON, &r.CreatedAt, &r.LastTestAt, &r.LastLatencyMs, &r.LastTestStatus, &r.LastTestError,
+		); err != nil {
+			return nil, err
+		}
+		list = append(list, r)
+	}
+	return list, rows.Err()
 }

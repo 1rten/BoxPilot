@@ -12,6 +12,7 @@ type SubscriptionRow struct {
 	URL                string
 	Type               string
 	Enabled            int
+	AutoUpdateEnabled  int
 	RefreshIntervalSec int
 	Etag               string
 	LastModified       string
@@ -26,9 +27,9 @@ func ListSubscriptions(db *sql.DB, onlyEnabled bool) ([]SubscriptionRow, error) 
 	var rows *sql.Rows
 	var err error
 	if onlyEnabled {
-		rows, err = db.Query("SELECT id, name, url, type, enabled, refresh_interval_sec, etag, last_modified, last_fetch_at, last_success_at, last_error, created_at, updated_at FROM subscriptions WHERE enabled = 1 ORDER BY created_at")
+		rows, err = db.Query("SELECT id, name, url, type, enabled, auto_update_enabled, refresh_interval_sec, etag, last_modified, last_fetch_at, last_success_at, last_error, created_at, updated_at FROM subscriptions WHERE enabled = 1 ORDER BY created_at")
 	} else {
-		rows, err = db.Query("SELECT id, name, url, type, enabled, refresh_interval_sec, etag, last_modified, last_fetch_at, last_success_at, last_error, created_at, updated_at FROM subscriptions ORDER BY created_at")
+		rows, err = db.Query("SELECT id, name, url, type, enabled, auto_update_enabled, refresh_interval_sec, etag, last_modified, last_fetch_at, last_success_at, last_error, created_at, updated_at FROM subscriptions ORDER BY created_at")
 	}
 	if err != nil {
 		return nil, err
@@ -37,7 +38,7 @@ func ListSubscriptions(db *sql.DB, onlyEnabled bool) ([]SubscriptionRow, error) 
 	var list []SubscriptionRow
 	for rows.Next() {
 		var r SubscriptionRow
-		err := rows.Scan(&r.ID, &r.Name, &r.URL, &r.Type, &r.Enabled, &r.RefreshIntervalSec, &r.Etag, &r.LastModified, &r.LastFetchAt, &r.LastSuccessAt, &r.LastError, &r.CreatedAt, &r.UpdatedAt)
+		err := rows.Scan(&r.ID, &r.Name, &r.URL, &r.Type, &r.Enabled, &r.AutoUpdateEnabled, &r.RefreshIntervalSec, &r.Etag, &r.LastModified, &r.LastFetchAt, &r.LastSuccessAt, &r.LastError, &r.CreatedAt, &r.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -48,8 +49,8 @@ func ListSubscriptions(db *sql.DB, onlyEnabled bool) ([]SubscriptionRow, error) 
 
 func GetSubscription(db *sql.DB, id string) (*SubscriptionRow, error) {
 	var r SubscriptionRow
-	err := db.QueryRow("SELECT id, name, url, type, enabled, refresh_interval_sec, etag, last_modified, last_fetch_at, last_success_at, last_error, created_at, updated_at FROM subscriptions WHERE id = ?", id).Scan(
-		&r.ID, &r.Name, &r.URL, &r.Type, &r.Enabled, &r.RefreshIntervalSec, &r.Etag, &r.LastModified, &r.LastFetchAt, &r.LastSuccessAt, &r.LastError, &r.CreatedAt, &r.UpdatedAt)
+	err := db.QueryRow("SELECT id, name, url, type, enabled, auto_update_enabled, refresh_interval_sec, etag, last_modified, last_fetch_at, last_success_at, last_error, created_at, updated_at FROM subscriptions WHERE id = ?", id).Scan(
+		&r.ID, &r.Name, &r.URL, &r.Type, &r.Enabled, &r.AutoUpdateEnabled, &r.RefreshIntervalSec, &r.Etag, &r.LastModified, &r.LastFetchAt, &r.LastSuccessAt, &r.LastError, &r.CreatedAt, &r.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -59,18 +60,18 @@ func GetSubscription(db *sql.DB, id string) (*SubscriptionRow, error) {
 	return &r, nil
 }
 
-func CreateSubscription(db *sql.DB, id, name, url, subType string, enabled, refreshIntervalSec int) error {
+func CreateSubscription(db *sql.DB, id, name, url, subType string, enabled, autoUpdateEnabled, refreshIntervalSec int) error {
 	now := util.NowRFC3339()
-	_, err := db.Exec("INSERT INTO subscriptions (id, name, url, type, enabled, refresh_interval_sec, etag, last_modified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, '', '', ?, ?)",
-		id, name, url, subType, enabled, refreshIntervalSec, now, now)
+	_, err := db.Exec("INSERT INTO subscriptions (id, name, url, type, enabled, auto_update_enabled, refresh_interval_sec, etag, last_modified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, '', '', ?, ?)",
+		id, name, url, subType, enabled, autoUpdateEnabled, refreshIntervalSec, now, now)
 	return err
 }
 
-func UpdateSubscription(db *sql.DB, id string, name *string, url *string, enabled *int, refreshIntervalSec *int) error {
+func UpdateSubscription(db *sql.DB, id string, name *string, url *string, enabled *int, autoUpdateEnabled *int, refreshIntervalSec *int) error {
 	// Build update dynamically to only touch provided fields
 	now := util.NowRFC3339()
-	_, err := db.Exec("UPDATE subscriptions SET name = COALESCE(?, name), url = COALESCE(?, url), enabled = COALESCE(?, enabled), refresh_interval_sec = COALESCE(?, refresh_interval_sec), updated_at = ? WHERE id = ?",
-		name, url, enabled, refreshIntervalSec, now, id)
+	_, err := db.Exec("UPDATE subscriptions SET name = COALESCE(?, name), url = COALESCE(?, url), enabled = COALESCE(?, enabled), auto_update_enabled = COALESCE(?, auto_update_enabled), refresh_interval_sec = COALESCE(?, refresh_interval_sec), updated_at = ? WHERE id = ?",
+		name, url, enabled, autoUpdateEnabled, refreshIntervalSec, now, id)
 	return err
 }
 

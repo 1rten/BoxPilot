@@ -271,6 +271,35 @@ paths:
                         latency_ms: { type: integer, nullable: true }
                         error: { type: string, nullable: true }
 
+  /api/v1/nodes/forwarding/batch:
+    post:
+      tags: [Nodes]
+      summary: Batch set forwarding enabled for nodes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                node_ids:
+                  type: array
+                  items: { type: string }
+                forwarding_enabled: { type: boolean }
+              required: [node_ids, forwarding_enabled]
+      responses:
+        '200':
+          description: Batch update result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      updated: { type: integer }
+
   /api/v1/nodes/update:
     post:
       tags: [Nodes]
@@ -336,10 +365,11 @@ components:
           type: string
           enum: [singbox]
         enabled: { type: boolean }
+        auto_update_enabled: { type: boolean }
         refresh_interval_sec: { type: integer }
         created_at: { type: string }
         updated_at: { type: string }
-      required: [id, name, url, type, enabled, created_at, updated_at]
+      required: [id, name, url, type, enabled, auto_update_enabled, refresh_interval_sec, created_at, updated_at]
 
     CreateSubscriptionRequest:
       type: object
@@ -350,6 +380,9 @@ components:
           type: string
           enum: [singbox]
           default: singbox
+        auto_update_enabled:
+          type: boolean
+          default: false
         refresh_interval_sec:
           type: integer
           minimum: 60
@@ -363,6 +396,7 @@ components:
         name: { type: string }
         url: { type: string }
         enabled: { type: boolean }
+        auto_update_enabled: { type: boolean }
         refresh_interval_sec:
           type: integer
           minimum: 60

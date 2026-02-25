@@ -6,6 +6,7 @@ type Subscription struct {
 	URL                string  `json:"url"`
 	Type               string  `json:"type"`
 	Enabled            bool    `json:"enabled"`
+	AutoUpdateEnabled  bool    `json:"auto_update_enabled"`
 	RefreshIntervalSec int     `json:"refresh_interval_sec"`
 	Etag               string  `json:"etag,omitempty"`
 	LastModified       string  `json:"last_modified,omitempty"`
@@ -20,6 +21,7 @@ type CreateSubscriptionRequest struct {
 	Name               string `json:"name"`
 	URL                string `json:"url"`
 	Type               string `json:"type"`
+	AutoUpdateEnabled  *bool  `json:"auto_update_enabled"`
 	RefreshIntervalSec int    `json:"refresh_interval_sec"`
 }
 
@@ -28,5 +30,6 @@ type UpdateSubscriptionRequest struct {
 	Name               string `json:"name"`
 	URL                string `json:"url"`
 	Enabled            *bool  `json:"enabled"`
+	AutoUpdateEnabled  *bool  `json:"auto_update_enabled"`
 	RefreshIntervalSec *int   `json:"refresh_interval_sec"`
 }

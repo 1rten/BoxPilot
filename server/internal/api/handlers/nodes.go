@@ -96,6 +96,44 @@ func (h *Nodes) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": nil})
 }
 
+func (h *Nodes) BatchForwarding(c *gin.Context) {
+	var req struct {
+		NodeIDs           []string `json:"node_ids"`
+		ForwardingEnabled *bool    `json:"forwarding_enabled"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, errorx.New(errorx.REQValidationFailed, "invalid body"))
+		return
+	}
+	if len(req.NodeIDs) == 0 {
+		writeError(c, errorx.New(errorx.REQMissingField, "node_ids required"))
+		return
+	}
+	if req.ForwardingEnabled == nil {
+		writeError(c, errorx.New(errorx.REQMissingField, "forwarding_enabled required"))
+		return
+	}
+	forwardingEnabled := 0
+	if *req.ForwardingEnabled {
+		forwardingEnabled = 1
+	}
+	updated := 0
+	for _, id := range req.NodeIDs {
+		ok, err := repo.UpdateNode(h.DB, id, nil, nil, &forwardingEnabled)
+		if err != nil {
+			writeError(c, errorx.New(errorx.NODEUpdateFailed, "batch update forwarding").WithDetails(map[string]any{
+				"id":  id,
+				"err": err.Error(),
+			}))
+			return
+		}
+		if ok {
+			updated++
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"updated": updated}})
+}
+
 func (h *Nodes) Test(c *gin.Context) {
 	var req struct {
 		NodeIDs []string `json:"node_ids"`

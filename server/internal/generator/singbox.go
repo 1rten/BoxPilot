@@ -39,7 +39,40 @@ func BuildConfig(httpProxy ProxyInbound, socksProxy ProxyInbound, nodeOutboundJS
 			tags = append(tags, tag)
 		}
 	}
-	outbounds = append(outbounds, map[string]any{"type": "selector", "tag": "proxy", "outbounds": tags})
+	switch len(tags) {
+	case 0:
+		outbounds = append(outbounds, map[string]any{
+			"type":      "selector",
+			"tag":       "proxy",
+			"outbounds": []string{"direct"},
+			"default":   "direct",
+		})
+	case 1:
+		outbounds = append(outbounds, map[string]any{
+			"type":      "selector",
+			"tag":       "proxy",
+			"outbounds": tags,
+			"default":   tags[0],
+		})
+	default:
+		outbounds = append(outbounds, map[string]any{
+			"type":      "urltest",
+			"tag":       "proxy-auto",
+			"outbounds": tags,
+			"url":       "https://www.gstatic.com/generate_204",
+			"interval":  "3m",
+			"tolerance": 120,
+		})
+		choices := make([]string, 0, len(tags)+1)
+		choices = append(choices, "proxy-auto")
+		choices = append(choices, tags...)
+		outbounds = append(outbounds, map[string]any{
+			"type":      "selector",
+			"tag":       "proxy",
+			"outbounds": choices,
+			"default":   "proxy-auto",
+		})
+	}
 	cfg := map[string]any{
 		"inbounds": inbounds, "outbounds": outbounds,
 		"route": map[string]any{"final": "proxy"},

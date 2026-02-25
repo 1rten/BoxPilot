@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
+	"time"
 
 	"boxpilot/server/internal/api"
+	"boxpilot/server/internal/service"
 	"boxpilot/server/internal/store"
 )
 
@@ -18,6 +21,9 @@ func main() {
 		log.Fatalf("db: %v", err)
 	}
 	defer db.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go service.StartSubscriptionScheduler(ctx, db.DB, 30*time.Second)
 
 	addr := ":8080"
 	if a := os.Getenv("ADDR"); a != "" {

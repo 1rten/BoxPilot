@@ -57,6 +57,17 @@ export function SubscriptionTable({
       render: (_value, record) => renderStatusTag(record),
     },
     {
+      title: "Auto Update",
+      dataIndex: "auto_update_enabled",
+      key: "auto_update_enabled",
+      width: 130,
+      render: (value: boolean, record) => (
+        <Tag color={value ? "blue" : "default"}>
+          {value ? `${record.refresh_interval_sec}s` : "Off"}
+        </Tag>
+      ),
+    },
+    {
       title: (
         <span
           style={{ cursor: onToggleSort ? "pointer" : "default" }}
@@ -121,7 +132,7 @@ export function SubscriptionTable({
   return (
     <Table<Subscription>
       rowKey="id"
-      scroll={{ x: 1030 }}
+      scroll={{ x: 1160 }}
       dataSource={list}
       columns={columns}
       pagination={pagination}

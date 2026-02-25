@@ -31,6 +31,7 @@ func Router(db *sql.DB) *gin.Engine {
 		node := &handlers.Nodes{DB: db}
 		v1.GET("/nodes", node.List)
 		v1.POST("/nodes/update", node.Update)
+		v1.POST("/nodes/forwarding/batch", node.BatchForwarding)
 		v1.POST("/nodes/test", node.Test)
 		v1.GET("/nodes/forwarding", node.Forwarding)
 		v1.POST("/nodes/forwarding/update", node.UpdateForwarding)
