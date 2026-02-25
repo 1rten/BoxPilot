@@ -25,7 +25,7 @@
 body {
   margin: 0;
   font-family: "Fira Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background-color: #f5f7fb;
+  background: linear-gradient(180deg, #f4f6fb 0%, #eef2f9 100%);
   color: var(--color-text);
 }
 
@@ -152,19 +152,46 @@ a {
   background: #eef3ff;
 }
 
+.bp-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #dbeafe, #bfdbfe);
+  display: grid;
+  place-items: center;
+  border: 1px solid #c6d4f3;
+}
+
+.bp-avatar svg {
+  width: 20px;
+  height: 20px;
+  fill: #24416a;
+}
+
 .bp-main {
   flex: 1;
-  padding: 1.5rem;
-  max-width: 1120px;
+  padding: 1.5rem 2rem 2rem;
+  max-width: 1420px;
+  width: 100%;
   margin: 0 auto;
+}
+
+.bp-page {
+  animation: bp-fade-in 220ms ease;
 }
 
 .bp-page-title {
   font-size: 26px;
   font-weight: 600;
-  margin: 0 0 16px 0;
+  margin: 0;
   font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
+}
+
+.bp-page-subtitle {
+  margin: 6px 0 0 0;
+  color: #65738f;
+  font-size: 14px;
 }
 
 .bp-dashboard {
@@ -441,10 +468,10 @@ a {
 
 .bp-page-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .bp-page-actions {
@@ -462,7 +489,7 @@ a {
   margin-bottom: 16px;
   padding: 12px 14px;
   border-radius: 12px;
-  background: #f6f8ff;
+  background: #f7f9ff;
   border: 1px solid #e1e7f5;
 }
 
@@ -471,12 +498,19 @@ a {
   align-items: center;
   gap: 12px;
   font-size: 12px;
-  color: #64748B;
+  color: #64748b;
   flex-wrap: wrap;
 }
 
 .bp-search-input {
   background: #ffffff;
+  min-width: 260px;
+}
+
+.bp-inline-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .bp-table-mono {
@@ -487,7 +521,15 @@ a {
 }
 
 .bp-drawer-section {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #edf1f8;
+}
+
+.bp-drawer-section:last-child {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .bp-drawer-title {
@@ -562,6 +604,48 @@ a {
   flex-wrap: wrap;
 }
 
+.bp-section-note {
+  margin: -2px 0 10px 0;
+}
+
+.bp-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.bp-data-card {
+  border-radius: 14px;
+}
+
+.bp-settings-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bp-settings-card {
+  border-radius: 14px;
+}
+
+.bp-settings-status-row {
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid #e5ebf7;
+  border-radius: 10px;
+  background: #f8faff;
+}
+
+.bp-settings-actions {
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
 .ant-card {
   border-radius: 14px;
   border: 1px solid var(--bp-border);
@@ -570,7 +654,7 @@ a {
 }
 
 .ant-card .ant-card-body {
-  padding: 18px;
+  padding: 20px;
 }
 
 .ant-input,
@@ -594,6 +678,7 @@ a {
 .ant-btn {
   border-radius: 10px;
   font-weight: 600;
+  transition: all 160ms ease;
 }
 
 .ant-btn-primary {
@@ -645,10 +730,9 @@ a {
 
 .ant-table-thead > tr > th {
   background: #f4f6fb;
-  color: #4a5a78;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
   border-bottom: 1px solid var(--bp-border);
   padding: 12px 16px;
 }
@@ -660,7 +744,11 @@ a {
 }
 
 .ant-table-tbody > tr:hover > td {
-  background: #f7f9ff;
+  background: #f5f8ff;
+}
+
+.ant-table-tbody > tr.bp-clickable-row {
+  cursor: pointer;
 }
 
 .ant-pagination-item {
@@ -694,6 +782,7 @@ a {
 
 .ant-drawer .ant-drawer-body {
   padding: 18px 20px;
+  background: #fbfcff;
 }
 
 .bp-input {
@@ -832,6 +921,10 @@ a {
   .bp-drawer-kv {
     grid-template-columns: 1fr;
   }
+
+  .bp-settings-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -840,5 +933,16 @@ a {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes bp-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

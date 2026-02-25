@@ -72,20 +72,25 @@ export default function Subscriptions() {
   };
 
   return (
-    <div>
+    <div className="bp-page">
       <div className="bp-page-header">
-        <h1 className="bp-page-title">Subscriptions</h1>
+        <div>
+          <h1 className="bp-page-title">Subscriptions</h1>
+          <p className="bp-page-subtitle">
+            Manage source feeds, refresh cadence, and sync health.
+          </p>
+        </div>
         <div className="bp-page-actions">
           <Button type="primary" onClick={handleCreate} loading={create.isPending}>
             New Subscription
           </Button>
-          <Button onClick={() => refetch()} loading={isLoading}>
-            Refresh List
+          <Button onClick={() => refetch()} loading={isFetching}>
+            Refresh
           </Button>
         </div>
       </div>
 
-      <Card>
+      <Card className="bp-data-card">
         <div className="bp-card-toolbar">
           <Input
             className="bp-input bp-search-input"
@@ -100,7 +105,7 @@ export default function Subscriptions() {
                 Showing {filteredList.length} of {list?.length ?? 0} subscriptions
               </span>
             )}
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span className="bp-inline-control">
               <Switch
                 size="small"
                 checked={autoRefresh}

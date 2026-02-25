@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNodes, useUpdateNode } from "../hooks/useNodes";
 import { useNodeForwarding, useUpdateNodeForwarding, useRestartNodeForwarding } from "../hooks/useNodeForwarding";
 import { ErrorState } from "../components/common/ErrorState";
@@ -19,12 +19,17 @@ export default function Nodes() {
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideType, setOverrideType] = useState<ProxyType>("http");
   const [useGlobal, setUseGlobal] = useState(false);
+  const [copiedType, setCopiedType] = useState<ProxyType | null>(null);
   const [form] = Form.useForm();
   const overrideAuthMode = Form.useWatch("auth_mode", form);
   const { addToast } = useToast();
   const forwarding = useNodeForwarding(selectedNode?.id);
   const updateForwarding = useUpdateNodeForwarding();
   const restartForwarding = useRestartNodeForwarding();
+
+  useEffect(() => {
+    setCopiedType(null);
+  }, [selectedNode?.id]);
 
   const filtered = useMemo(() => {
     if (!list) return list;
@@ -39,9 +44,14 @@ export default function Nodes() {
   }, [list, search]);
 
   return (
-    <div>
+    <div className="bp-page">
       <div className="bp-page-header">
-        <h1 className="bp-page-title">Nodes</h1>
+        <div>
+          <h1 className="bp-page-title">Nodes</h1>
+          <p className="bp-page-subtitle">
+            Review node status and manage per-node proxy forwarding.
+          </p>
+        </div>
         <div className="bp-page-actions">
           <Button type="primary">Add Node</Button>
           <Button onClick={() => refetch()} loading={isLoading}>
@@ -50,7 +60,7 @@ export default function Nodes() {
         </div>
       </div>
 
-      <Card>
+      <Card className="bp-data-card">
         <div className="bp-card-toolbar">
           <Input
             className="bp-input bp-search-input"
@@ -88,17 +98,23 @@ export default function Nodes() {
             size="middle"
             dataSource={filtered}
             loading={isLoading}
+            onRow={(record) => ({
+              onClick: () => openDetails(record),
+              className: "bp-clickable-row",
+            })}
             pagination={{
               pageSize: 10,
               showSizeChanger: true,
               showTotal: (total, range) =>
                 `${range[0]}-${range[1]} of ${total} nodes`,
             }}
-            columns={buildColumns(update.isPending, (row) =>
-              update.mutate({
-                id: row.id,
-                enabled: !row.enabled,
-              }),
+            columns={buildColumns(
+              update.isPending,
+              (row) =>
+                update.mutate({
+                  id: row.id,
+                  enabled: !row.enabled,
+                }),
               (row) => openDetails(row)
             )}
           />
@@ -163,6 +179,9 @@ export default function Nodes() {
 
         <div className="bp-drawer-section">
           <h3 className="bp-card-title">Forwarding</h3>
+          <p className="bp-muted bp-section-note">
+            Configure proxy behavior inherited from global settings or per-node overrides.
+          </p>
           {forwarding.isLoading && <p className="bp-muted">Loading forwarding...</p>}
           {forwarding.data && (
             <div className="bp-forwarding-grid">
@@ -273,7 +292,9 @@ export default function Nodes() {
         </div>
         {cfg.error_message && <p className="bp-text-danger">{cfg.error_message}</p>}
         <div className="bp-forwarding-actions">
-          <Button onClick={() => copyConnection(cfg)}>Copy URL</Button>
+          <Button onClick={() => copyConnection(cfg, type)}>
+            {copiedType === type ? "Copied" : "Copy URL"}
+          </Button>
           <Button onClick={() => openOverride(type)}>Edit</Button>
           <Button onClick={() => selectedNode && restartForwarding.mutate(selectedNode.id)}>
             Restart
@@ -322,11 +343,13 @@ export default function Nodes() {
     setOverrideOpen(false);
   }
 
-  async function copyConnection(cfg: ProxyConfig) {
+  async function copyConnection(cfg: ProxyConfig, type: ProxyType) {
     const url = buildProxyUrl(cfg);
     try {
       await navigator.clipboard.writeText(url);
       addToast("success", "Connection string copied");
+      setCopiedType(type);
+      window.setTimeout(() => setCopiedType((current) => (current === type ? null : current)), 1200);
     } catch {
       addToast("error", "Copy failed");
     }
@@ -369,7 +392,12 @@ function buildColumns(
       key: "actions",
       align: "right",
       render: (_value, record) => (
-        <>
+        <div
+          className="bp-row-actions"
+          onClick={(event) => {
+            event.stopPropagation();
+          }}
+        >
           <Button type="link" onClick={() => onShowDetails(record)}>
             Details
           </Button>
@@ -380,7 +408,7 @@ function buildColumns(
           >
             {updating ? "Updating..." : record.enabled ? "Disable" : "Enable"}
           </Button>
-        </>
+        </div>
       ),
     },
   ];

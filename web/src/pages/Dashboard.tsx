@@ -30,7 +30,7 @@ export default function Dashboard() {
   const configHash = runtime?.config_hash ? runtime.config_hash.slice(0, 8) : "--";
 
   return (
-    <div className="bp-dashboard">
+    <div className="bp-page bp-dashboard">
       <section className="bp-dashboard-hero">
         <div>
           <p className="bp-eyebrow">BoxPilot</p>

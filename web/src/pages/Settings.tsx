@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button, Card, Form, Input, InputNumber, Select, Switch, Tag } from "antd";
 import type { ProxyConfig, ProxyType } from "../api/types";
 import { buildProxyUrl } from "../api/settings";
@@ -14,11 +14,16 @@ interface ProxyCardProps {
 export default function Settings() {
   const { data, isLoading } = useProxySettings();
   return (
-    <div>
+    <div className="bp-page">
       <div className="bp-page-header">
-        <h1 className="bp-page-title">Settings</h1>
+        <div>
+          <h1 className="bp-page-title">Settings</h1>
+          <p className="bp-page-subtitle">
+            Configure global HTTP and SOCKS5 forwarding behavior.
+          </p>
+        </div>
       </div>
-      <div className="bp-dashboard-grid">
+      <div className="bp-settings-grid">
         <ProxySettingsCard title="HTTP Proxy" proxyType="http" data={data?.http} />
         <ProxySettingsCard title="SOCKS5 Proxy" proxyType="socks" data={data?.socks} />
       </div>
@@ -37,6 +42,7 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
   const update = useUpdateProxySettings();
   const apply = useApplyProxySettings();
   const authMode = Form.useWatch("auth_mode", form);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!data) return;
@@ -69,6 +75,8 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
     try {
       await navigator.clipboard.writeText(url);
       addToast("success", "Connection string copied");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
     } catch {
       addToast("error", "Copy failed");
     }
@@ -81,13 +89,19 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
   ) : null;
 
   return (
-    <Card className="bp-dashboard-card bp-dashboard-card--wide">
+    <Card className="bp-settings-card">
       <div className="bp-card-header">
         <div>
-          <p className="bp-card-kicker">Forwarding</p>
+          <p className="bp-card-kicker">Global Forwarding</p>
           <h2 className="bp-card-title">{title}</h2>
         </div>
         {statusTag}
+      </div>
+      <div className="bp-settings-status-row">
+        <span className="bp-muted">Current binding</span>
+        <span className="bp-table-mono">
+          {data?.listen_address ?? "0.0.0.0"}:{data?.port ?? "-"}
+        </span>
       </div>
       {data?.error_message && (
         <p className="bp-text-danger" style={{ marginBottom: 12 }}>
@@ -135,40 +149,44 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
             ]}
           />
         </Form.Item>
-        <Form.Item
-          name="username"
-          label="Username"
-          rules={[
-            {
-              required: authMode === "basic",
-              message: "Username is required for Basic auth",
-            },
-          ]}
-        >
-          <Input placeholder="Optional" />
-        </Form.Item>
-        <Form.Item
-          name="password"
-          label="Password"
-          rules={[
-            {
-              required: authMode === "basic",
-              message: "Password is required for Basic auth",
-            },
-          ]}
-        >
-          <Input.Password placeholder="Optional" />
-        </Form.Item>
+        {authMode === "basic" && (
+          <>
+            <Form.Item
+              name="username"
+              label="Username"
+              rules={[
+                {
+                  required: true,
+                  message: "Username is required for Basic auth",
+                },
+              ]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="password"
+              label="Password"
+              rules={[
+                {
+                  required: true,
+                  message: "Password is required for Basic auth",
+                },
+              ]}
+            >
+              <Input.Password />
+            </Form.Item>
+          </>
+        )}
       </Form>
-      <div className="bp-page-actions" style={{ marginTop: 12 }}>
-        <Button onClick={onCopy} disabled={!data}>
-          Copy URL
-        </Button>
+      <div className="bp-page-actions bp-settings-actions">
         <Button onClick={onSave} type="primary" loading={update.isPending}>
           Save
         </Button>
         <Button onClick={() => apply.mutate()} loading={apply.isPending}>
           Apply / Restart
+        </Button>
+        <Button onClick={onCopy} disabled={!data}>
+          {copied ? "Copied" : "Copy URL"}
         </Button>
       </div>
     </Card>

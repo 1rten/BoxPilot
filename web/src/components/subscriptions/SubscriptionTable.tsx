@@ -84,7 +84,7 @@ export function SubscriptionTable({
       render: (_value, record) => {
         const refreshing = rowRefreshingId === record.id && loading;
         return (
-          <>
+          <div className="bp-row-actions">
             <Button type="link" onClick={() => onEdit(record)}>
               Edit
             </Button>
@@ -103,7 +103,7 @@ export function SubscriptionTable({
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </Button>
-          </>
+          </div>
         );
       },
     },
