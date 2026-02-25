@@ -4,6 +4,7 @@ import { useNodeForwarding, useUpdateNodeForwarding, useRestartNodeForwarding } 
 import { ErrorState } from "../components/common/ErrorState";
 import { EmptyState } from "../components/common/EmptyState";
 import { formatDateTime } from "../utils/datetime";
+import { SearchOutlined } from "@ant-design/icons";
 import { Button, Card, Drawer, Form, Input, InputNumber, Modal, Select, Switch, Table, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { Node, ProxyType, ProxyConfig } from "../api/types";
@@ -61,21 +62,15 @@ export default function Nodes() {
       </div>
 
       <Card className="bp-data-card">
-        <div className="bp-card-toolbar">
+        <div className="bp-toolbar-inline">
           <Input
             className="bp-input bp-search-input"
+            prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
             allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search nodes"
           />
-          <div className="bp-card-toolbar-meta">
-            {filtered && (
-              <span>
-                Showing {filtered.length} of {list?.length ?? 0} nodes
-              </span>
-            )}
-          </div>
         </div>
 
         {isLoading && !list && (

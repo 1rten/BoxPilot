@@ -14,6 +14,7 @@ import {
   SubscriptionModal,
   type SubscriptionModalMode,
 } from "../components/subscriptions/SubscriptionModal";
+import { SearchOutlined } from "@ant-design/icons";
 import { Button, Card, Input, Modal, Skeleton, Switch } from "antd";
 
 export default function Subscriptions() {
@@ -91,29 +92,23 @@ export default function Subscriptions() {
       </div>
 
       <Card className="bp-data-card">
-        <div className="bp-card-toolbar">
+        <div className="bp-toolbar-inline">
           <Input
             className="bp-input bp-search-input"
+            prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
             allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or URL"
           />
-          <div className="bp-card-toolbar-meta">
-            {filteredList && (
-              <span>
-                Showing {filteredList.length} of {list?.length ?? 0} subscriptions
-              </span>
-            )}
-            <span className="bp-inline-control">
-              <Switch
-                size="small"
-                checked={autoRefresh}
-                onChange={(checked) => setAutoRefresh(checked)}
-              />
-              Auto poll list every 30s
-            </span>
-          </div>
+          <span className="bp-inline-control">
+            <Switch
+              size="small"
+              checked={autoRefresh}
+              onChange={(checked) => setAutoRefresh(checked)}
+            />
+            Auto poll list every 30s
+          </span>
         </div>
 
         {isLoading && !list && <Skeleton active paragraph={{ rows: 4 }} />}

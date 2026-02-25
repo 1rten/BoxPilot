@@ -481,6 +481,14 @@ a {
   flex-wrap: wrap;
 }
 
+.bp-toolbar-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .bp-card-toolbar {
   display: flex;
   align-items: center;
@@ -895,6 +903,7 @@ a {
     align-items: flex-start;
   }
 
+  .bp-toolbar-inline,
   .bp-card-toolbar {
     flex-direction: column;
     align-items: stretch;
