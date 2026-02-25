@@ -207,6 +207,44 @@ func clashProxyToOutbound(proxy map[string]any) (*OutboundItem, error) {
 		attachTransport(out, proxy)
 		attachTLS(out, proxy)
 		return mapToItem(out), nil
+	case "http", "https":
+		out := map[string]any{
+			"type":        "http",
+			"tag":         tag,
+			"server":      server,
+			"server_port": port,
+		}
+		if username := toString(proxy["username"]); username != "" {
+			out["username"] = username
+		}
+		if password := toString(proxy["password"]); password != "" {
+			out["password"] = password
+		}
+		attachTLS(out, proxy)
+		if typ == "https" {
+			tls := map[string]any{"enabled": true}
+			if existing, ok := out["tls"].(map[string]any); ok {
+				for k, v := range existing {
+					tls[k] = v
+				}
+			}
+			out["tls"] = tls
+		}
+		return mapToItem(out), nil
+	case "socks", "socks5":
+		out := map[string]any{
+			"type":        "socks",
+			"tag":         tag,
+			"server":      server,
+			"server_port": port,
+		}
+		if username := toString(proxy["username"]); username != "" {
+			out["username"] = username
+		}
+		if password := toString(proxy["password"]); password != "" {
+			out["password"] = password
+		}
+		return mapToItem(out), nil
 	default:
 		return nil, nil
 	}
@@ -279,6 +317,12 @@ func parseTraditionalURI(line string) (*OutboundItem, bool) {
 		return item, ok
 	case strings.HasPrefix(lower, "ss://"):
 		item, ok := parseShadowsocksURI(line)
+		return item, ok
+	case strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://"):
+		item, ok := parseHTTPURI(line)
+		return item, ok
+	case strings.HasPrefix(lower, "socks://") || strings.HasPrefix(lower, "socks5://"):
+		item, ok := parseSOCKSURI(line)
 		return item, ok
 	default:
 		return nil, false
@@ -456,6 +500,63 @@ func parseShadowsocksURI(link string) (*OutboundItem, bool) {
 		"server_port": port,
 		"method":      method,
 		"password":    password,
+	}
+	return mapToItem(out), true
+}
+
+func parseHTTPURI(link string) (*OutboundItem, bool) {
+	u, err := url.Parse(link)
+	if err != nil {
+		return nil, true
+	}
+	server := u.Hostname()
+	port, err := strconv.Atoi(u.Port())
+	if err != nil || server == "" || port <= 0 {
+		return nil, true
+	}
+	out := map[string]any{
+		"type":        "http",
+		"tag":         fragmentTag(u.Fragment),
+		"server":      server,
+		"server_port": port,
+	}
+	if u.User != nil {
+		if username := u.User.Username(); username != "" {
+			out["username"] = username
+		}
+		if password, ok := u.User.Password(); ok && password != "" {
+			out["password"] = password
+		}
+	}
+	if strings.EqualFold(u.Scheme, "https") {
+		out["tls"] = map[string]any{"enabled": true}
+	}
+	return mapToItem(out), true
+}
+
+func parseSOCKSURI(link string) (*OutboundItem, bool) {
+	u, err := url.Parse(link)
+	if err != nil {
+		return nil, true
+	}
+	server := u.Hostname()
+	port, err := strconv.Atoi(u.Port())
+	if err != nil || server == "" || port <= 0 {
+		return nil, true
+	}
+	out := map[string]any{
+		"type":        "socks",
+		"tag":         fragmentTag(u.Fragment),
+		"server":      server,
+		"server_port": port,
+	}
+	if u.User != nil {
+		if username := u.User.Username(); username != "" {
+			out["username"] = username
+		}
+		if password, ok := u.User.Password(); ok && password != "" {
+			out["password"] = password
+		}
 	}
 	return mapToItem(out), true
 }
