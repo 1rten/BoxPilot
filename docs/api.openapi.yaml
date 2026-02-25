@@ -234,6 +234,43 @@ paths:
                       $ref: '#/components/schemas/Node'
                 required: [data]
 
+  /api/v1/nodes/test:
+    post:
+      tags: [Nodes]
+      summary: Test node connectivity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                node_ids:
+                  type: array
+                  items: { type: string }
+                mode:
+                  type: string
+                  enum: [http, ping]
+                  default: ping
+              required: [node_ids]
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        node_id: { type: string }
+                        status: { type: string }
+                        latency_ms: { type: integer, nullable: true }
+                        error: { type: string, nullable: true }
+
   /api/v1/nodes/update:
     post:
       tags: [Nodes]
@@ -349,8 +386,17 @@ components:
         name: { type: string }
         type: { type: string }
         enabled: { type: boolean }
+        forwarding_enabled: { type: boolean }
+        server: { type: string }
+        server_port: { type: integer }
+        network: { type: string }
+        tls_enabled: { type: boolean }
+        last_test_at: { type: string, nullable: true }
+        last_latency_ms: { type: integer, nullable: true }
+        last_test_status: { type: string, nullable: true }
+        last_test_error: { type: string, nullable: true }
         created_at: { type: string }
-      required: [id, sub_id, tag, name, type, enabled, created_at]
+      required: [id, sub_id, tag, name, type, enabled, forwarding_enabled, created_at]
 
     UpdateNodeRequest:
       type: object
@@ -358,6 +404,7 @@ components:
         id: { type: string }
         name: { type: string }
         enabled: { type: boolean }
+        forwarding_enabled: { type: boolean }
       required: [id]
 
     RuntimeStatusResponse:

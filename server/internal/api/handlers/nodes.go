@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"boxpilot/server/internal/api/dto"
 	"boxpilot/server/internal/service"
@@ -33,10 +36,7 @@ func (h *Nodes) List(c *gin.Context) {
 	}
 	data := make([]dto.Node, 0, len(list))
 	for _, r := range list {
-		data = append(data, dto.Node{
-			ID: r.ID, SubID: r.SubID, Tag: r.Tag, Name: r.Name, Type: r.Type,
-			Enabled: r.Enabled == 1, CreatedAt: r.CreatedAt,
-		})
+		data = append(data, nodeRowToDTO(r))
 	}
 	c.JSON(http.StatusOK, gin.H{"data": data})
 }
@@ -61,6 +61,7 @@ func (h *Nodes) Update(c *gin.Context) {
 	}
 	var name *string
 	var enabled *int
+	var forwardingEnabled *int
 	if req.Name != "" {
 		name = &req.Name
 	}
@@ -71,7 +72,14 @@ func (h *Nodes) Update(c *gin.Context) {
 		}
 		enabled = &v
 	}
-	ok, err := repo.UpdateNode(h.DB, req.ID, name, enabled)
+	if req.ForwardingEnabled != nil {
+		v := 0
+		if *req.ForwardingEnabled {
+			v = 1
+		}
+		forwardingEnabled = &v
+	}
+	ok, err := repo.UpdateNode(h.DB, req.ID, name, enabled, forwardingEnabled)
 	if err != nil {
 		writeError(c, errorx.New(errorx.NODEUpdateFailed, "update node"))
 		return
@@ -82,13 +90,80 @@ func (h *Nodes) Update(c *gin.Context) {
 	}
 	row, _ := repo.GetNode(h.DB, req.ID)
 	if row != nil {
-		c.JSON(http.StatusOK, gin.H{"data": dto.Node{
-			ID: row.ID, SubID: row.SubID, Tag: row.Tag, Name: row.Name, Type: row.Type,
-			Enabled: row.Enabled == 1, CreatedAt: row.CreatedAt,
-		}})
+		c.JSON(http.StatusOK, gin.H{"data": nodeRowToDTO(*row)})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": nil})
+}
+
+func (h *Nodes) Test(c *gin.Context) {
+	var req struct {
+		NodeIDs []string `json:"node_ids"`
+		Mode    string   `json:"mode"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, errorx.New(errorx.REQValidationFailed, "invalid body"))
+		return
+	}
+	if len(req.NodeIDs) == 0 {
+		writeError(c, errorx.New(errorx.REQMissingField, "node_ids required"))
+		return
+	}
+	if req.Mode == "" {
+		req.Mode = "ping"
+	}
+	if req.Mode != "ping" && req.Mode != "http" {
+		writeError(c, errorx.New(errorx.REQInvalidField, "mode must be ping/http"))
+		return
+	}
+
+	results := make([]map[string]any, 0, len(req.NodeIDs))
+	for _, nodeID := range req.NodeIDs {
+		row, err := repo.GetNode(h.DB, nodeID)
+		if err != nil {
+			results = append(results, map[string]any{
+				"node_id": nodeID,
+				"status":  "error",
+				"error":   err.Error(),
+			})
+			continue
+		}
+		if row == nil {
+			results = append(results, map[string]any{
+				"node_id": nodeID,
+				"status":  "error",
+				"error":   "node not found",
+			})
+			continue
+		}
+		var latency int
+		var status string
+		var errMsg string
+		if req.Mode == "http" {
+			latency, status, errMsg = probeNodeHTTP(row.OutboundJSON)
+		} else {
+			latency, status, errMsg = probeNodePing(row.OutboundJSON)
+		}
+		var latencyPtr *int
+		if latency >= 0 {
+			latencyPtr = &latency
+		}
+		if err := repo.SetNodeProbeResult(h.DB, nodeID, latencyPtr, status, errMsg); err != nil {
+			results = append(results, map[string]any{
+				"node_id": nodeID,
+				"status":  "error",
+				"error":   err.Error(),
+			})
+			continue
+		}
+		results = append(results, map[string]any{
+			"node_id":    nodeID,
+			"status":     status,
+			"latency_ms": latencyPtr,
+			"error":      nullIfEmpty(errMsg),
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"data": results})
 }
 
 func (h *Nodes) Forwarding(c *gin.Context) {
@@ -228,4 +303,119 @@ func buildForwardingConfig(global repo.ProxySettingsRow, override repo.NodeProxy
 	cfg.Status = statusFor(cfg.Enabled, runtimeStatus)
 	cfg.ErrorMessage = errMsg
 	return cfg
+}
+
+func nodeRowToDTO(r repo.NodeRow) dto.Node {
+	d := dto.Node{
+		ID:                r.ID,
+		SubID:             r.SubID,
+		Tag:               r.Tag,
+		Name:              r.Name,
+		Type:              r.Type,
+		Enabled:           r.Enabled == 1,
+		ForwardingEnabled: r.ForwardingEnabled == 1,
+		CreatedAt:         r.CreatedAt,
+	}
+	meta := parseNodeMeta(r.OutboundJSON)
+	d.Server = meta.Server
+	d.ServerPort = meta.ServerPort
+	d.Network = meta.Network
+	d.TLSEnabled = meta.TLSEnabled
+	if r.LastTestAt.Valid {
+		d.LastTestAt = &r.LastTestAt.String
+	}
+	if r.LastLatencyMs.Valid {
+		v := int(r.LastLatencyMs.Int64)
+		d.LastLatencyMs = &v
+	}
+	if r.LastTestStatus.Valid {
+		d.LastTestStatus = &r.LastTestStatus.String
+	}
+	if r.LastTestError.Valid {
+		d.LastTestError = &r.LastTestError.String
+	}
+	return d
+}
+
+type nodeMeta struct {
+	Server     string
+	ServerPort int
+	Network    string
+	TLSEnabled bool
+}
+
+func parseNodeMeta(raw string) nodeMeta {
+	var m map[string]any
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return nodeMeta{}
+	}
+	out := nodeMeta{}
+	if v, ok := m["server"].(string); ok {
+		out.Server = v
+	}
+	switch p := m["server_port"].(type) {
+	case float64:
+		out.ServerPort = int(p)
+	case int:
+		out.ServerPort = p
+	}
+	if t, ok := m["transport"].(map[string]any); ok {
+		if n, ok := t["type"].(string); ok {
+			out.Network = n
+		}
+	}
+	if t, ok := m["tls"].(map[string]any); ok {
+		if enabled, ok := t["enabled"].(bool); ok {
+			out.TLSEnabled = enabled
+		}
+	}
+	return out
+}
+
+func probeNodePing(rawOutbound string) (latencyMs int, status string, errMsg string) {
+	meta := parseNodeMeta(rawOutbound)
+	if meta.Server == "" || meta.ServerPort <= 0 {
+		return -1, "error", "node has no server/server_port"
+	}
+	addr := net.JoinHostPort(meta.Server, strconv.Itoa(meta.ServerPort))
+	start := time.Now()
+	conn, err := net.DialTimeout("tcp", addr, 4*time.Second)
+	if err != nil {
+		return -1, "error", err.Error()
+	}
+	_ = conn.Close()
+	return int(time.Since(start).Milliseconds()), "ok", ""
+}
+
+func probeNodeHTTP(rawOutbound string) (latencyMs int, status string, errMsg string) {
+	meta := parseNodeMeta(rawOutbound)
+	if meta.Server == "" || meta.ServerPort <= 0 {
+		return -1, "error", "node has no server/server_port"
+	}
+	scheme := "http"
+	if meta.TLSEnabled {
+		scheme = "https"
+	}
+	target := scheme + "://" + net.JoinHostPort(meta.Server, strconv.Itoa(meta.ServerPort)) + "/"
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+	req, err := http.NewRequest(http.MethodHead, target, nil)
+	if err != nil {
+		return -1, "error", err.Error()
+	}
+	start := time.Now()
+	resp, err := client.Do(req)
+	if err != nil {
+		return -1, "error", err.Error()
+	}
+	_ = resp.Body.Close()
+	return int(time.Since(start).Milliseconds()), "ok", ""
+}
+
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
