@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useBatchForwarding, useNodes, useUpdateNode, useTestNodes } from "../hooks/useNodes";
 import { ErrorState } from "../components/common/ErrorState";
 import { EmptyState } from "../components/common/EmptyState";
 import { formatDateTime } from "../utils/datetime";
-import { SearchOutlined } from "@ant-design/icons";
-import { Button, Card, Drawer, Input, Select, Table, Tag } from "antd";
+import { MoreOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, Card, Drawer, Dropdown, Input, Popconfirm, Table, Tag } from "antd";
+import type { MenuProps } from "antd";
 import type { ColumnsType, TableRowSelection } from "antd/es/table/interface";
 import type { Node } from "../api/types";
 
@@ -37,6 +38,40 @@ export default function Nodes() {
     onChange: (keys) => setSelectedRowKeys(keys.map((k) => String(k))),
   };
 
+  useEffect(() => {
+    if (!list) return;
+    const validKeys = new Set(list.map((item) => item.id));
+    setSelectedRowKeys((prev) => prev.filter((key) => validKeys.has(key)));
+  }, [list]);
+
+  const selectedCount = selectedRowKeys.length;
+  const testModeLabel = testMode.toUpperCase();
+  const forwardingMenu: MenuProps = {
+    items: [
+      { key: "enable", label: "Enable Forwarding" },
+      { key: "disable", label: "Disable Forwarding" },
+    ],
+    onClick: ({ key }) => {
+      if (key === "enable") {
+        void batchSetForwarding(true);
+      }
+      if (key === "disable") {
+        void batchSetForwarding(false);
+      }
+    },
+  };
+  const testMenu: MenuProps = {
+    items: [
+      { key: "ping", label: "Test Selected via PING" },
+      { key: "http", label: "Test Selected via HTTP" },
+    ],
+    onClick: ({ key }) => {
+      const mode = key === "http" ? "http" : "ping";
+      setTestMode(mode);
+      void runSelectedTest(mode);
+    },
+  };
+
   return (
     <div className="bp-page">
       <div className="bp-page-header">
@@ -47,27 +82,18 @@ export default function Nodes() {
           </p>
         </div>
         <div className="bp-page-actions">
-          <Select
-            value={testMode}
-            onChange={(value: "ping" | "http") => setTestMode(value)}
-            options={[
-              { value: "ping", label: "PING" },
-              { value: "http", label: "HTTP" },
-            ]}
-            style={{ minWidth: 108 }}
-          />
-          <Button
-            onClick={() =>
-              testNodes.mutate({
-                node_ids: selectedRowKeys.map((k) => String(k)),
-                mode: testMode,
-              })
-            }
-            disabled={selectedRowKeys.length === 0}
-            loading={testNodes.isPending}
+          <Dropdown
+            menu={testMenu}
+            disabled={selectedCount === 0}
+            trigger={["click"]}
           >
-            Test Selected
-          </Button>
+            <Button
+              disabled={selectedCount === 0}
+              loading={testNodes.isPending}
+            >
+              Test Selected ({testModeLabel})
+            </Button>
+          </Dropdown>
           <Button onClick={() => refetch()} loading={isLoading}>
             Refresh
           </Button>
@@ -85,25 +111,27 @@ export default function Nodes() {
             placeholder="Search by name or address"
           />
           <div className="bp-page-actions">
-            {filtered && (
-              <span>
-                Showing {filtered.length} of {list?.length ?? 0} nodes
-              </span>
+            {selectedCount > 0 && (
+              <span className="bp-selection-pill">Selected {selectedCount}</span>
             )}
-            <Button
-              disabled={selectedRowKeys.length === 0}
-              loading={batchForwarding.isPending}
-              onClick={() => batchSetForwarding(true)}
+            <Dropdown
+              menu={forwardingMenu}
+              disabled={selectedCount === 0}
+              trigger={["click"]}
             >
-              Enable Forwarding
-            </Button>
-            <Button
-              disabled={selectedRowKeys.length === 0}
-              loading={batchForwarding.isPending}
-              onClick={() => batchSetForwarding(false)}
-            >
-              Disable Forwarding
-            </Button>
+              <Button
+                disabled={selectedCount === 0}
+                loading={batchForwarding.isPending}
+                icon={<MoreOutlined />}
+              >
+                Forwarding
+              </Button>
+            </Dropdown>
+            {selectedCount > 0 && (
+              <Button onClick={() => setSelectedRowKeys([])}>
+                Clear Selection
+              </Button>
+            )}
           </div>
         </div>
 
@@ -223,7 +251,15 @@ export default function Nodes() {
               <div className="bp-drawer-kv">
                 <div>
                   <p className="bp-kv-label">Last Status</p>
-                  <p className="bp-kv-value">{selectedNode.last_test_status || "-"}</p>
+                  <p className="bp-kv-value">
+                    {selectedNode.last_test_status ? (
+                      <Tag color={statusColor(selectedNode.last_test_status)}>
+                        {selectedNode.last_test_status.toUpperCase()}
+                      </Tag>
+                    ) : (
+                      "-"
+                    )}
+                  </p>
                 </div>
                 <div>
                   <p className="bp-kv-label">Last Latency</p>
@@ -279,6 +315,14 @@ export default function Nodes() {
     await batchForwarding.mutateAsync({
       node_ids: selectedRowKeys,
       forwarding_enabled: enabled,
+    });
+  }
+
+  async function runSelectedTest(mode: "ping" | "http" = testMode) {
+    if (selectedRowKeys.length === 0) return;
+    await testNodes.mutateAsync({
+      node_ids: selectedRowKeys,
+      mode,
     });
   }
 }
@@ -359,13 +403,27 @@ function buildColumns({
           >
             Test
           </Button>
-          <Button
-            type="link"
-            onClick={() => onToggleEnabled(record)}
-            disabled={updating}
-          >
-            {record.enabled ? "Disable" : "Enable"}
-          </Button>
+          {record.enabled ? (
+            <Popconfirm
+              title="Disable this node?"
+              description="Disabled nodes will be excluded from forwarding and tests."
+              okText="Disable"
+              cancelText="Cancel"
+              onConfirm={() => onToggleEnabled(record)}
+            >
+              <Button type="link" disabled={updating}>
+                Disable
+              </Button>
+            </Popconfirm>
+          ) : (
+            <Button
+              type="link"
+              onClick={() => onToggleEnabled(record)}
+              disabled={updating}
+            >
+              Enable
+            </Button>
+          )}
           <Button
             type="link"
             onClick={() => onToggleForwarding(record)}
@@ -377,4 +435,17 @@ function buildColumns({
       ),
     },
   ];
+}
+
+function statusColor(status: string): string {
+  switch (status.toLowerCase()) {
+    case "ok":
+      return "success";
+    case "warn":
+      return "warning";
+    case "error":
+      return "error";
+    default:
+      return "default";
+  }
 }
