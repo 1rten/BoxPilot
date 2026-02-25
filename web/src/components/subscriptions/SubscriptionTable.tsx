@@ -40,7 +40,9 @@ export function SubscriptionTable({
       dataIndex: "url",
       key: "url",
       render: (value: string) => (
-        <span title={value}>{truncate(value)}</span>
+        <span className="bp-table-mono" title={value}>
+          {truncate(value)}
+        </span>
       ),
     },
     {
@@ -62,14 +64,7 @@ export function SubscriptionTable({
       dataIndex: "updated_at",
       key: "updated_at",
       render: (value: string) => (
-        <span
-          style={{
-            fontFamily:
-              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-          }}
-        >
-          {formatDateTime(value)}
-        </span>
+        <span className="bp-table-mono">{formatDateTime(value)}</span>
       ),
     },
     {
@@ -135,4 +130,3 @@ function renderStatusTag(s: Subscription): JSX.Element {
   const label = hasError ? "Error" : paused ? "Paused" : "Active";
   return <Tag color={hasError ? "error" : paused ? "warning" : "success"}>{label}</Tag>;
 }
-

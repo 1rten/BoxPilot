@@ -88,7 +88,8 @@ export default function Subscriptions() {
       <Card>
         <div className="bp-card-toolbar">
           <Input
-            className="bp-input"
+            className="bp-input bp-search-input"
+            allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or URL"

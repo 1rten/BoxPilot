@@ -53,7 +53,8 @@ export default function Nodes() {
       <Card>
         <div className="bp-card-toolbar">
           <Input
-            className="bp-input"
+            className="bp-input bp-search-input"
+            allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search nodes"
@@ -116,16 +117,47 @@ export default function Nodes() {
       </Card>
 
       <Drawer
-        title={selectedNode ? `Node Details: ${selectedNode.name || selectedNode.tag}` : "Node Details"}
+        className="bp-drawer"
         width={520}
         onClose={() => setDetailOpen(false)}
         open={detailOpen}
+        title={
+          selectedNode ? (
+            <div className="bp-drawer-title">
+              <div>
+                <span className="bp-drawer-name">
+                  {selectedNode.name || selectedNode.tag}
+                </span>
+                <Tag
+                  className="bp-drawer-status"
+                  color={selectedNode.enabled ? "success" : "error"}
+                >
+                  {selectedNode.enabled ? "Online" : "Offline"}
+                </Tag>
+              </div>
+              <span className="bp-muted">Node Details</span>
+            </div>
+          ) : (
+            "Node Details"
+          )
+        }
       >
         {selectedNode && (
           <div className="bp-drawer-section">
-            <p className="bp-muted">Type: {selectedNode.type}</p>
-            <p className="bp-muted">Tag: {selectedNode.tag}</p>
-            <p className="bp-muted">Created: {formatDateTime(selectedNode.created_at)}</p>
+            <div className="bp-drawer-kv">
+              <div>
+                <p className="bp-kv-label">Type</p>
+                <p className="bp-kv-value">{selectedNode.type}</p>
+              </div>
+              <div>
+                <p className="bp-kv-label">Tag</p>
+                <p className="bp-kv-value bp-mono">{selectedNode.tag}</p>
+              </div>
+              <div>
+                <p className="bp-kv-label">Created</p>
+                <p className="bp-kv-value bp-mono">{formatDateTime(selectedNode.created_at)}</p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -221,6 +253,7 @@ export default function Nodes() {
   }
 
   function renderForwardingCard(title: string, type: ProxyType, cfg: ProxyConfig) {
+    const host = cfg.listen_address ?? "127.0.0.1";
     return (
       <div className="bp-forwarding-card" key={type}>
         <div className="bp-forwarding-header">
@@ -234,11 +267,12 @@ export default function Nodes() {
         </div>
         <div className="bp-forwarding-meta">
           <span>Enabled: {cfg.enabled ? "Yes" : "No"}</span>
+          <span>Listen: {host}</span>
           <span>Port: {cfg.port}</span>
           <span>Source: {cfg.source === "override" ? "Override" : "Global"}</span>
         </div>
         {cfg.error_message && <p className="bp-text-danger">{cfg.error_message}</p>}
-        <div className="bp-page-actions">
+        <div className="bp-forwarding-actions">
           <Button onClick={() => copyConnection(cfg)}>Copy URL</Button>
           <Button onClick={() => openOverride(type)}>Edit</Button>
           <Button onClick={() => selectedNode && restartForwarding.mutate(selectedNode.id)}>
@@ -326,7 +360,9 @@ function buildColumns(
       title: "Created at",
       dataIndex: "created_at",
       key: "created_at",
-      render: (value: string) => formatDateTime(value),
+      render: (value: string) => (
+        <span className="bp-table-mono">{formatDateTime(value)}</span>
+      ),
     },
     {
       title: "Actions",
