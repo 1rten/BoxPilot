@@ -1,25 +1,25 @@
 package repo
 
 import (
-	"database/sql"
 	"boxpilot/server/internal/util"
 	"boxpilot/server/internal/util/errorx"
+	"database/sql"
 )
 
 type SubscriptionRow struct {
-	ID                   string
-	Name                 string
-	URL                  string
-	Type                 string
-	Enabled              int
-	RefreshIntervalSec   int
-	Etag                 string
-	LastModified         string
-	LastFetchAt          sql.NullString
-	LastSuccessAt        sql.NullString
-	LastError            sql.NullString
-	CreatedAt            string
-	UpdatedAt            string
+	ID                 string
+	Name               string
+	URL                string
+	Type               string
+	Enabled            int
+	RefreshIntervalSec int
+	Etag               string
+	LastModified       string
+	LastFetchAt        sql.NullString
+	LastSuccessAt      sql.NullString
+	LastError          sql.NullString
+	CreatedAt          string
+	UpdatedAt          string
 }
 
 func ListSubscriptions(db *sql.DB, onlyEnabled bool) ([]SubscriptionRow, error) {
@@ -66,20 +66,32 @@ func CreateSubscription(db *sql.DB, id, name, url, subType string, enabled, refr
 	return err
 }
 
-func UpdateSubscription(db *sql.DB, id string, name *string, enabled *int, refreshIntervalSec *int) error {
+func UpdateSubscription(db *sql.DB, id string, name *string, url *string, enabled *int, refreshIntervalSec *int) error {
 	// Build update dynamically to only touch provided fields
 	now := util.NowRFC3339()
-	_, err := db.Exec("UPDATE subscriptions SET name = COALESCE(?, name), enabled = COALESCE(?, enabled), refresh_interval_sec = COALESCE(?, refresh_interval_sec), updated_at = ? WHERE id = ?",
-		name, enabled, refreshIntervalSec, now, id)
+	_, err := db.Exec("UPDATE subscriptions SET name = COALESCE(?, name), url = COALESCE(?, url), enabled = COALESCE(?, enabled), refresh_interval_sec = COALESCE(?, refresh_interval_sec), updated_at = ? WHERE id = ?",
+		name, url, enabled, refreshIntervalSec, now, id)
 	return err
 }
 
 func DeleteSubscription(db *sql.DB, id string) (bool, error) {
-	res, err := db.Exec("DELETE FROM subscriptions WHERE id = ?", id)
+	tx, err := db.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec("DELETE FROM nodes WHERE sub_id = ?", id); err != nil {
+		return false, err
+	}
+	res, err := tx.Exec("DELETE FROM subscriptions WHERE id = ?", id)
 	if err != nil {
 		return false, err
 	}
 	n, _ := res.RowsAffected()
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
 	return n > 0, nil
 }
 

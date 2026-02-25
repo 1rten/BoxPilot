@@ -198,7 +198,7 @@ export default function Subscriptions() {
           } else {
             if (!editingSub) return;
             update.mutate(
-              { id: editingSub.id, name: values.name },
+              { id: editingSub.id, name: values.name, url: values.url },
               {
                 onSuccess: () => {
                   setModalOpen(false);

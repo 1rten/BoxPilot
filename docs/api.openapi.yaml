@@ -324,6 +324,7 @@ components:
       properties:
         id: { type: string }
         name: { type: string }
+        url: { type: string }
         enabled: { type: boolean }
         refresh_interval_sec:
           type: integer

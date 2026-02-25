@@ -33,7 +33,13 @@ func Open(path string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Keep a single SQLite connection so connection-scoped PRAGMA is stable.
+	db.SetMaxOpenConns(1)
 	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if _, err := db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -57,7 +63,7 @@ func (d *DB) migrate() error {
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
-	}
+		}
 		name := e.Name()
 		if !strings.HasSuffix(name, ".sql") {
 			continue

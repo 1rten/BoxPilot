@@ -75,18 +75,23 @@ func (h *Subscriptions) Update(c *gin.Context) {
 		writeError(c, errorx.New(errorx.REQMissingField, "id required"))
 		return
 	}
-	if err := repo.EnsureSubscriptionExists(h.DB, req.ID); err != nil {
-		if appErr, ok := err.(*errorx.AppError); ok {
-			writeError(c, appErr)
-			return
-		}
-		writeError(c, errorx.New(errorx.DBError, err.Error()))
+	before, err := repo.GetSubscription(h.DB, req.ID)
+	if err != nil {
+		writeError(c, errorx.New(errorx.DBError, "get subscription").WithDetails(map[string]any{"err": err.Error()}))
+		return
+	}
+	if before == nil {
+		writeError(c, errorx.New(errorx.SUBNotFound, "subscription not found").WithDetails(map[string]any{"id": req.ID}))
 		return
 	}
 	var name *string
+	var subURL *string
 	var enabled *int
 	if req.Name != "" {
 		name = &req.Name
+	}
+	if req.URL != "" {
+		subURL = &req.URL
 	}
 	if req.Enabled != nil {
 		v := 0
@@ -99,10 +104,28 @@ func (h *Subscriptions) Update(c *gin.Context) {
 	if req.RefreshIntervalSec != nil && *req.RefreshIntervalSec > 0 {
 		refresh = req.RefreshIntervalSec
 	}
-	if err := repo.UpdateSubscription(h.DB, req.ID, name, enabled, refresh); err != nil {
+	if err := repo.UpdateSubscription(h.DB, req.ID, name, subURL, enabled, refresh); err != nil {
 		writeError(c, errorx.New(errorx.DBError, "update subscription"))
 		return
 	}
+
+	urlChanged := subURL != nil && *subURL != before.URL
+	if urlChanged {
+		if _, _, _, err := service.RefreshSubscription(h.DB, req.ID); err != nil {
+			oldURL := before.URL
+			_ = repo.UpdateSubscription(h.DB, req.ID, nil, &oldURL, nil, nil)
+			if appErr, ok := err.(*errorx.AppError); ok {
+				writeError(c, appErr)
+				return
+			}
+			writeError(c, errorx.New(errorx.SUBFetchFailed, "refresh after url update failed").WithDetails(map[string]any{
+				"id":  req.ID,
+				"err": err.Error(),
+			}))
+			return
+		}
+	}
+
 	row, _ := repo.GetSubscription(h.DB, req.ID)
 	if row != nil {
 		c.JSON(http.StatusOK, gin.H{"data": subRowToDTO(*row)})

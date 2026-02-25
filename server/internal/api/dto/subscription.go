@@ -26,6 +26,7 @@ type CreateSubscriptionRequest struct {
 type UpdateSubscriptionRequest struct {
 	ID                 string `json:"id"`
 	Name               string `json:"name"`
+	URL                string `json:"url"`
 	Enabled            *bool  `json:"enabled"`
 	RefreshIntervalSec *int   `json:"refresh_interval_sec"`
 }

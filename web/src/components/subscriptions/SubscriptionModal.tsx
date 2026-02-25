@@ -59,15 +59,14 @@ export function SubscriptionModal({
           onSubmit(values);
         }}
       >
-        {mode === "create" && (
-          <Form.Item
-            label="URL"
-            name="url"
-            rules={[{ required: true, message: "Please enter subscription URL" }]}
-          >
-            <Input placeholder="Subscription URL" />
-          </Form.Item>
-        )}
+        <Form.Item
+          label="URL"
+          name="url"
+          rules={[{ required: true, message: "Please enter subscription URL" }]}
+          extra={mode === "edit" ? "Changing URL will trigger node refresh." : undefined}
+        >
+          <Input placeholder="Subscription URL" />
+        </Form.Item>
         <Form.Item
           label="Name"
           name="name"
@@ -79,4 +78,3 @@ export function SubscriptionModal({
     </Modal>
   );
 }
-

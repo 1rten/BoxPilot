@@ -24,14 +24,16 @@ export async function createSubscription(body: CreateSubscriptionBody): Promise<
 export interface UpdateSubscriptionBody {
   id: string;
   name?: string;
+  url?: string;
   enabled?: boolean;
   refresh_interval_sec?: number;
 }
 
 export async function updateSubscription(body: UpdateSubscriptionBody): Promise<Subscription> {
-  const { id, name, enabled, refresh_interval_sec } = body;
+  const { id, name, url, enabled, refresh_interval_sec } = body;
   const payload: any = { id };
   if (name !== undefined) payload.name = name;
+  if (url !== undefined) payload.url = url;
   if (enabled !== undefined) payload.enabled = enabled;
   if (refresh_interval_sec !== undefined) payload.refresh_interval_sec = refresh_interval_sec;
   const { data } = await api.post<{ data: Subscription }>("/subscriptions/update", payload);
