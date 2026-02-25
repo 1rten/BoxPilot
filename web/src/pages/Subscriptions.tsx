@@ -111,7 +111,7 @@ export default function Subscriptions() {
                 checked={autoRefresh}
                 onChange={(checked) => setAutoRefresh(checked)}
               />
-              Auto refresh every 30s
+              Auto poll list every 30s
             </span>
           </div>
         </div>

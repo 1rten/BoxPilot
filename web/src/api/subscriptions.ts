@@ -9,12 +9,12 @@ export async function getSubscriptions(): Promise<Subscription[]> {
 export interface CreateSubscriptionBody {
   url: string;
   name?: string;
+  type?: string;
   refresh_interval_sec?: number;
 }
 
 export async function createSubscription(body: CreateSubscriptionBody): Promise<Subscription> {
   const { data } = await api.post<{ data: Subscription }>("/subscriptions/create", {
-    type: "singbox",
     refresh_interval_sec: 3600,
     ...body,
   });
@@ -54,4 +54,3 @@ export async function refreshSubscription(id: string): Promise<RefreshSubscripti
   const { data } = await api.post<RefreshSubscriptionResult>("/subscriptions/refresh", { id });
   return data;
 }
-

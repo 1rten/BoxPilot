@@ -183,7 +183,7 @@ boxpilot/
 │   │   │   ├── runtime_control.go
 │   │   │   └── scheduler.go
 │   │   ├── parser/
-│   │   │   └── singbox.go
+│   │   │   └── subscription.go
 │   │   ├── generator/
 │   │   │   └── singbox.go
 │   │   ├── runtime/
@@ -370,20 +370,30 @@ boxpilot/
 
 **失败时可用性优先**：若本次刷新失败（拉取失败/解析失败），不要清空 nodes，保留上次成功结果（与 7.5 回滚策略一致）。
 
-### 6.2 sing-box 订阅解析（必须支持）
-输入支持两种常见形式：
+### 6.2 订阅解析（必须支持）
+输入至少支持三类常见格式（自动识别）：
 
-- **形式 A：完整 config（object with outbounds）**
-  ```json
-  { "outbounds": [ ... ] }
-  ```
+- **格式 A：传统订阅码**
+  - 典型内容：`vmess://`、`vless://`、`trojan://`、`ss://` 链接列表
+  - 常见传输：整体 base64 后返回，解码后按行分割 URI
+  - 处理：解析 URI 并转换为 sing-box outbound JSON
 
-- **形式 B：outbounds 数组**
-  ```json
-  [ { ... }, { ... } ]
-  ```
+- **格式 B：sing-box 订阅码**
+  - 形式 1：完整 config（object with outbounds）
+    ```json
+    { "outbounds": [ ... ] }
+    ```
+  - 形式 2：outbounds 数组
+    ```json
+    [ { ... }, { ... } ]
+    ```
+  - 处理：直接提取可用 outbounds（过滤内置类型）
 
-**过滤策略（不当作“节点”入库）：**  
+- **格式 C：clash 订阅码**
+  - 典型内容：YAML，核心字段 `proxies:`
+  - 处理：解析 `proxies`，映射为 sing-box outbound JSON
+
+**统一过滤策略（不当作“节点”入库）：**  
 direct、block、dns、selector、urltest 等。
 
 **节点 tag 全局唯一规则（关键）：**  
@@ -889,7 +899,7 @@ SemVer：MAJOR.MINOR.PATCH。
 - SQLite migrations（含 schema_migrations 机制）
 - Subscriptions CRUD
 - Fetch + ETag/Last-Modified
-- Parse sing-box subscription（object/array）
+- Parse multi-format subscription（traditional URI / sing-box / clash）
 - Nodes 入库（Replace）
 - 生成 sing-box config（http+socks+selector）
 - 原子写 config + 备份

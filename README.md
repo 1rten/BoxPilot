@@ -1,11 +1,11 @@
 # BoxPilot
 
-> A self-hosted control plane for managing sing-box subscriptions and runtime configuration.  
+> A self-hosted control plane for managing proxy subscriptions and sing-box runtime configuration.  
 > Built with Go + Gin + SQLite + Vite + React.
 
 BoxPilot is designed for **personal use** and focuses on:
 
-- Managing sing-box subscription links
+- Managing multi-format subscription links (traditional / sing-box / clash)
 - Parsing and storing nodes
 - Generating runtime config automatically
 - Exposing HTTP/SOCKS5 proxy via sing-box

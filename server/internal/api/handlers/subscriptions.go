@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"boxpilot/server/internal/api/dto"
+	"boxpilot/server/internal/service"
 	"boxpilot/server/internal/store/repo"
 	"boxpilot/server/internal/util"
 	"boxpilot/server/internal/util/errorx"
@@ -146,8 +147,20 @@ func (h *Subscriptions) Refresh(c *gin.Context) {
 		writeError(c, errorx.New(errorx.DBError, err.Error()))
 		return
 	}
+	notModified, total, enabled, err := service.RefreshSubscription(h.DB, req.ID)
+	if err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.SUBFetchFailed, "subscription refresh failed").WithDetails(map[string]any{
+			"id":  req.ID,
+			"err": err.Error(),
+		}))
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"sub_id": req.ID, "not_modified": false, "nodes_total": 0, "nodes_enabled": 0,
+		"sub_id": req.ID, "not_modified": notModified, "nodes_total": total, "nodes_enabled": enabled,
 		"fetched_at": util.NowRFC3339(),
 	})
 }

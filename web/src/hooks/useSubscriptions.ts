@@ -6,6 +6,7 @@ import {
   updateSubscription,
   deleteSubscription,
   refreshSubscription,
+  type RefreshSubscriptionResult,
   type CreateSubscriptionBody,
   type UpdateSubscriptionBody,
 } from "../api/subscriptions";
@@ -23,9 +24,21 @@ export function useCreateSubscription() {
   const { addToast } = useToast();
   return useMutation({
     mutationFn: (body: CreateSubscriptionBody) => createSubscription(body),
-    onSuccess: () => {
+    onSuccess: async (created) => {
+      let refreshed = false;
+      try {
+        const result = await refreshSubscription(created.id);
+        refreshed = true;
+        addToast("success", buildRefreshMessage(result, true));
+      } catch (error: unknown) {
+        const message = extractErrorMessage(error);
+        addToast("error", `Subscription created, but initial refresh failed: ${message}`);
+      }
       q.invalidateQueries({ queryKey: ["subscriptions"] });
-      addToast("success", "Subscription created");
+      q.invalidateQueries({ queryKey: ["nodes"] });
+      if (!refreshed) {
+        addToast("success", "Subscription created");
+      }
     },
     onError: (error: unknown) => {
       const message = extractErrorMessage(error);
@@ -41,6 +54,7 @@ export function useUpdateSubscription() {
     mutationFn: (body: UpdateSubscriptionBody) => updateSubscription(body),
     onSuccess: () => {
       q.invalidateQueries({ queryKey: ["subscriptions"] });
+      q.invalidateQueries({ queryKey: ["nodes"] });
       addToast("success", "Subscription updated");
     },
     onError: (error: unknown) => {
@@ -57,6 +71,7 @@ export function useDeleteSubscription() {
     mutationFn: (id: string) => deleteSubscription(id),
     onSuccess: () => {
       q.invalidateQueries({ queryKey: ["subscriptions"] });
+      q.invalidateQueries({ queryKey: ["nodes"] });
       addToast("success", "Subscription deleted");
     },
     onError: (error: unknown) => {
@@ -71,15 +86,29 @@ export function useRefreshSubscription() {
   const { addToast } = useToast();
   return useMutation({
     mutationFn: (id: string) => refreshSubscription(id),
-    onSuccess: () => {
+    onSuccess: (result) => {
       q.invalidateQueries({ queryKey: ["subscriptions"] });
-      addToast("success", "Subscription refreshed");
+      q.invalidateQueries({ queryKey: ["nodes"] });
+      addToast("success", buildRefreshMessage(result, false));
     },
     onError: (error: unknown) => {
       const message = extractErrorMessage(error);
       addToast("error", `Refresh subscription failed: ${message}`);
     },
   });
+}
+
+function buildRefreshMessage(result: RefreshSubscriptionResult, isInitial: boolean): string {
+  if (result.not_modified) {
+    return isInitial ? "Subscription created. No new nodes from source." : "No changes detected";
+  }
+  if (result.nodes_total <= 0) {
+    return isInitial ? "Subscription created. Source returned no usable nodes." : "Refreshed: no usable nodes";
+  }
+  const noun = result.nodes_total === 1 ? "node" : "nodes";
+  return isInitial
+    ? `Subscription created and synced ${result.nodes_total} ${noun}`
+    : `Refreshed ${result.nodes_total} ${noun}`;
 }
 
 function extractErrorMessage(error: unknown): string {
@@ -90,4 +119,3 @@ function extractErrorMessage(error: unknown): string {
   if (anyErr?.message) return anyErr.message as string;
   return "Unknown error";
 }
-
