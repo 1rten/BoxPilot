@@ -193,6 +193,8 @@ export default function Nodes() {
       <Drawer
         className="bp-drawer"
         width={520}
+        getContainer={false}
+        rootStyle={{ position: "fixed" }}
         onClose={() => setDetailOpen(false)}
         open={detailOpen}
         title={
