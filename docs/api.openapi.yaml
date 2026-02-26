@@ -92,6 +92,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ForwardingRuntimeStatusResponse'
 
+  /api/v1/settings/forwarding/summary:
+    get:
+      tags: [Settings]
+      summary: Get forwarding runtime summary and selected nodes
+      responses:
+        '200':
+          description: Forwarding summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForwardingSummaryResponse'
+
   /api/v1/settings/forwarding/start:
     post:
       tags: [Settings]
@@ -520,6 +532,33 @@ components:
               enum: [running, stopped, error]
             error_message: { type: string, nullable: true }
           required: [running, status]
+      required: [data]
+
+    ForwardingSummaryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            running: { type: boolean }
+            status:
+              type: string
+              enum: [running, stopped, error]
+            error_message: { type: string, nullable: true }
+            selected_nodes_count: { type: integer }
+            nodes:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  tag: { type: string }
+                  type: { type: string }
+                  last_status: { type: string, nullable: true }
+                  last_latency_ms: { type: integer, nullable: true }
+                required: [id, name, tag, type]
+          required: [running, status, selected_nodes_count, nodes]
       required: [data]
 
     RuntimePlanRequest:

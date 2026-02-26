@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { ForwardingRuntimeStatus, ProxySettingsData, ProxyType, ProxyConfig } from "./types";
+import type { ForwardingRuntimeStatus, ForwardingSummaryData, ProxySettingsData, ProxyType, ProxyConfig } from "./types";
 
 export async function getProxySettings(): Promise<ProxySettingsData> {
   const { data } = await api.get<{ data: ProxySettingsData }>("/settings/proxy");
@@ -37,6 +37,11 @@ export async function applyProxySettings(): Promise<ApplyProxyResult> {
 
 export async function getForwardingRuntimeStatus(): Promise<ForwardingRuntimeStatus> {
   const { data } = await api.get<{ data: ForwardingRuntimeStatus }>("/settings/forwarding/status");
+  return data.data;
+}
+
+export async function getForwardingSummary(): Promise<ForwardingSummaryData> {
+  const { data } = await api.get<{ data: ForwardingSummaryData }>("/settings/forwarding/summary");
   return data.data;
 }
 

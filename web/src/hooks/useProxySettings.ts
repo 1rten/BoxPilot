@@ -4,6 +4,7 @@ import {
   updateProxySettings,
   applyProxySettings,
   getForwardingRuntimeStatus,
+  getForwardingSummary,
   startForwardingRuntime,
   stopForwardingRuntime,
   type UpdateProxySettingsBody,
@@ -67,6 +68,14 @@ export function useForwardingRuntimeStatus() {
   });
 }
 
+export function useForwardingSummary() {
+  return useQuery({
+    queryKey: ["forwarding-summary"],
+    queryFn: getForwardingSummary,
+    refetchInterval: 10_000,
+  });
+}
+
 export function useStartForwardingRuntime() {
   const q = useQueryClient();
   const { addToast } = useToast();
@@ -74,6 +83,7 @@ export function useStartForwardingRuntime() {
     mutationFn: startForwardingRuntime,
     onSuccess: () => {
       q.invalidateQueries({ queryKey: ["forwarding-runtime-status"] });
+      q.invalidateQueries({ queryKey: ["forwarding-summary"] });
       q.invalidateQueries({ queryKey: ["proxy-settings"] });
       addToast("success", "Forwarding started");
     },
@@ -96,6 +106,7 @@ export function useStopForwardingRuntime() {
     mutationFn: stopForwardingRuntime,
     onSuccess: () => {
       q.invalidateQueries({ queryKey: ["forwarding-runtime-status"] });
+      q.invalidateQueries({ queryKey: ["forwarding-summary"] });
       q.invalidateQueries({ queryKey: ["proxy-settings"] });
       addToast("success", "Forwarding stopped");
     },

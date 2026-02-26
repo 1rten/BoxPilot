@@ -138,6 +138,50 @@ func (h *Settings) ForwardingStatus(c *gin.Context) {
 	})
 }
 
+func (h *Settings) ForwardingSummary(c *gin.Context) {
+	running, status, errMsg := runtimeStatus(h.DB)
+	nodes, err := repo.ListEnabledForwardingNodes(h.DB)
+	if err != nil {
+		writeError(c, errorx.New(errorx.DBError, "list forwarding nodes"))
+		return
+	}
+
+	maxNodes := 10
+	if len(nodes) < maxNodes {
+		maxNodes = len(nodes)
+	}
+	items := make([]dto.ForwardingSummaryNode, 0, maxNodes)
+	for _, n := range nodes[:maxNodes] {
+		var lastStatus *string
+		var lastLatencyMs *int64
+		if n.LastTestStatus.Valid {
+			lastStatus = &n.LastTestStatus.String
+		}
+		if n.LastLatencyMs.Valid {
+			v := n.LastLatencyMs.Int64
+			lastLatencyMs = &v
+		}
+		items = append(items, dto.ForwardingSummaryNode{
+			ID:            n.ID,
+			Name:          n.Name,
+			Tag:           n.Tag,
+			Type:          n.Type,
+			LastStatus:    lastStatus,
+			LastLatencyMs: lastLatencyMs,
+		})
+	}
+
+	c.JSON(http.StatusOK, dto.ForwardingSummaryResponse{
+		Data: dto.ForwardingSummaryData{
+			Running:            running,
+			Status:             status,
+			ErrorMessage:       errMsg,
+			SelectedNodesCount: len(nodes),
+			Nodes:              items,
+		},
+	})
+}
+
 func (h *Settings) StartForwarding(c *gin.Context) {
 	nodes, err := repo.ListEnabledForwardingNodes(h.DB)
 	if err != nil {

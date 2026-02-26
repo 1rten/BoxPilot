@@ -53,6 +53,27 @@ type ForwardingRuntimeStatus struct {
 	ErrorMessage *string `json:"error_message,omitempty"`
 }
 
+type ForwardingSummaryResponse struct {
+	Data ForwardingSummaryData `json:"data"`
+}
+
+type ForwardingSummaryData struct {
+	Running            bool                    `json:"running"`
+	Status             string                  `json:"status"`
+	ErrorMessage       *string                 `json:"error_message,omitempty"`
+	SelectedNodesCount int                     `json:"selected_nodes_count"`
+	Nodes              []ForwardingSummaryNode `json:"nodes"`
+}
+
+type ForwardingSummaryNode struct {
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Tag           string  `json:"tag"`
+	Type          string  `json:"type"`
+	LastStatus    *string `json:"last_status,omitempty"`
+	LastLatencyMs *int64  `json:"last_latency_ms,omitempty"`
+}
+
 type NodeForwardingResponse struct {
 	Data NodeForwardingData `json:"data"`
 }

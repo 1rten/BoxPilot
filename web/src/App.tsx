@@ -4,18 +4,20 @@ import Subscriptions from "./pages/Subscriptions";
 import Nodes from "./pages/Nodes";
 import Settings from "./pages/Settings";
 import {
-  useForwardingRuntimeStatus,
+  useForwardingSummary,
   useStartForwardingRuntime,
   useStopForwardingRuntime,
 } from "./hooks/useProxySettings";
+import { Popover } from "antd";
 
 export default function App() {
-  const { data: runtime } = useForwardingRuntimeStatus();
+  const { data: summary } = useForwardingSummary();
   const startForwarding = useStartForwardingRuntime();
   const stopForwarding = useStopForwardingRuntime();
   const toggling = startForwarding.isPending || stopForwarding.isPending;
-  const isRunning = !!runtime?.running;
-  const runtimeStatus = runtime?.status ?? "stopped";
+  const isRunning = !!summary?.running;
+  const runtimeStatus = summary?.status ?? "stopped";
+  const nodeList = summary?.nodes ?? [];
 
   return (
     <BrowserRouter>
@@ -55,27 +57,64 @@ export default function App() {
             </div>
           </div>
           <div className="bp-nav-right">
-            <button
-              type="button"
-              className={
-                runtimeStatus === "running"
-                  ? "bp-forwarding-toggle bp-forwarding-toggle-running"
-                  : runtimeStatus === "error"
-                  ? "bp-forwarding-toggle bp-forwarding-toggle-error"
-                  : "bp-forwarding-toggle"
+            <Popover
+              placement="bottomRight"
+              trigger={["hover"]}
+              content={
+                <div className="bp-forwarding-popover">
+                  <div className="bp-forwarding-popover-head">
+                    <span className="bp-forwarding-popover-title">Proxy</span>
+                    <span className={`bp-runtime-dot bp-runtime-dot-${runtimeStatus}`} />
+                  </div>
+                  <p className="bp-forwarding-popover-meta">
+                    Status: {runtimeStatus.toUpperCase()} · Selected: {summary?.selected_nodes_count ?? 0}
+                  </p>
+                  {summary?.error_message && (
+                    <p className="bp-forwarding-popover-error">{summary.error_message}</p>
+                  )}
+                  {nodeList.length > 0 ? (
+                    <div className="bp-forwarding-popover-list">
+                      {nodeList.map((node) => (
+                        <div key={node.id} className="bp-forwarding-popover-item">
+                          <span className="bp-forwarding-popover-name">{node.name || node.tag}</span>
+                          <span className="bp-forwarding-popover-side">
+                            {node.type.toUpperCase()}
+                            {node.last_latency_ms !== null && node.last_latency_ms !== undefined
+                              ? ` · ${node.last_latency_ms}ms`
+                              : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="bp-forwarding-popover-empty">No forwarding nodes selected.</p>
+                  )}
+                </div>
               }
-              disabled={toggling}
-              onClick={() => {
-                if (isRunning) {
-                  stopForwarding.mutate();
-                } else {
-                  startForwarding.mutate();
-                }
-              }}
-              title={runtime?.error_message || "Forwarding runtime control"}
             >
-              {toggling ? "Applying..." : isRunning ? "Stop Forwarding" : "Start Forwarding"}
-            </button>
+              <button
+                type="button"
+                className={
+                  runtimeStatus === "running"
+                    ? "bp-forwarding-toggle bp-forwarding-toggle-running"
+                    : runtimeStatus === "error"
+                    ? "bp-forwarding-toggle bp-forwarding-toggle-error"
+                    : "bp-forwarding-toggle"
+                }
+                disabled={toggling}
+                onClick={() => {
+                  if (isRunning) {
+                    stopForwarding.mutate();
+                  } else {
+                    startForwarding.mutate();
+                  }
+                }}
+                title={summary?.error_message || "Forwarding runtime control"}
+              >
+                <span className={`bp-runtime-dot bp-runtime-dot-${runtimeStatus}`} />
+                {toggling ? "Applying..." : "Proxy"}
+              </button>
+            </Popover>
             <NavLink
               to="/settings"
               className={({ isActive }) =>
