@@ -5,27 +5,15 @@ services:
     image: boxpilot:latest
     ports:
       - "127.0.0.1:8080:8080"
+      - "127.0.0.1:7890:7890"
+      - "127.0.0.1:7891:7891"
     environment:
       - DATA_DIR=/data
       - DB_PATH=/data/app.db
       - SINGBOX_CONFIG=/data/sing-box.json
-      - SINGBOX_CONTAINER=singbox
-      - RUNTIME_MODE=docker
+      - SINGBOX_RESTART_CMD=/app/docker/restart-singbox.sh
       - HTTP_PROXY_PORT=7890
       - SOCKS_PROXY_PORT=7891
       - BACKUP_KEEP=10
     volumes:
       - ./data:/data
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - singbox
-
-  singbox:
-    image: ghcr.io/sagernet/sing-box:latest
-    container_name: singbox
-    volumes:
-      - ./data:/data
-    command: ["run", "-c", "/data/sing-box.json"]
-    ports:
-      - "127.0.0.1:7890:7890"
-      - "127.0.0.1:7891:7891"

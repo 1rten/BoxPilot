@@ -24,7 +24,7 @@ BoxPilot is designed for **personal use** and focuses on:
 - 🧵 Concurrency control (reload mutex + sub lock)
 - 🗂 Automatic database migration
 - 📜 Structured error codes
-- ⚙️ Docker-ready
+- ⚙️ Process-mode runtime control
 - 🧩 Typed frontend (OpenAPI-driven)
 
 ---
@@ -38,7 +38,7 @@ flowchart LR
   Browser -->|HTTP| BoxPilot
   BoxPilot --> SQLite
   BoxPilot --> Filesystem
-  BoxPilot -->|docker restart| sing-box
+  BoxPilot -->|exec SINGBOX_RESTART_CMD| sing-box
   sing-box --> ProxyPorts
 ```
 
@@ -47,8 +47,8 @@ flowchart LR
 * **Frontend**: React + Vite (embedded into Go binary)
 * **Backend**: Go + Gin
 * **Database**: SQLite
-* **Runtime control**: Docker (MVP mode)
-* **Data plane**: sing-box container
+* **Runtime control**: Process command (`SINGBOX_RESTART_CMD`)
+* **Data plane**: local/same-container sing-box process
 
 ---
 
@@ -76,23 +76,14 @@ services:
     container_name: boxpilot
     ports:
       - "127.0.0.1:8080:8080"
-    volumes:
-      - ./data:/data
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - RUNTIME_MODE=docker
-      - SINGBOX_CONTAINER=singbox
-      - DB_PATH=/data/app.db
-
-  singbox:
-    image: ghcr.io/sagernet/sing-box:latest
-    container_name: singbox
-    volumes:
-      - ./data:/data
-    command: ["run", "-c", "/data/sing-box.json"]
-    ports:
       - "127.0.0.1:7890:7890"
       - "127.0.0.1:7891:7891"
+    volumes:
+      - ./data:/data
+    environment:
+      - DB_PATH=/data/app.db
+      - SINGBOX_CONFIG=/data/sing-box.json
+      - SINGBOX_RESTART_CMD=/app/docker/restart-singbox.sh
 ```
 
 ---
@@ -148,7 +139,7 @@ Reload flow:
 2. Load enabled nodes from DB
 3. Build sing-box config
 4. Atomic write `/data/sing-box.json`
-5. Restart sing-box container
+5. Execute `SINGBOX_RESTART_CMD` to reload sing-box
 6. Update runtime_state
 7. Release lock
 
@@ -181,11 +172,11 @@ server/internal/store/migrations/
 
 Environment variables:
 
-| Variable          | Default | Description       |
-| ----------------- | ------- | ----------------- |
-| RUNTIME_MODE      | docker  | docker or process |
-| SINGBOX_CONTAINER | singbox | container name    |
-| DATA_DIR          | /data   | storage path      |
+| Variable             | Default                         | Description |
+| -------------------- | ------------------------------- | ----------- |
+| SINGBOX_RESTART_CMD  |                                 | required; command used to reload/restart sing-box process (container default: `/app/docker/restart-singbox.sh`) |
+| SINGBOX_CONFIG       | `/data/sing-box.json` or `data/sing-box.json` | config path; auto picks `/data` if exists |
+| DATA_DIR             | /data                           | storage path |
 
 ---
 
@@ -194,7 +185,7 @@ Environment variables:
 * Default bind address is `127.0.0.1`
 * Do NOT expose proxy ports to public internet
 * Avoid committing subscription URLs
-* Docker socket gives high privilege — use carefully
+* `SINGBOX_RESTART_CMD` should be tightly scoped and trusted
 
 ---
 
@@ -284,12 +275,11 @@ v0.1:
 * [x] Subscription management
 * [x] Config generation
 * [x] Safe reload
-* [x] Docker runtime mode
+* [x] Process runtime mode
 * [x] Typed API
 
 Future:
 
-* [ ] Process mode (no docker.sock)
 * [ ] Node health check
 * [ ] Multiple profiles
 * [ ] SSE live logs

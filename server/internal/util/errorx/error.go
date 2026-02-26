@@ -28,7 +28,7 @@ func (e *AppError) HTTPStatus() int {
 	case e.Code == REQBadRequest || e.Code == REQValidationFailed || e.Code == REQMissingField ||
 		e.Code == REQInvalidField || e.Code == REQUnsupportedOperation || e.Code == SUBInvalidURL ||
 		e.Code == SUBParseFailed || e.Code == SUBFormatUnsupported || e.Code == SUBEmptyOutbounds ||
-		e.Code == NODEInvalidOutbound || e.Code == RTModeUnsupported:
+		e.Code == NODEInvalidOutbound:
 		return http.StatusBadRequest
 	case e.Code == REQTooLarge || e.Code == SUBResponseTooLarge:
 		return http.StatusRequestEntityTooLarge
@@ -41,8 +41,6 @@ func (e *AppError) HTTPStatus() int {
 		return http.StatusTooManyRequests
 	case e.Code == SUBFetchFailed || e.Code == SUBFetchTimeout || e.Code == SUBHTTPStatusError:
 		return http.StatusBadGateway
-	case e.Code == RTDockerSockUnavailable || e.Code == RTSingboxContainerNotFound:
-		return http.StatusServiceUnavailable
 	case e.Code == NotImplemented:
 		return http.StatusNotImplemented
 	default:

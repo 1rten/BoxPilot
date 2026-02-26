@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"boxpilot/server/internal/api"
@@ -14,7 +15,14 @@ import (
 func main() {
 	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
-		dbPath = "/data/app.db"
+		if stat, err := os.Stat("/data"); err == nil && stat.IsDir() {
+			dbPath = "/data/app.db"
+		} else {
+			dbPath = filepath.Join("data", "app.db")
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+		log.Fatalf("prepare db dir: %v", err)
 	}
 	db, err := store.Open(dbPath)
 	if err != nil {

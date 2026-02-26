@@ -509,9 +509,6 @@ components:
             forwarding_running: { type: boolean }
             last_reload_at: { type: string }
             last_reload_error: { type: string }
-            runtime_mode:
-              type: string
-              enum: [docker, process]
             ports:
               type: object
               properties:

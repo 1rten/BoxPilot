@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"database/sql"
-	"os"
 	"path/filepath"
 
 	"boxpilot/server/internal/generator"
@@ -28,11 +27,7 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 	if err := util.AtomicWrite(filepath.Dir(configPath), filepath.Base(configPath), cfg); err != nil {
 		return 0, "", "", err
 	}
-	container := os.Getenv("SINGBOX_CONTAINER")
-	if container == "" {
-		container = "singbox"
-	}
-	out, err := runtime.DockerRestart(ctx, container)
+	out, err := runtime.Restart(ctx, configPath)
 	if err != nil {
 		repo.UpdateRuntimeState(db, 0, h, err.Error())
 		return 0, h, string(out), err

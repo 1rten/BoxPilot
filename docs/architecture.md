@@ -115,7 +115,7 @@ BoxPilot 用于个人自托管场景：把订阅管理、节点持久化、配�
 - Gin（HTTP 框架）
 - modernc.org/sqlite（纯 Go SQLite 驱动，无 CGO）
 - 标准库 `net/http` 拉取订阅
-- 通过 docker.sock 执行 `docker restart singbox`（MVP 最简单可靠）
+- 通过 `SINGBOX_RESTART_CMD` 执行 sing-box 重载/重启
 
 ### 3.2 前端（Vite + React）
 - Vite + React 18 + TypeScript
@@ -187,8 +187,7 @@ boxpilot/
 │   │   ├── generator/
 │   │   │   └── singbox.go
 │   │   ├── runtime/
-│   │   │   ├── docker_restart.go
-│   │   │   └── process_mode.go    # 预留：不挂 docker.sock 时使用
+│   │   │   └── restart.go
 │   │   ├── util/
 │   │   │   ├── atomic_write.go
 │   │   │   ├── hash.go
@@ -226,14 +225,14 @@ boxpilot/
 - **service**：订阅刷新、配置构建、runtime 控制、定时调度。
 - **parser**：sing-box 订阅解析（object/array）。
 - **generator**：sing-box 运行时 config 生成。
-- **runtime**：执行重载（docker_restart / process_mode 可选）。
+- **runtime**：执行 sing-box 重载/重启（process command）。
 - **util**：原子写、hash、id、时间、统一错误码（errorx）。
 - **observability**：结构化日志等。
 
 ### 4.2 构建策略（推荐：后端镜像内包含前端静态资源）
 - `web/` 先 `vite build` 输出 `web/dist`
 - 构建 Go 后端时把 `web/dist` 拷贝进镜像，并由 Go 提供静态资源服务
-- 最终只需要两个容器：`boxpilot`（Go + UI）、`singbox`（官方镜像）
+- 最终只需要一个容器：`boxpilot`（Go + UI + sing-box）
 
 优点：部署最简单（少一个 web 容器）、UI/API 版本严格一致。
 
@@ -515,33 +514,16 @@ sing-box 的 selector outbounds 依赖 tag，tag 冲突会导致 selector 指向
 
 ## 8. Runtime 控制与重载策略
 
-### 8.1 MVP：docker restart（推荐）
+### 8.1 Process-only（当前实现）
 
-- boxpilot 容器挂载 `/var/run/docker.sock`
-- 执行：`docker restart singbox`
-
-**优点：** 实现简单、行为稳定  
-**缺点：** 短暂断连（个人自用通常可接受）
+- BoxPilot 固定执行 `SINGBOX_RESTART_CMD`
+- 不再区分 docker/process/none 多模式
+- 推荐 sing-box 与 boxpilot 同机或同容器运行
 
 ### 8.2 健康检查（可选）
 
-- 检查 singbox 端口连通（7890/7891）
-- 检查 singbox 容器状态（`docker inspect`）
-
-### 8.3 sing-box 控制模式（可配置，建议两种）
-
-开源用户环境不同，建议做成可配置：
-
-| 模式 | 说明 | 适用场景 |
-|------|------|----------|
-| **Mode A：Docker**（默认） | 依赖 `docker.sock`，执行 `docker restart <container>` | 标准 Docker 部署 |
-| **Mode B：Process** | sing-box 与 boxpilot 同机/同容器以进程运行；boxpilot 负责启动/stop/reload | 不想给 docker.sock 权限、NAS/群晖/软路由等 |
-
-- **配置项**：`RUNTIME_MODE=docker|process`
-- Docker 模式需要：`SINGBOX_CONTAINER`
-- Process 模式需要：`SINGBOX_BIN=/usr/bin/sing-box`（boxpilot 调用该二进制完成 check/run）
-
-docker.sock 权限较大，部分用户不愿挂载；提供 process mode 可提高项目接受度。
+- 检查 sing-box 端口连通（7890/7891）
+- 检查最近一次 reload 错误信息（runtime_state）
 
 ---
 
@@ -583,7 +565,7 @@ docker.sock 权限较大，部分用户不愿挂载；提供 process mode 可提
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/v1/runtime/status` | 运行时状态，200 返回 `RuntimeStatusResponse`（config_version、config_hash、last_reload_at/error、ports.http/socks、runtime_mode、singbox_container） |
+| GET | `/api/v1/runtime/status` | 运行时状态，200 返回 `RuntimeStatusResponse`（config_version、config_hash、last_reload_at/error、ports.http/socks） |
 | POST | `/api/v1/runtime/plan` | **Dry Run**：不落盘、不重启；body 可选 `RuntimePlanRequest`（include_disabled_nodes），200 返回 nodes_included、tags、config_hash |
 | POST | `/api/v1/runtime/reload` | 写盘并重启 sing-box；body 可选 `RuntimeReloadRequest`（force_restart，默认 true），200 返回 config_version、config_hash、nodes_included、restart_output、reloaded_at |
 | GET | `/api/v1/settings/proxy` | 代理设置（HTTP/SOCKS）与状态，返回 `ProxySettingsResponse` |
@@ -714,7 +696,6 @@ web/src/
 | NODE_NOT_FOUND | Toast 提示，并刷新节点列表 |
 | RT_RESTART_FAILED | Toast + 可选弹出日志/详情（展示 details.output 截断） |
 | REQ_VALIDATION_FAILED | 表单字段高亮（用 details.field / reason） |
-| RT_DOCKER_SOCK_UNAVAILABLE / RT_SINGBOX_CONTAINER_NOT_FOUND | 明确提示“运行环境不可用”，引导检查部署 |
 | 其他 | 仅展示 message，必要时展示 details |
 
 禁止在业务组件里到处 `try/catch` 后各写各的提示；统一在 API 层或全局错误处理里根据 code 分支。
@@ -770,7 +751,7 @@ web/src/
 
 **架构上必须明确**：
 
-- 前端**不直接操作** Docker（不调 docker 命令、不访问 docker.sock）。
+- 前端**不直接操作**运行时进程（不调系统命令、不感知重启实现细节）。
 - 前端**不直接读写**服务器文件系统（不访问 `/data`、不写 sing-box 配置）。
 - **所有**与订阅、节点、配置、重载相关的操作**仅通过 API** 完成。
 
@@ -787,8 +768,7 @@ web/src/
 
 ### 11.1 运行形态
 
-- **容器 A**：boxpilot（Go + UI，含 SQLite 文件）
-- **容器 B**：singbox（官方镜像）
+- **单容器双进程**：boxpilot（Go + UI）+ sing-box（同容器）
 - **共享 volume**：`./data:/data`
 
 ### 11.2 docker-compose（建议默认本机绑定）
@@ -800,35 +780,25 @@ services:
     image: ghcr.io/<you>/boxpilot:latest
     ports:
       - "127.0.0.1:8080:8080"
+      - "127.0.0.1:7890:7890"
+      - "127.0.0.1:7891:7891"
     environment:
       - DATA_DIR=/data
       - DB_PATH=/data/app.db
       - SINGBOX_CONFIG=/data/sing-box.json
-      - SINGBOX_CONTAINER=singbox
+      - SINGBOX_RESTART_CMD=/app/docker/restart-singbox.sh
       - HTTP_PROXY_PORT=7890
       - SOCKS_PROXY_PORT=7891
     volumes:
       - ./data:/data
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - singbox
-
-  singbox:
-    image: ghcr.io/sagernet/sing-box:latest
-    container_name: singbox
-    volumes:
-      - ./data:/data
-    command: ["run", "-c", "/data/sing-box.json"]
-    ports:
-      - "127.0.0.1:7890:7890"
-      - "127.0.0.1:7891:7891"
 ```
 
 ### 11.3 BoxPilot 镜像构建（多阶段）
 
 - **Stage 1**：Node 构建前端（`vite build`）
 - **Stage 2**：Go 编译后端
-- **Stage 3**：最终镜像仅包含 Go 二进制（与静态资源）
+- **Stage 3**：提取 sing-box 二进制
+- **Stage 4**：最终镜像包含 boxpilot + sing-box + entrypoint 脚本
 
 ---
 
@@ -859,7 +829,7 @@ services:
 ### 13.2 健康检查
 
 - `/healthz`：进程存活
-- 可选 `/readyz`：DB 可写、config 目录可写、docker.sock 可用
+- 可选 `/readyz`：DB 可写、config 目录可写、sing-box 重启命令可执行
 
 ### 13.3 故障恢复
 
@@ -903,7 +873,7 @@ SemVer：MAJOR.MINOR.PATCH。
 - Nodes 入库（Replace）
 - 生成 sing-box config（http+socks+selector）
 - 原子写 config + 备份
-- docker restart singbox
+- 执行 `SINGBOX_RESTART_CMD` 重载/重启 sing-box
 - React UI：Dashboard / Subscriptions / Nodes / Reload
 
 ### Phase 2（体验增强）
@@ -933,9 +903,7 @@ SemVer：MAJOR.MINOR.PATCH。
 | DATA_DIR | /data | 数据目录 |
 | DB_PATH | /data/app.db | SQLite 路径 |
 | SINGBOX_CONFIG | /data/sing-box.json | sing-box 配置文件 |
-| SINGBOX_CONTAINER | singbox | 容器名（Docker 模式） |
-| RUNTIME_MODE | docker | `docker` 或 `process`（见 8.3） |
-| SINGBOX_BIN | （无） | Process 模式下 sing-box 二进制路径，如 `/usr/bin/sing-box` |
+| SINGBOX_RESTART_CMD | （无） | 必填，执行 sing-box 重载/重启的命令 |
 | HTTP_PROXY_PORT | 7890 | http 入站端口 |
 | SOCKS_PROXY_PORT | 7891 | socks 入站端口 |
 | BACKUP_KEEP | 10 | 配置备份保留数量（建议默认 10） |

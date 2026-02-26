@@ -3,7 +3,6 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
-	"os"
 
 	"boxpilot/server/internal/api/dto"
 	"boxpilot/server/internal/service"
@@ -49,14 +48,6 @@ func (h *Runtime) Status(c *gin.Context) {
 			socksPort = socksRow.Port
 		}
 	}
-	mode := "docker"
-	if os.Getenv("RUNTIME_MODE") != "" {
-		mode = os.Getenv("RUNTIME_MODE")
-	}
-	container := os.Getenv("SINGBOX_CONTAINER")
-	if container == "" {
-		container = "singbox"
-	}
 	c.JSON(http.StatusOK, dto.RuntimeStatusResponse{
 		Data: dto.RuntimeStatusData{
 			ConfigVersion:     cfgVersion,
@@ -65,8 +56,6 @@ func (h *Runtime) Status(c *gin.Context) {
 			LastReloadAt:      lastReloadAt,
 			LastReloadError:   lastReloadError,
 			Ports:             dto.RuntimePorts{HTTP: httpPort, Socks: socksPort},
-			RuntimeMode:       mode,
-			SingboxContainer:  container,
 		},
 	})
 }
@@ -83,10 +72,7 @@ func (h *Runtime) Plan(c *gin.Context) {
 }
 
 func (h *Runtime) Reload(c *gin.Context) {
-	configPath := os.Getenv("SINGBOX_CONFIG")
-	if configPath == "" {
-		configPath = "/data/sing-box.json"
-	}
+	configPath := service.ResolveConfigPath()
 	v, hsh, out, err := service.Reload(c.Request.Context(), h.DB, configPath)
 	if err != nil {
 		writeError(c, errorx.New(errorx.RTRestartFailed, err.Error()))

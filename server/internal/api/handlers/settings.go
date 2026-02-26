@@ -3,7 +3,6 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
-	"os"
 	"strconv"
 
 	"boxpilot/server/internal/api/dto"
@@ -108,10 +107,7 @@ func (h *Settings) UpdateProxySettings(c *gin.Context) {
 }
 
 func (h *Settings) ApplyProxySettings(c *gin.Context) {
-	configPath := os.Getenv("SINGBOX_CONFIG")
-	if configPath == "" {
-		configPath = "/data/sing-box.json"
-	}
+	configPath := service.ResolveConfigPath()
 	v, hsh, out, err := service.Reload(c.Request.Context(), h.DB, configPath)
 	if err != nil {
 		writeError(c, errorx.New(errorx.RTRestartFailed, err.Error()))
@@ -242,10 +238,7 @@ func (h *Settings) setForwardingRunningAndReload(c *gin.Context, running bool) e
 	if err := repo.SetForwardingRunning(h.DB, next); err != nil {
 		return errorx.New(errorx.DBError, "update forwarding state")
 	}
-	configPath := os.Getenv("SINGBOX_CONFIG")
-	if configPath == "" {
-		configPath = "/data/sing-box.json"
-	}
+	configPath := service.ResolveConfigPath()
 	if _, _, _, err := service.Reload(c.Request.Context(), h.DB, configPath); err != nil {
 		_ = repo.SetForwardingRunning(h.DB, prev)
 		return errorx.New(errorx.RTRestartFailed, err.Error())

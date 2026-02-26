@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -308,10 +307,7 @@ func (h *Nodes) RestartForwarding(c *gin.Context) {
 		writeError(c, errorx.New(errorx.REQMissingField, "node_id required"))
 		return
 	}
-	configPath := os.Getenv("SINGBOX_CONFIG")
-	if configPath == "" {
-		configPath = "/data/sing-box.json"
-	}
+	configPath := service.ResolveConfigPath()
 	if _, _, _, err := service.Reload(c.Request.Context(), h.DB, configPath); err != nil {
 		writeError(c, errorx.New(errorx.RTRestartFailed, err.Error()))
 		return

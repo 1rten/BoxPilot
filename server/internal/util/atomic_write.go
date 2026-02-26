@@ -8,6 +8,12 @@ import (
 // AtomicWrite writes data to a file atomically (write to temp then rename).
 // dir is the directory for the target file; target is the final filename (e.g. "sing-box.json").
 func AtomicWrite(dir, target string, data []byte) error {
+	if dir == "" {
+		dir = "."
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
 	tmp := filepath.Join(dir, target+".tmp")
 	if err := os.WriteFile(tmp, data, 0644); err != nil {
 		return err

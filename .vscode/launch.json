@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch BoxPilot API",
+      "name": "Launch BoxPilot API (process mode)",
       "type": "go",
       "request": "launch",
       "mode": "debug",
@@ -10,7 +10,9 @@
       "cwd": "${workspaceFolder}/server",
       "env": {
         "ADDR": ":8080",
-        "DB_PATH": "${workspaceFolder}/data/app.db"
+        "DB_PATH": "${workspaceFolder}/data/app.db",
+        "SINGBOX_CONFIG": "${workspaceFolder}/data/sing-box.json",
+        "SINGBOX_RESTART_CMD": "pkill -HUP sing-box"
       }
     }
   ]

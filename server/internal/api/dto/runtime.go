@@ -11,8 +11,6 @@ type RuntimeStatusData struct {
 	LastReloadAt      *string      `json:"last_reload_at,omitempty"`
 	LastReloadError   *string      `json:"last_reload_error,omitempty"`
 	Ports             RuntimePorts `json:"ports"`
-	RuntimeMode       string       `json:"runtime_mode"`
-	SingboxContainer  string       `json:"singbox_container"`
 }
 
 type RuntimePorts struct {

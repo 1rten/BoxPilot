@@ -78,12 +78,12 @@ export default function Dashboard() {
                 <span className="bp-runtime-value bp-mono">{configHash}</span>
               </div>
               <div className="bp-runtime-item">
-                <span className="bp-runtime-label">Mode</span>
-                <span className="bp-runtime-value">{runtime.runtime_mode}</span>
+                <span className="bp-runtime-label">HTTP Port</span>
+                <span className="bp-runtime-value">{runtime.ports.http}</span>
               </div>
               <div className="bp-runtime-item">
-                <span className="bp-runtime-label">Container</span>
-                <span className="bp-runtime-value">{runtime.singbox_container}</span>
+                <span className="bp-runtime-label">SOCKS Port</span>
+                <span className="bp-runtime-value">{runtime.ports.socks}</span>
               </div>
             </div>
           )}

@@ -61,7 +61,7 @@
 | 资源冲突（并发 reload、tag 冲突等） | 409 |
 | 上游订阅源不可用/超时 | 502 |
 | 内部错误/未知异常 | 500 |
-| 服务不可用（依赖缺失，如 docker.sock 不可用） | 503 |
+| 服务不可用（依赖缺失，如 sing-box 运行环境不可用） | 503 |
 
 也可以选择所有错误都返回 200，但不推荐：会让调试和代理/网关日志更难看懂。
 
@@ -151,10 +151,7 @@ BoxPilot 个人版通常无需鉴权错误码；若未来加 token，可再增�
 
 | code | 建议状态码 | message（建议） | details 建议字段 |
 |------|------------|-----------------|------------------|
-| RT_MODE_UNSUPPORTED | 400 | runtime mode unsupported | mode |
-| RT_DOCKER_SOCK_UNAVAILABLE | 503 | docker socket unavailable | path |
-| RT_SINGBOX_CONTAINER_NOT_FOUND | 503 | sing-box container not found | container |
-| RT_RESTART_FAILED | 500 | failed to restart sing-box | container, output(截断) |
+| RT_RESTART_FAILED | 500 | failed to restart sing-box | cmd, output(截断) |
 | RT_START_FAILED | 500 | failed to start sing-box | output(截断) |
 | RT_STOP_FAILED | 500 | failed to stop sing-box | output(截断) |
 | RT_STATUS_FAILED | 500 | failed to read runtime status | reason |
@@ -216,7 +213,6 @@ BoxPilot 个人版通常无需鉴权错误码；若未来加 token，可再增�
 | *_NOT_FOUND | 404 |
 | *_CONFLICT / *_IN_PROGRESS | 409 |
 | SUB_FETCH_* / SUB_HTTP_STATUS_ERROR | 502 |
-| RT_DOCKER_SOCK_UNAVAILABLE | 503 |
 | 其他 | 500 |
 
 ---
