@@ -1,4 +1,4 @@
-.PHONY: build web server run test migrate-gen
+.PHONY: build web server run test migrate-gen image-prebuilt up-prebuilt
 
 # Build web then server binary (embedding web/dist)
 build: web server
@@ -18,6 +18,14 @@ run: server
 # Run tests
 test:
 	cd server && go test ./...
+
+# Build docker image from prebuilt artifacts (bin/boxpilot + web/dist)
+image-prebuilt: build
+	docker build -f docker/Dockerfile.prebuilt -t boxpilot:latest .
+
+# Run compose with prebuilt image flow
+up-prebuilt: build
+	docker compose -f docker-compose.yml -f docker-compose.prebuilt.yml up --build
 
 # Generate OpenAPI types for frontend
 migrate-gen:

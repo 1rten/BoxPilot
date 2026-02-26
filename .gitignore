@@ -6,6 +6,7 @@ data/
 # Build
 dist/
 web/dist/
+bin/
 *.exe
 *.dll
 *.so

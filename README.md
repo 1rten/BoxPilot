@@ -94,6 +94,22 @@ services:
 docker compose up --build
 ```
 
+## 4️⃣ Prebuilt Artifacts (recommended for release)
+
+Build frontend and backend first, then package runtime image:
+
+```bash
+make image-prebuilt
+```
+
+Or build and run compose in one step:
+
+```bash
+make up-prebuilt
+# or
+./scripts/compose-up-prebuilt.sh
+```
+
 Open:
 
 ```
@@ -260,9 +276,12 @@ npm run dev
 ```
 boxpilot/
   docs/
+  docker/
+  scripts/
   server/
   web/
   docker-compose.yml
+  docker-compose.prebuilt.yml
   Dockerfile
 ```
 

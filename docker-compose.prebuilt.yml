@@ -1,0 +1,5 @@
+services:
+  boxpilot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.prebuilt
