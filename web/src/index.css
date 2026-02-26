@@ -27,6 +27,13 @@ body {
   font-family: "Fira Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: linear-gradient(180deg, #f4f6fb 0%, #eef2f9 100%);
   color: var(--color-text);
+  overflow: hidden;
+}
+
+html,
+body,
+#root {
+  height: 100%;
 }
 
 a {
@@ -35,7 +42,7 @@ a {
 }
 
 .bp-shell {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -293,6 +300,8 @@ a {
 
 .bp-main {
   flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 1.5rem 2rem 2rem;
   max-width: 1420px;
   width: 100%;
@@ -781,6 +790,15 @@ a {
   align-items: center;
   justify-content: flex-end;
   gap: 2px;
+}
+
+.bp-row-actions .ant-btn {
+  padding: 0 6px;
+  height: 28px;
+}
+
+.bp-row-actions .ant-btn .anticon {
+  font-size: 16px;
 }
 
 .bp-data-card {

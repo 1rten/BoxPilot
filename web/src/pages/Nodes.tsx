@@ -4,8 +4,8 @@ import { useSubscriptions } from "../hooks/useSubscriptions";
 import { ErrorState } from "../components/common/ErrorState";
 import { EmptyState } from "../components/common/EmptyState";
 import { formatDateTime } from "../utils/datetime";
-import { MoreOutlined, SearchOutlined } from "@ant-design/icons";
-import { Button, Card, Drawer, Dropdown, Input, Popconfirm, Table, Tag } from "antd";
+import { EyeOutlined, MoreOutlined, PoweroffOutlined, SwapOutlined, ThunderboltOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, Card, Drawer, Dropdown, Input, Popconfirm, Table, Tag, Tooltip } from "antd";
 import type { MenuProps } from "antd";
 import type { ColumnsType, TableRowSelection } from "antd/es/table/interface";
 import type { Node } from "../api/types";
@@ -372,7 +372,7 @@ function buildColumns({
       title: "Actions",
       key: "actions",
       align: "right",
-      width: 260,
+      width: 180,
       render: (_value, record) => (
         <div
           className="bp-row-actions"
@@ -380,16 +380,21 @@ function buildColumns({
             event.stopPropagation();
           }}
         >
-          <Button type="link" onClick={() => onShowDetails(record)}>
-            Details
-          </Button>
-          <Button
-            type="link"
-            loading={rowTestingId === record.id}
-            onClick={() => onTest(record)}
-          >
-            Test
-          </Button>
+          <Tooltip title="Details">
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
+              onClick={() => onShowDetails(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Test">
+            <Button
+              type="text"
+              icon={<ThunderboltOutlined />}
+              loading={rowTestingId === record.id}
+              onClick={() => onTest(record)}
+            />
+          </Tooltip>
           {record.enabled ? (
             <Popconfirm
               title="Disable this node?"
@@ -398,26 +403,28 @@ function buildColumns({
               cancelText="Cancel"
               onConfirm={() => onToggleEnabled(record)}
             >
-              <Button type="link" disabled={updating}>
-                Disable
-              </Button>
+              <Tooltip title="Disable">
+                <Button type="text" icon={<PoweroffOutlined />} disabled={updating} />
+              </Tooltip>
             </Popconfirm>
           ) : (
-            <Button
-              type="link"
-              onClick={() => onToggleEnabled(record)}
-              disabled={updating}
-            >
-              Enable
-            </Button>
+            <Tooltip title="Enable">
+              <Button
+                type="text"
+                icon={<PoweroffOutlined />}
+                onClick={() => onToggleEnabled(record)}
+                disabled={updating}
+              />
+            </Tooltip>
           )}
-          <Button
-            type="link"
-            onClick={() => onToggleForwarding(record)}
-            disabled={updating}
-          >
-            {record.forwarding_enabled ? "Disable Forwarding" : "Enable Forwarding"}
-          </Button>
+          <Tooltip title={record.forwarding_enabled ? "Disable forwarding" : "Enable forwarding"}>
+            <Button
+              type="text"
+              icon={<SwapOutlined />}
+              onClick={() => onToggleForwarding(record)}
+              disabled={updating}
+            />
+          </Tooltip>
         </div>
       ),
     },
