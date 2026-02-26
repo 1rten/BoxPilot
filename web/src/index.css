@@ -647,6 +647,7 @@ a {
 .bp-selection-pill {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   height: 30px;
   padding: 0 10px;
   border-radius: 999px;
@@ -654,6 +655,30 @@ a {
   color: #1d4ed8;
   font-size: 12px;
   font-weight: 700;
+}
+
+.bp-selection-pill-static {
+  min-width: 92px;
+}
+
+.bp-nodes-toolbar {
+  align-items: center;
+}
+
+.bp-nodes-search {
+  flex: 1;
+  min-width: 280px;
+  max-width: 560px;
+}
+
+.bp-nodes-toolbar-actions {
+  margin-left: auto;
+  min-width: 260px;
+  justify-content: flex-end;
+}
+
+.bp-batch-forwarding-btn {
+  min-width: 152px;
 }
 
 .bp-table-mono {
@@ -928,6 +953,69 @@ a {
   background: #fbfcff;
 }
 
+.bp-node-detail-list {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.bp-node-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #4b5a77;
+  font-size: 14px;
+}
+
+.bp-node-detail-row strong {
+  color: #111827;
+  font-weight: 600;
+  text-align: right;
+}
+
+.bp-node-ports {
+  border: 1px solid var(--bp-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.bp-node-ports-head,
+.bp-node-ports-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.bp-node-ports-head {
+  background: #f4f6fb;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bp-node-ports-row {
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.bp-node-bound-list {
+  margin: 8px 0 0 0;
+  padding-left: 18px;
+  color: #334155;
+  line-height: 1.8;
+}
+
+.bp-node-drawer-footer {
+  display: flex;
+  gap: 10px;
+  padding-top: 6px;
+}
+
 .bp-input {
   height: 36px;
   padding: 0 8px;
@@ -1042,6 +1130,16 @@ a {
   .bp-card-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .bp-nodes-search {
+    max-width: none;
+  }
+
+  .bp-nodes-toolbar-actions {
+    min-width: 0;
+    margin-left: 0;
+    justify-content: flex-start;
   }
 
   .bp-dashboard-hero {

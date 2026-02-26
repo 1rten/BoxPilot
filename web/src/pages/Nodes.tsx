@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useBatchForwarding, useNodes, useUpdateNode, useTestNodes } from "../hooks/useNodes";
+import { useSubscriptions } from "../hooks/useSubscriptions";
 import { ErrorState } from "../components/common/ErrorState";
 import { EmptyState } from "../components/common/EmptyState";
 import { formatDateTime } from "../utils/datetime";
@@ -11,6 +12,7 @@ import type { Node } from "../api/types";
 
 export default function Nodes() {
   const { data: list, isLoading, error, refetch } = useNodes({});
+  const { data: subscriptions } = useSubscriptions();
   const update = useUpdateNode();
   const testNodes = useTestNodes();
   const batchForwarding = useBatchForwarding();
@@ -19,6 +21,7 @@ export default function Nodes() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const [testMode, setTestMode] = useState<"ping" | "http">("ping");
+  const [rowTestingId, setRowTestingId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     if (!list) return list;
@@ -46,6 +49,11 @@ export default function Nodes() {
 
   const selectedCount = selectedRowKeys.length;
   const testModeLabel = testMode.toUpperCase();
+  const boundSubName = useMemo(() => {
+    if (!selectedNode || !subscriptions) return null;
+    const found = subscriptions.find((s) => s.id === selectedNode.sub_id);
+    return found?.name || null;
+  }, [selectedNode, subscriptions]);
   const forwardingMenu: MenuProps = {
     items: [
       { key: "enable", label: "Enable Forwarding" },
@@ -101,37 +109,31 @@ export default function Nodes() {
       </div>
 
       <Card className="bp-data-card">
-        <div className="bp-toolbar-inline">
+        <div className="bp-toolbar-inline bp-nodes-toolbar">
           <Input
-            className="bp-input bp-search-input"
+            className="bp-input bp-search-input bp-nodes-search"
             prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
             allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or address"
           />
-          <div className="bp-page-actions">
-            {selectedCount > 0 && (
-              <span className="bp-selection-pill">Selected {selectedCount}</span>
-            )}
+          <div className="bp-page-actions bp-nodes-toolbar-actions">
+            <span className="bp-selection-pill bp-selection-pill-static">Selected {selectedCount}</span>
             <Dropdown
               menu={forwardingMenu}
               disabled={selectedCount === 0}
               trigger={["click"]}
             >
               <Button
+                className="bp-batch-forwarding-btn"
                 disabled={selectedCount === 0}
                 loading={batchForwarding.isPending}
                 icon={<MoreOutlined />}
               >
-                Forwarding
+                Batch Forwarding
               </Button>
             </Dropdown>
-            {selectedCount > 0 && (
-              <Button onClick={() => setSelectedRowKeys([])}>
-                Clear Selection
-              </Button>
-            )}
           </div>
         </div>
 
@@ -167,12 +169,12 @@ export default function Nodes() {
                   id: row.id,
                   enabled: !row.enabled,
                 }),
-              onTest: (row) =>
-                testNodes.mutate({ node_ids: [row.id], mode: testMode }),
+              onTest: (row) => runSingleNodeTest(row.id),
               onShowDetails: (row) => openDetails(row),
               updating: update.isPending,
-              testing: testNodes.isPending,
+              rowTestingId,
             })}
+            tableLayout="fixed"
           />
         ) : (
           !isLoading && (
@@ -196,18 +198,9 @@ export default function Nodes() {
         title={
           selectedNode ? (
             <div className="bp-drawer-title">
-              <div>
-                <span className="bp-drawer-name">
-                  {selectedNode.name || selectedNode.tag}
-                </span>
-                <Tag
-                  className="bp-drawer-status"
-                  color={selectedNode.enabled ? "success" : "error"}
-                >
-                  {selectedNode.enabled ? "Online" : "Offline"}
-                </Tag>
-              </div>
-              <span className="bp-muted">Node Details</span>
+              <span className="bp-drawer-name">
+                {selectedNode.name || selectedNode.tag}
+              </span>
             </div>
           ) : (
             "Node Details"
@@ -217,87 +210,65 @@ export default function Nodes() {
         {selectedNode && (
           <>
             <div className="bp-drawer-section">
-              <div className="bp-drawer-kv">
-                <div>
-                  <p className="bp-kv-label">Type</p>
-                  <p className="bp-kv-value">{selectedNode.type}</p>
-                </div>
-                <div>
-                  <p className="bp-kv-label">Tag</p>
-                  <p className="bp-kv-value bp-mono">{selectedNode.tag}</p>
-                </div>
-                <div>
-                  <p className="bp-kv-label">Server</p>
-                  <p className="bp-kv-value bp-mono">
-                    {selectedNode.server || "-"}:{selectedNode.server_port || "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="bp-kv-label">Network</p>
-                  <p className="bp-kv-value">{selectedNode.network || "-"}</p>
-                </div>
-                <div>
-                  <p className="bp-kv-label">TLS</p>
-                  <p className="bp-kv-value">{selectedNode.tls_enabled ? "Enabled" : "Disabled"}</p>
-                </div>
-                <div>
-                  <p className="bp-kv-label">Created</p>
-                  <p className="bp-kv-value bp-mono">{formatDateTime(selectedNode.created_at)}</p>
+              <Tag color={selectedNode.enabled ? "success" : "default"}>
+                {selectedNode.enabled ? "Online" : "Offline"}
+              </Tag>
+              <div className="bp-node-detail-list">
+                <div className="bp-node-detail-row"><span>Type</span><strong>{selectedNode.type.toUpperCase()}</strong></div>
+                <div className="bp-node-detail-row"><span>IP</span><strong>{selectedNode.server || "-"}</strong></div>
+                <div className="bp-node-detail-row"><span>Port</span><strong>{selectedNode.server_port ?? "-"}</strong></div>
+                <div className="bp-node-detail-row"><span>Created At</span><strong className="bp-mono">{formatDateTime(selectedNode.created_at)}</strong></div>
+                <div className="bp-node-detail-row">
+                  <span>Last Seen</span>
+                  <strong className="bp-mono">{selectedNode.last_test_at ? formatDateTime(selectedNode.last_test_at) : "-"}</strong>
                 </div>
               </div>
             </div>
             <div className="bp-drawer-section">
-              <h3 className="bp-card-title">Health</h3>
-              <div className="bp-drawer-kv">
-                <div>
-                  <p className="bp-kv-label">Last Status</p>
-                  <p className="bp-kv-value">
-                    {selectedNode.last_test_status ? (
-                      <Tag color={statusColor(selectedNode.last_test_status)}>
-                        {selectedNode.last_test_status.toUpperCase()}
-                      </Tag>
-                    ) : (
-                      "-"
-                    )}
-                  </p>
+              <h3 className="bp-card-title">Ports</h3>
+              <div className="bp-node-ports">
+                <div className="bp-node-ports-head">
+                  <span>Port</span>
+                  <span>Protocol</span>
+                  <span>Status</span>
                 </div>
-                <div>
-                  <p className="bp-kv-label">Last Latency</p>
-                  <p className="bp-kv-value">
-                    {selectedNode.last_latency_ms !== null && selectedNode.last_latency_ms !== undefined
-                      ? `${selectedNode.last_latency_ms} ms`
-                      : "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="bp-kv-label">Last Test At</p>
-                  <p className="bp-kv-value bp-mono">
-                    {selectedNode.last_test_at ? formatDateTime(selectedNode.last_test_at) : "-"}
-                  </p>
+                <div className="bp-node-ports-row">
+                  <span>{selectedNode.server_port ?? "-"}</span>
+                  <span>{selectedNode.type.toUpperCase()}</span>
+                  <span>
+                    <Tag color={selectedNode.last_test_status ? statusColor(selectedNode.last_test_status) : selectedNode.enabled ? "success" : "default"}>
+                      {selectedNode.last_test_status ? selectedNode.last_test_status.toUpperCase() : selectedNode.enabled ? "ACTIVE" : "INACTIVE"}
+                    </Tag>
+                  </span>
                 </div>
               </div>
               {selectedNode.last_test_error && (
-                <p className="bp-text-danger" style={{ marginTop: 12 }}>
+                <p className="bp-text-danger" style={{ marginTop: 10 }}>
                   {selectedNode.last_test_error}
                 </p>
               )}
-              <div className="bp-page-actions" style={{ marginTop: 12 }}>
-                <Button
-                  loading={testNodes.isPending}
-                  onClick={() => testNodes.mutate({ node_ids: [selectedNode.id], mode: testMode })}
-                >
-                  Test Node ({testMode.toUpperCase()})
-                </Button>
-              </div>
             </div>
             <div className="bp-drawer-section">
-              <h3 className="bp-card-title">Forwarding</h3>
-              <p className="bp-muted">
-                Forwarding configuration is global in Settings. This node only controls whether it participates in forwarding.
-              </p>
-              <p className="bp-kv-value" style={{ marginTop: 10 }}>
-                {selectedNode.forwarding_enabled ? "Forwarding enabled" : "Forwarding disabled"}
-              </p>
+              <h3 className="bp-card-title">Bound Subscriptions</h3>
+              <ul className="bp-node-bound-list">
+                <li>{boundSubName || selectedNode.sub_id}</li>
+              </ul>
+            </div>
+            <div className="bp-node-drawer-footer">
+              <Button
+                type="primary"
+                loading={testNodes.isPending}
+                onClick={() => testNodes.mutate({ node_ids: [selectedNode.id], mode: testMode })}
+              >
+                Test Node ({testModeLabel})
+              </Button>
+              <Button
+                danger={selectedNode.enabled}
+                onClick={() => update.mutate({ id: selectedNode.id, enabled: !selectedNode.enabled })}
+                disabled={update.isPending}
+              >
+                {selectedNode.enabled ? "Disable Node" : "Enable Node"}
+              </Button>
             </div>
           </>
         )}
@@ -320,23 +291,33 @@ export default function Nodes() {
 
   async function runSelectedTest(mode: "ping" | "http" = testMode) {
     if (selectedRowKeys.length === 0) return;
+    setRowTestingId(null);
     await testNodes.mutateAsync({
       node_ids: selectedRowKeys,
       mode,
     });
   }
+
+  async function runSingleNodeTest(nodeID: string) {
+    setRowTestingId(nodeID);
+    try {
+      await testNodes.mutateAsync({ node_ids: [nodeID], mode: testMode });
+    } finally {
+      setRowTestingId(null);
+    }
+  }
 }
 
 function buildColumns({
   updating,
-  testing,
+  rowTestingId,
   onToggleForwarding,
   onToggleEnabled,
   onTest,
   onShowDetails,
 }: {
   updating: boolean;
-  testing: boolean;
+  rowTestingId: string | null;
   onToggleForwarding: (row: Node) => void;
   onToggleEnabled: (row: Node) => void;
   onTest: (row: Node) => void;
@@ -347,13 +328,15 @@ function buildColumns({
       title: "Name",
       dataIndex: "name",
       key: "name",
+      width: 180,
       render: (_value, record) => record.name || record.tag,
     },
-    { title: "Type", dataIndex: "type", key: "type" },
+    { title: "Type", dataIndex: "type", key: "type", width: 110 },
     {
       title: "Forwarding",
       dataIndex: "forwarding_enabled",
       key: "forwarding_enabled",
+      width: 130,
       render: (value: boolean) => (
         <Tag color={value ? "blue" : "default"}>{value ? "Enabled" : "Disabled"}</Tag>
       ),
@@ -362,6 +345,7 @@ function buildColumns({
       title: "Node Status",
       dataIndex: "enabled",
       key: "status",
+      width: 130,
       render: (value: boolean) => (
         <Tag color={value ? "success" : "default"}>{value ? "Enabled" : "Disabled"}</Tag>
       ),
@@ -370,6 +354,7 @@ function buildColumns({
       title: "Latency",
       dataIndex: "last_latency_ms",
       key: "latency",
+      width: 120,
       render: (_value, record) =>
         record.last_latency_ms !== null && record.last_latency_ms !== undefined
           ? `${record.last_latency_ms} ms`
@@ -379,6 +364,7 @@ function buildColumns({
       title: "Last Test",
       dataIndex: "last_test_at",
       key: "last_test_at",
+      width: 190,
       render: (value: string | null | undefined) =>
         value ? <span className="bp-table-mono">{formatDateTime(value)}</span> : "-",
     },
@@ -386,6 +372,7 @@ function buildColumns({
       title: "Actions",
       key: "actions",
       align: "right",
+      width: 260,
       render: (_value, record) => (
         <div
           className="bp-row-actions"
@@ -398,7 +385,7 @@ function buildColumns({
           </Button>
           <Button
             type="link"
-            loading={testing}
+            loading={rowTestingId === record.id}
             onClick={() => onTest(record)}
           >
             Test
