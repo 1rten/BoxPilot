@@ -41,6 +41,12 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Antd Drawer/Modal toggles body width for scrollbar compensation.
+   With centered layouts this causes visible horizontal jitter. */
+body.ant-scrolling-effect {
+  width: 100% !important;
+}
+
 a {
   color: inherit;
   text-decoration: none;
