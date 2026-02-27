@@ -172,7 +172,7 @@ export default function Subscriptions() {
             ? {
                 name: editingSub.name || editingSub.url,
                 url: editingSub.url,
-                auto_update_enabled: editingSub.auto_update_enabled,
+                auto_update_enabled: editingSub.auto_update_enabled ?? false,
                 refresh_interval_sec: editingSub.refresh_interval_sec,
               }
             : undefined

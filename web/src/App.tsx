@@ -3,6 +3,7 @@ import Dashboard from "./pages/Dashboard";
 import Subscriptions from "./pages/Subscriptions";
 import Nodes from "./pages/Nodes";
 import Settings from "./pages/Settings";
+import type { ForwardingSummaryNode } from "./api/types";
 import {
   useForwardingSummary,
   useStartForwardingRuntime,
@@ -74,7 +75,7 @@ export default function App() {
                   )}
                   {nodeList.length > 0 ? (
                     <div className="bp-forwarding-popover-list">
-                      {nodeList.map((node) => (
+                      {nodeList.map((node: ForwardingSummaryNode) => (
                         <div key={node.id} className="bp-forwarding-popover-item">
                           <span className="bp-forwarding-popover-name">{node.name || node.tag}</span>
                           <span className="bp-forwarding-popover-side">
