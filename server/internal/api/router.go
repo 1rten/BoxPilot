@@ -46,6 +46,8 @@ func Router(db *sql.DB) *gin.Engine {
 		v1.GET("/settings/proxy", settings.GetProxySettings)
 		v1.POST("/settings/proxy/update", settings.UpdateProxySettings)
 		v1.POST("/settings/proxy/apply", settings.ApplyProxySettings)
+		v1.GET("/settings/routing", settings.GetRoutingSettings)
+		v1.POST("/settings/routing/update", settings.UpdateRoutingSettings)
 		v1.GET("/settings/forwarding/status", settings.ForwardingStatus)
 		v1.GET("/settings/forwarding/summary", settings.ForwardingSummary)
 		v1.POST("/settings/forwarding/start", settings.StartForwarding)

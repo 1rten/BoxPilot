@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"boxpilot/server/internal/api/dto"
+	"boxpilot/server/internal/generator"
 	"boxpilot/server/internal/service"
 	"boxpilot/server/internal/store/repo"
 	"boxpilot/server/internal/util"
@@ -119,6 +120,59 @@ func (h *Settings) ApplyProxySettings(c *gin.Context) {
 			ConfigHash:    hsh,
 			RestartOutput: out,
 			ReloadedAt:    util.NowRFC3339(),
+		},
+	})
+}
+
+func (h *Settings) GetRoutingSettings(c *gin.Context) {
+	settings, updatedAt, err := service.LoadRoutingSettings(h.DB)
+	if err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.DBError, "get routing settings"))
+		return
+	}
+	c.JSON(http.StatusOK, dto.RoutingSettingsResponse{
+		Data: dto.RoutingSettingsData{
+			BypassPrivateEnabled: settings.BypassPrivateEnabled,
+			BypassDomains:        settings.BypassDomains,
+			BypassCIDRs:          settings.BypassCIDRs,
+			UpdatedAt:            updatedAt,
+		},
+	})
+}
+
+func (h *Settings) UpdateRoutingSettings(c *gin.Context) {
+	var req dto.UpdateRoutingSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, errorx.New(errorx.REQValidationFailed, "invalid body"))
+		return
+	}
+	if req.BypassPrivateEnabled == nil {
+		writeError(c, errorx.New(errorx.REQMissingField, "bypass_private_enabled required"))
+		return
+	}
+	saved, updatedAt, err := service.SaveRoutingSettings(h.DB, generator.RoutingSettings{
+		BypassPrivateEnabled: *req.BypassPrivateEnabled,
+		BypassDomains:        req.BypassDomains,
+		BypassCIDRs:          req.BypassCIDRs,
+	})
+	if err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.DBError, "update routing settings"))
+		return
+	}
+	c.JSON(http.StatusOK, dto.RoutingSettingsResponse{
+		Data: dto.RoutingSettingsData{
+			BypassPrivateEnabled: saved.BypassPrivateEnabled,
+			BypassDomains:        saved.BypassDomains,
+			BypassCIDRs:          saved.BypassCIDRs,
+			UpdatedAt:            updatedAt,
 		},
 	})
 }

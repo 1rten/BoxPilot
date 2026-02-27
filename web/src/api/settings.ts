@@ -1,5 +1,12 @@
 import { api } from "./client";
-import type { ForwardingRuntimeStatus, ForwardingSummaryData, ProxySettingsData, ProxyType, ProxyConfig } from "./types";
+import type {
+  ForwardingRuntimeStatus,
+  ForwardingSummaryData,
+  ProxySettingsData,
+  ProxyType,
+  ProxyConfig,
+  RoutingSettingsData,
+} from "./types";
 
 export async function getProxySettings(): Promise<ProxySettingsData> {
   const { data } = await api.get<{ data: ProxySettingsData }>("/settings/proxy");
@@ -52,6 +59,24 @@ export async function startForwardingRuntime(): Promise<ForwardingRuntimeStatus>
 
 export async function stopForwardingRuntime(): Promise<ForwardingRuntimeStatus> {
   const { data } = await api.post<{ data: ForwardingRuntimeStatus }>("/settings/forwarding/stop", {});
+  return data.data;
+}
+
+export async function getRoutingSettings(): Promise<RoutingSettingsData> {
+  const { data } = await api.get<{ data: RoutingSettingsData }>("/settings/routing");
+  return data.data;
+}
+
+export interface UpdateRoutingSettingsBody {
+  bypass_private_enabled: boolean;
+  bypass_domains: string[];
+  bypass_cidrs: string[];
+}
+
+export async function updateRoutingSettings(
+  body: UpdateRoutingSettingsBody
+): Promise<RoutingSettingsData> {
+  const { data } = await api.post<{ data: RoutingSettingsData }>("/settings/routing/update", body);
   return data.data;
 }
 

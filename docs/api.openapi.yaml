@@ -136,6 +136,40 @@ paths:
         '500':
           $ref: '#/components/responses/ErrorResponse'
 
+  /api/v1/settings/routing:
+    get:
+      tags: [Settings]
+      summary: Get routing bypass settings
+      responses:
+        '200':
+          description: Routing bypass settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutingSettingsResponse'
+
+  /api/v1/settings/routing/update:
+    post:
+      tags: [Settings]
+      summary: Update routing bypass settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRoutingSettingsRequest'
+      responses:
+        '200':
+          description: Routing bypass settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutingSettingsResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
   /api/v1/subscriptions:
     get:
       tags: [Subscriptions]
@@ -557,6 +591,35 @@ components:
                 required: [id, name, tag, type]
           required: [running, status, selected_nodes_count, nodes]
       required: [data]
+
+    RoutingSettingsResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            bypass_private_enabled: { type: boolean }
+            bypass_domains:
+              type: array
+              items: { type: string }
+            bypass_cidrs:
+              type: array
+              items: { type: string }
+            updated_at: { type: string }
+          required: [bypass_private_enabled, bypass_domains, bypass_cidrs]
+      required: [data]
+
+    UpdateRoutingSettingsRequest:
+      type: object
+      properties:
+        bypass_private_enabled: { type: boolean }
+        bypass_domains:
+          type: array
+          items: { type: string }
+        bypass_cidrs:
+          type: array
+          items: { type: string }
+      required: [bypass_private_enabled]
 
     RuntimePlanRequest:
       type: object

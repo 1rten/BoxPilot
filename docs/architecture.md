@@ -293,7 +293,7 @@ boxpilot/
 - 每次启动执行 migrations：按版本号排序，只执行未执行过的 migration。
 - 保证旧版本升级不丢数据、可重复执行（幂等）。
 
-实现与规范：迁移文件放在 `server/internal/store/migrations/`（如 `0001_init.sql`、`0002_runtime_state.sql`）；**migration 编写与发布规范见 `docs/migrations.md`**。
+实现与规范：迁移文件放在 `server/internal/store/migrations/`（开发期先统一在 `0001_init.sql`）；**migration 编写与发布规范见 `docs/migrations.md`**。
 
 ### 5.4 表：runtime_state（单行即可）
 用途：记录当前运行配置版本、hash、上次重载结果。
@@ -335,6 +335,17 @@ boxpilot/
 | password | TEXT | 可选 |
 | created_at | TEXT | RFC3339 |
 | updated_at | TEXT | RFC3339 |
+
+### 5.7 表：routing_settings（单行即可）
+用途：全局路由绕过配置（控制哪些目标走直连）。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| id | TEXT PK | 固定 `global` |
+| bypass_private_enabled | INTEGER | 1/0，是否启用绕过规则 |
+| bypass_domains_json | TEXT | JSON 数组，域名后缀列表 |
+| bypass_cidrs_json | TEXT | JSON 数组，CIDR 列表 |
+| updated_at | TEXT | 更新时间 |
 
 ---
 
@@ -427,7 +438,7 @@ sing-box 的 selector outbounds 依赖 tag，tag 冲突会导致 selector 指向
 核心内容：
 - **inbounds**：HTTP + SOCKS
 - **outbounds**：direct/block + 节点 outbounds + selector(proxy)
-- **route**：final=proxy（MVP）
+- **route**：final=proxy + 可配置绕过规则（直连）
 
 ### 7.2 Inbounds（可配置）
 
@@ -481,17 +492,27 @@ sing-box 的 selector outbounds 依赖 tag，tag 冲突会导致 selector 指向
 }
 ```
 
-### 7.4 Route（MVP）
+### 7.4 Route（全局绕过）
 
-默认全走 proxy：
+默认行为：
+- `final = proxy`
+- 当 `routing_settings.bypass_private_enabled = 1` 时，追加规则：
+  - `domain_suffix` 命中 `bypass_domains_json` -> `direct`
+  - `ip_cidr` 命中 `bypass_cidrs_json` -> `direct`
+
+示例：
 
 ```json
 {
-  "route": { "final": "proxy" }
+  "route": {
+    "rules": [
+      { "domain_suffix": ["localhost", "local"], "outbound": "direct" },
+      { "ip_cidr": ["10.0.0.0/8", "192.168.0.0/16"], "outbound": "direct" }
+    ],
+    "final": "proxy"
+  }
 }
 ```
-
-后续扩展：geosite/geoip 分流、urltest 自动选优、自定义规则编辑器。
 
 ### 7.5 原子写入与备份（强烈建议）
 
@@ -571,6 +592,8 @@ sing-box 的 selector outbounds 依赖 tag，tag 冲突会导致 selector 指向
 | GET | `/api/v1/settings/proxy` | 代理设置（HTTP/SOCKS）与状态，返回 `ProxySettingsResponse` |
 | POST | `/api/v1/settings/proxy/update` | 保存代理设置，返回 `ProxySettingsResponse` |
 | POST | `/api/v1/settings/proxy/apply` | 写盘并重启 sing-box，使代理配置生效，返回 `ProxyApplyResponse` |
+| GET | `/api/v1/settings/routing` | 获取路由绕过配置，返回 `RoutingSettingsResponse` |
+| POST | `/api/v1/settings/routing/update` | 保存路由绕过配置，返回 `RoutingSettingsResponse` |
 | GET | `/api/v1/nodes/forwarding` | 节点代理信息（global/override），query: `node_id` |
 | POST | `/api/v1/nodes/forwarding/update` | 保存节点代理 override（或 `use_global=true` 清除 override） |
 | POST | `/api/v1/nodes/forwarding/restart` | 重启该节点代理（MVP 触发整体重启） |

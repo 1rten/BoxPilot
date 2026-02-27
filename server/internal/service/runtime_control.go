@@ -20,7 +20,11 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 	if err != nil {
 		return 0, "", "", err
 	}
-	cfg, _, h, err := BuildConfigFromDB(db, httpProxy, socksProxy, forwardingRunning)
+	routing, _, err := LoadRoutingSettings(db)
+	if err != nil {
+		return 0, "", "", err
+	}
+	cfg, _, h, err := BuildConfigFromDB(db, httpProxy, socksProxy, routing, forwardingRunning)
 	if err != nil {
 		return 0, "", "", err
 	}

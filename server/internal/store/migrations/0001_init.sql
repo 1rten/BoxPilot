@@ -85,3 +85,20 @@ CREATE TABLE IF NOT EXISTS node_proxy_overrides (
 );
 
 CREATE INDEX IF NOT EXISTS idx_node_proxy_overrides_node_id ON node_proxy_overrides(node_id);
+
+CREATE TABLE IF NOT EXISTS routing_settings (
+  id TEXT PRIMARY KEY,
+  bypass_private_enabled INTEGER NOT NULL DEFAULT 1,
+  bypass_domains_json TEXT NOT NULL DEFAULT '["localhost","local"]',
+  bypass_cidrs_json TEXT NOT NULL DEFAULT '["127.0.0.0/8","10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","169.254.0.0/16","::1/128","fc00::/7","fe80::/10"]',
+  updated_at TEXT NOT NULL DEFAULT ''
+);
+
+INSERT OR IGNORE INTO routing_settings (id, bypass_private_enabled, bypass_domains_json, bypass_cidrs_json, updated_at)
+VALUES (
+  'global',
+  1,
+  '["localhost","local"]',
+  '["127.0.0.0/8","10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","169.254.0.0/16","::1/128","fc00::/7","fe80::/10"]',
+  ''
+);

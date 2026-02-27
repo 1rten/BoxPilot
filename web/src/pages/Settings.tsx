@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Form, Input, InputNumber, Select, Switch, Tag } from "antd";
-import type { ProxyConfig, ProxyType } from "../api/types";
+import type { ProxyConfig, ProxyType, RoutingSettingsData } from "../api/types";
 import { buildProxyUrl, resolveProxyClientHost } from "../api/settings";
-import { useProxySettings, useUpdateProxySettings, useApplyProxySettings } from "../hooks/useProxySettings";
+import {
+  useProxySettings,
+  useUpdateProxySettings,
+  useApplyProxySettings,
+  useRoutingSettings,
+  useUpdateRoutingSettings,
+} from "../hooks/useProxySettings";
 import { useToast } from "../components/common/ToastContext";
 
 interface ProxyCardProps {
@@ -13,6 +19,7 @@ interface ProxyCardProps {
 
 export default function Settings() {
   const { data, isLoading } = useProxySettings();
+  const { data: routingData, isLoading: routingLoading } = useRoutingSettings();
   return (
     <div className="bp-page">
       <div className="bp-page-header">
@@ -27,7 +34,10 @@ export default function Settings() {
         <ProxySettingsCard title="HTTP Proxy" proxyType="http" data={data?.http} />
         <ProxySettingsCard title="SOCKS5 Proxy" proxyType="socks" data={data?.socks} />
       </div>
-      {isLoading && (
+      <div style={{ marginTop: 16 }}>
+        <RoutingSettingsCard data={routingData} />
+      </div>
+      {(isLoading || routingLoading) && (
         <p className="bp-muted" style={{ marginTop: 12 }}>
           Loading settings...
         </p>
@@ -202,4 +212,82 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
       </div>
     </Card>
   );
+}
+
+interface RoutingCardProps {
+  data?: RoutingSettingsData;
+}
+
+function RoutingSettingsCard({ data }: RoutingCardProps) {
+  const [form] = Form.useForm();
+  const update = useUpdateRoutingSettings();
+  const apply = useApplyProxySettings();
+
+  useEffect(() => {
+    if (!data) return;
+    form.setFieldsValue({
+      bypass_private_enabled: data.bypass_private_enabled,
+      bypass_domains_text: (data.bypass_domains || []).join("\n"),
+      bypass_cidrs_text: (data.bypass_cidrs || []).join("\n"),
+    });
+  }, [data, form]);
+
+  const onSave = async () => {
+    const values = await form.validateFields();
+    update.mutate({
+      bypass_private_enabled: values.bypass_private_enabled,
+      bypass_domains: splitLines(values.bypass_domains_text),
+      bypass_cidrs: splitLines(values.bypass_cidrs_text),
+    });
+  };
+
+  return (
+    <Card className="bp-settings-card">
+      <div className="bp-card-header">
+        <div>
+          <p className="bp-card-kicker">Route Rules</p>
+          <h2 className="bp-card-title">Routing Bypass</h2>
+        </div>
+        {data?.updated_at ? <span className="bp-muted">Updated {data.updated_at}</span> : null}
+      </div>
+      <p className="bp-muted" style={{ marginTop: 0 }}>
+        Matched domains and CIDRs will go direct instead of proxy.
+      </p>
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={{
+          bypass_private_enabled: true,
+          bypass_domains_text: "localhost\nlocal",
+          bypass_cidrs_text:
+            "127.0.0.0/8\n10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16\n169.254.0.0/16\n::1/128\nfc00::/7\nfe80::/10",
+        }}
+      >
+        <Form.Item name="bypass_private_enabled" label="Enable bypass rules" valuePropName="checked">
+          <Switch />
+        </Form.Item>
+        <Form.Item name="bypass_domains_text" label="Bypass domains (one per line)">
+          <Input.TextArea rows={4} placeholder="localhost&#10;local" />
+        </Form.Item>
+        <Form.Item name="bypass_cidrs_text" label="Bypass CIDRs (one per line)">
+          <Input.TextArea rows={6} placeholder="192.168.0.0/16&#10;10.0.0.0/8" />
+        </Form.Item>
+      </Form>
+      <div className="bp-page-actions bp-settings-actions">
+        <Button onClick={onSave} type="primary" loading={update.isPending}>
+          Save
+        </Button>
+        <Button onClick={() => apply.mutate()} loading={apply.isPending}>
+          Apply / Restart
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function splitLines(raw: string): string[] {
+  return raw
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }

@@ -16,7 +16,30 @@ type ProxyInbound struct {
 	Password      string
 }
 
-func BuildConfig(httpProxy ProxyInbound, socksProxy ProxyInbound, nodeOutboundJSONs []string) ([]byte, error) {
+type RoutingSettings struct {
+	BypassPrivateEnabled bool
+	BypassDomains        []string
+	BypassCIDRs          []string
+}
+
+func DefaultRoutingSettings() RoutingSettings {
+	return RoutingSettings{
+		BypassPrivateEnabled: true,
+		BypassDomains:        []string{"localhost", "local"},
+		BypassCIDRs: []string{
+			"127.0.0.0/8",
+			"10.0.0.0/8",
+			"172.16.0.0/12",
+			"192.168.0.0/16",
+			"169.254.0.0/16",
+			"::1/128",
+			"fc00::/7",
+			"fe80::/10",
+		},
+	}
+}
+
+func BuildConfig(httpProxy ProxyInbound, socksProxy ProxyInbound, routing RoutingSettings, nodeOutboundJSONs []string) ([]byte, error) {
 	inbounds := []map[string]any{}
 	if httpProxy.Enabled {
 		inbounds = append(inbounds, buildInbound("http", "http-in", httpProxy))
@@ -73,9 +96,32 @@ func BuildConfig(httpProxy ProxyInbound, socksProxy ProxyInbound, nodeOutboundJS
 			"default":   "proxy-auto",
 		})
 	}
+	route := map[string]any{
+		"final": "proxy",
+	}
+	if routing.BypassPrivateEnabled {
+		rules := make([]map[string]any, 0, 2)
+		if len(routing.BypassDomains) > 0 {
+			rules = append(rules, map[string]any{
+				"domain_suffix": routing.BypassDomains,
+				"outbound":      "direct",
+			})
+		}
+		if len(routing.BypassCIDRs) > 0 {
+			rules = append(rules, map[string]any{
+				"ip_cidr":  routing.BypassCIDRs,
+				"outbound": "direct",
+			})
+		}
+		if len(rules) > 0 {
+			route["rules"] = rules
+		}
+	}
+
 	cfg := map[string]any{
-		"inbounds": inbounds, "outbounds": outbounds,
-		"route": map[string]any{"final": "proxy"},
+		"inbounds":  inbounds,
+		"outbounds": outbounds,
+		"route":     route,
 	}
 	b, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {

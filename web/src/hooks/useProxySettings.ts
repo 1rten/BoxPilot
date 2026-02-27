@@ -7,7 +7,10 @@ import {
   getForwardingSummary,
   startForwardingRuntime,
   stopForwardingRuntime,
+  getRoutingSettings,
+  updateRoutingSettings,
   type UpdateProxySettingsBody,
+  type UpdateRoutingSettingsBody,
 } from "../api/settings";
 import { useToast } from "../components/common/ToastContext";
 
@@ -109,6 +112,34 @@ export function useStopForwardingRuntime() {
       q.invalidateQueries({ queryKey: ["forwarding-summary"] });
       q.invalidateQueries({ queryKey: ["proxy-settings"] });
       addToast("success", "Forwarding stopped");
+    },
+    onError: (error: unknown) => {
+      const anyErr = error as any;
+      const message =
+        anyErr?.appError?.message ||
+        anyErr?.response?.data?.error?.message ||
+        anyErr?.message ||
+        "Unknown error";
+      addToast("error", message);
+    },
+  });
+}
+
+export function useRoutingSettings() {
+  return useQuery({
+    queryKey: ["routing-settings"],
+    queryFn: getRoutingSettings,
+  });
+}
+
+export function useUpdateRoutingSettings() {
+  const q = useQueryClient();
+  const { addToast } = useToast();
+  return useMutation({
+    mutationFn: (body: UpdateRoutingSettingsBody) => updateRoutingSettings(body),
+    onSuccess: () => {
+      q.invalidateQueries({ queryKey: ["routing-settings"] });
+      addToast("success", "Routing bypass settings saved");
     },
     onError: (error: unknown) => {
       const anyErr = error as any;

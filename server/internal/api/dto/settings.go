@@ -43,6 +43,23 @@ type ProxyApplyData struct {
 	ReloadedAt    string `json:"reloaded_at"`
 }
 
+type RoutingSettingsResponse struct {
+	Data RoutingSettingsData `json:"data"`
+}
+
+type RoutingSettingsData struct {
+	BypassPrivateEnabled bool     `json:"bypass_private_enabled"`
+	BypassDomains        []string `json:"bypass_domains"`
+	BypassCIDRs          []string `json:"bypass_cidrs"`
+	UpdatedAt            string   `json:"updated_at,omitempty"`
+}
+
+type UpdateRoutingSettingsRequest struct {
+	BypassPrivateEnabled *bool    `json:"bypass_private_enabled"`
+	BypassDomains        []string `json:"bypass_domains"`
+	BypassCIDRs          []string `json:"bypass_cidrs"`
+}
+
 type ForwardingRuntimeStatusResponse struct {
 	Data ForwardingRuntimeStatus `json:"data"`
 }
