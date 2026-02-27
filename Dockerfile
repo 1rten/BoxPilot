@@ -2,16 +2,15 @@
 FROM node:20-alpine AS web
 WORKDIR /app/web
 COPY web/package.json web/package-lock.json* ./
-RUN npm ci --ignore-scripts || true
+RUN npm ci
 COPY web/ ./
-RUN npm run build 2>/dev/null || npx vite build 2>/dev/null || true
-RUN mkdir -p dist && echo '<!DOCTYPE html><html><body>BoxPilot</body></html>' > dist/index.html
+RUN npm run build
 
 # Stage 2: build server
 FROM golang:1.22-alpine AS server
 WORKDIR /app
 COPY server/go.mod server/go.sum* ./
-RUN go mod download 2>/dev/null || true
+RUN go mod download
 COPY server/ ./
 RUN CGO_ENABLED=0 go build -o /boxpilot .
 

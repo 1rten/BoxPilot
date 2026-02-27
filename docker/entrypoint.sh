@@ -14,6 +14,13 @@ if [ ! -x /app/boxpilot ]; then
 fi
 
 config_path="${SINGBOX_CONFIG:-/data/sing-box.json}"
+web_root="${WEB_ROOT:-/app/web/dist}"
+if [ -f "$web_root/index.html" ]; then
+  log "web root ready: $web_root/index.html"
+else
+  log "WARN: frontend index missing at $web_root/index.html"
+fi
+
 if [ -f "$config_path" ]; then
   log "found sing-box config at $config_path, starting sing-box"
   if ! /app/docker/restart-singbox.sh --start-only; then
