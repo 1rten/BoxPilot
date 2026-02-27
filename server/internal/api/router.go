@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"net/http"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 
 	"boxpilot/server/internal/api/handlers"
 	"boxpilot/server/internal/api/middleware"
@@ -56,13 +59,33 @@ func Router(db *sql.DB) *gin.Engine {
 
 	// Static files when WEB_ROOT is set (e.g. production)
 	if dir := os.Getenv("WEB_ROOT"); dir != "" {
+		indexPath := filepath.Join(dir, "index.html")
 		r.NoRoute(func(c *gin.Context) {
 			p := c.Request.URL.Path
-			if p == "" || p == "/" {
-				c.File(dir + "/index.html")
+			if strings.HasPrefix(p, "/api/") {
+				c.String(http.StatusNotFound, "404 page not found")
 				return
 			}
-			c.File(dir + p)
+			cleaned := strings.TrimPrefix(path.Clean("/"+p), "/")
+			if cleaned == "" {
+				c.File(indexPath)
+				return
+			}
+
+			target := filepath.Join(dir, filepath.FromSlash(cleaned))
+			if stat, err := os.Stat(target); err == nil && !stat.IsDir() {
+				c.File(target)
+				return
+			}
+
+			// Missing files with extension are likely asset requests; keep 404.
+			if strings.Contains(filepath.Base(cleaned), ".") {
+				c.String(http.StatusNotFound, "404 page not found")
+				return
+			}
+
+			// SPA route fallback, e.g. /nodes or /subscriptions/123.
+			c.File(indexPath)
 		})
 	} else {
 		r.NoRoute(func(c *gin.Context) {
