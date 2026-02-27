@@ -110,6 +110,12 @@ make up-prebuilt
 ./scripts/compose-up-prebuilt.sh
 ```
 
+If target architecture differs from host default, override build arch:
+
+```bash
+make PREBUILT_GOARCH=amd64 up-prebuilt
+```
+
 Open:
 
 ```

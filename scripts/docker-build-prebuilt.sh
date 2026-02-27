@@ -6,5 +6,5 @@ cd "$ROOT_DIR"
 
 IMAGE_TAG="${1:-boxpilot:latest}"
 
-make build
+make build-prebuilt
 docker build -f docker/Dockerfile.prebuilt -t "$IMAGE_TAG" .
