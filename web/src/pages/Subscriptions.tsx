@@ -92,23 +92,25 @@ export default function Subscriptions() {
       </div>
 
       <Card className="bp-data-card">
-        <div className="bp-toolbar-inline">
+        <div className="bp-toolbar-inline bp-subscriptions-toolbar">
           <Input
-            className="bp-input bp-search-input"
+            className="bp-input bp-search-input bp-toolbar-search"
             prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
             allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or URL"
           />
-          <span className="bp-inline-control">
-            <Switch
-              size="small"
-              checked={autoRefresh}
-              onChange={(checked) => setAutoRefresh(checked)}
-            />
-            Auto poll list every 30s
-          </span>
+          <div className="bp-toolbar-actions-fixed bp-subscriptions-toolbar-actions">
+            <span className="bp-inline-control">
+              <Switch
+                size="small"
+                checked={autoRefresh}
+                onChange={(checked) => setAutoRefresh(checked)}
+              />
+              Auto poll list every 30s
+            </span>
+          </div>
         </div>
 
         {isLoading && !list && <Skeleton active paragraph={{ rows: 4 }} />}
@@ -131,8 +133,6 @@ export default function Subscriptions() {
             pagination={{
               pageSize: 10,
               showSizeChanger: true,
-              showTotal: (total, range) =>
-                `${range[0]}-${range[1]} of ${total} subscriptions`,
             }}
             onEdit={(row) => {
               setEditingSub(row);

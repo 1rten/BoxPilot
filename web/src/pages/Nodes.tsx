@@ -4,7 +4,15 @@ import { useSubscriptions } from "../hooks/useSubscriptions";
 import { ErrorState } from "../components/common/ErrorState";
 import { EmptyState } from "../components/common/EmptyState";
 import { formatDateTime } from "../utils/datetime";
-import { EyeOutlined, MoreOutlined, PoweroffOutlined, SwapOutlined, ThunderboltOutlined, SearchOutlined } from "@ant-design/icons";
+import {
+  EyeOutlined,
+  LoadingOutlined,
+  MoreOutlined,
+  PoweroffOutlined,
+  SearchOutlined,
+  SwapOutlined,
+  ThunderboltOutlined,
+} from "@ant-design/icons";
 import { Button, Card, Drawer, Dropdown, Input, Popconfirm, Table, Tag, Tooltip } from "antd";
 import type { MenuProps } from "antd";
 import type { ColumnsType, TableRowSelection } from "antd/es/table/interface";
@@ -80,6 +88,8 @@ export default function Nodes() {
     },
   };
 
+  const virtualEnabled = (filtered?.length ?? 0) > 200;
+
   return (
     <div className="bp-page">
       <div className="bp-page-header">
@@ -90,19 +100,20 @@ export default function Nodes() {
           </p>
         </div>
         <div className="bp-page-actions">
-          <Dropdown
-            menu={testMenu}
-            disabled={selectedCount === 0}
-            trigger={["click"]}
-          >
-            <Button
-              disabled={selectedCount === 0}
-              loading={testNodes.isPending}
-            >
-              Test Selected ({testModeLabel})
+          <Dropdown menu={testMenu} disabled={selectedCount === 0} trigger={["click"]}>
+            <Button className="bp-btn-fixed bp-btn-test-mode" disabled={selectedCount === 0}>
+              Mode: {testModeLabel}
             </Button>
           </Dropdown>
-          <Button onClick={() => refetch()} loading={isLoading}>
+          <Button
+            className="bp-btn-fixed bp-btn-test-selected"
+            disabled={selectedCount === 0}
+            loading={testNodes.isPending}
+            onClick={() => void runSelectedTest(testMode)}
+          >
+            Test Selected
+          </Button>
+          <Button className="bp-btn-fixed" onClick={() => refetch()} loading={isLoading}>
             Refresh
           </Button>
         </div>
@@ -111,22 +122,18 @@ export default function Nodes() {
       <Card className="bp-data-card">
         <div className="bp-toolbar-inline bp-nodes-toolbar">
           <Input
-            className="bp-input bp-search-input bp-nodes-search"
+            className="bp-input bp-search-input bp-toolbar-search bp-nodes-search"
             prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
             allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or address"
           />
-          <div className="bp-page-actions bp-nodes-toolbar-actions">
+          <div className="bp-toolbar-actions-fixed bp-nodes-toolbar-actions">
             <span className="bp-selection-pill bp-selection-pill-static">Selected {selectedCount}</span>
-            <Dropdown
-              menu={forwardingMenu}
-              disabled={selectedCount === 0}
-              trigger={["click"]}
-            >
+            <Dropdown menu={forwardingMenu} disabled={selectedCount === 0} trigger={["click"]}>
               <Button
-                className="bp-batch-forwarding-btn"
+                className="bp-batch-forwarding-btn bp-btn-fixed"
                 disabled={selectedCount === 0}
                 loading={batchForwarding.isPending}
                 icon={<MoreOutlined />}
@@ -152,14 +159,18 @@ export default function Nodes() {
             dataSource={filtered}
             loading={isLoading}
             onRow={(record) => ({
-              onClick: () => openDetails(record),
+              onClick: (event) => {
+                const target = event.target as HTMLElement;
+                if (target.closest(".ant-table-selection-column") || target.closest(".bp-row-actions")) {
+                  return;
+                }
+                openDetails(record);
+              },
               className: "bp-clickable-row",
             })}
             pagination={{
               pageSize: 10,
               showSizeChanger: true,
-              showTotal: (total, range) =>
-                `${range[0]}-${range[1]} of ${total} nodes`,
             }}
             columns={buildColumns({
               onToggleForwarding: (row) =>
@@ -175,6 +186,8 @@ export default function Nodes() {
               rowTestingId,
             })}
             tableLayout="fixed"
+            virtual={virtualEnabled}
+            scroll={virtualEnabled ? { y: 560 } : undefined}
           />
         ) : (
           !isLoading && (
@@ -200,8 +213,11 @@ export default function Nodes() {
         title={
           selectedNode ? (
             <div className="bp-drawer-title">
-              <span className="bp-drawer-name">
-                {selectedNode.name || selectedNode.tag}
+              <span className="bp-drawer-name">{selectedNode.name || selectedNode.tag}</span>
+              <span className="bp-drawer-status">
+                <Tag color={selectedNode.enabled ? "success" : "default"}>
+                  {selectedNode.enabled ? "Online" : "Offline"}
+                </Tag>
               </span>
             </div>
           ) : (
@@ -212,36 +228,75 @@ export default function Nodes() {
         {selectedNode && (
           <>
             <div className="bp-drawer-section">
-              <Tag color={selectedNode.enabled ? "success" : "default"}>
-                {selectedNode.enabled ? "Online" : "Offline"}
-              </Tag>
-              <div className="bp-node-detail-list">
-                <div className="bp-node-detail-row"><span>Type</span><strong>{selectedNode.type.toUpperCase()}</strong></div>
-                <div className="bp-node-detail-row"><span>IP</span><strong>{selectedNode.server || "-"}</strong></div>
-                <div className="bp-node-detail-row"><span>Port</span><strong>{selectedNode.server_port ?? "-"}</strong></div>
-                <div className="bp-node-detail-row"><span>Created At</span><strong className="bp-mono">{formatDateTime(selectedNode.created_at)}</strong></div>
-                <div className="bp-node-detail-row">
-                  <span>Last Seen</span>
-                  <strong className="bp-mono">{selectedNode.last_test_at ? formatDateTime(selectedNode.last_test_at) : "-"}</strong>
+              <h3 className="bp-card-title">Overview</h3>
+              <div className="bp-drawer-kv">
+                <div>
+                  <p className="bp-kv-label">Type</p>
+                  <p className="bp-kv-value">{selectedNode.type.toUpperCase()}</p>
+                </div>
+                <div>
+                  <p className="bp-kv-label">IP</p>
+                  <p className="bp-kv-value bp-table-mono">{selectedNode.server || "-"}</p>
+                </div>
+                <div>
+                  <p className="bp-kv-label">Port</p>
+                  <p className="bp-kv-value bp-table-mono">{selectedNode.server_port ?? "-"}</p>
+                </div>
+                <div>
+                  <p className="bp-kv-label">Created</p>
+                  <p className="bp-kv-value bp-table-mono">{formatDateTime(selectedNode.created_at)}</p>
+                </div>
+                <div>
+                  <p className="bp-kv-label">Forwarding</p>
+                  <p className="bp-kv-value">
+                    <Tag color={selectedNode.forwarding_enabled ? "blue" : "default"}>
+                      {selectedNode.forwarding_enabled ? "Enabled" : "Disabled"}
+                    </Tag>
+                  </p>
+                </div>
+                <div>
+                  <p className="bp-kv-label">Subscription</p>
+                  <p className="bp-kv-value">{boundSubName || selectedNode.sub_id}</p>
                 </div>
               </div>
             </div>
+
             <div className="bp-drawer-section">
-              <h3 className="bp-card-title">Ports</h3>
-              <div className="bp-node-ports">
-                <div className="bp-node-ports-head">
-                  <span>Port</span>
-                  <span>Protocol</span>
-                  <span>Status</span>
+              <h3 className="bp-card-title">Connectivity</h3>
+              <div className="bp-drawer-kv">
+                <div>
+                  <p className="bp-kv-label">Last Test</p>
+                  <p className="bp-kv-value bp-table-mono">
+                    {selectedNode.last_test_at ? formatDateTime(selectedNode.last_test_at) : "-"}
+                  </p>
                 </div>
-                <div className="bp-node-ports-row">
-                  <span>{selectedNode.server_port ?? "-"}</span>
-                  <span>{selectedNode.type.toUpperCase()}</span>
-                  <span>
-                    <Tag color={selectedNode.last_test_status ? statusColor(selectedNode.last_test_status) : selectedNode.enabled ? "success" : "default"}>
-                      {selectedNode.last_test_status ? selectedNode.last_test_status.toUpperCase() : selectedNode.enabled ? "ACTIVE" : "INACTIVE"}
+                <div>
+                  <p className="bp-kv-label">Latency</p>
+                  <p className="bp-kv-value bp-table-mono">
+                    {selectedNode.last_latency_ms !== null && selectedNode.last_latency_ms !== undefined
+                      ? `${selectedNode.last_latency_ms} ms`
+                      : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="bp-kv-label">Status</p>
+                  <p className="bp-kv-value">
+                    <Tag
+                      color={
+                        selectedNode.last_test_status
+                          ? statusColor(selectedNode.last_test_status)
+                          : selectedNode.enabled
+                          ? "success"
+                          : "default"
+                      }
+                    >
+                      {selectedNode.last_test_status
+                        ? selectedNode.last_test_status.toUpperCase()
+                        : selectedNode.enabled
+                        ? "ACTIVE"
+                        : "INACTIVE"}
                     </Tag>
-                  </span>
+                  </p>
                 </div>
               </div>
               {selectedNode.last_test_error && (
@@ -250,21 +305,18 @@ export default function Nodes() {
                 </p>
               )}
             </div>
-            <div className="bp-drawer-section">
-              <h3 className="bp-card-title">Bound Subscriptions</h3>
-              <ul className="bp-node-bound-list">
-                <li>{boundSubName || selectedNode.sub_id}</li>
-              </ul>
-            </div>
+
             <div className="bp-node-drawer-footer">
               <Button
                 type="primary"
+                className="bp-btn-fixed"
                 loading={testNodes.isPending}
                 onClick={() => testNodes.mutate({ node_ids: [selectedNode.id], mode: testMode })}
               >
                 Test Node ({testModeLabel})
               </Button>
               <Button
+                className="bp-btn-fixed"
                 danger={selectedNode.enabled}
                 onClick={() => update.mutate({ id: selectedNode.id, enabled: !selectedNode.enabled })}
                 disabled={update.isPending}
@@ -330,27 +382,30 @@ function buildColumns({
       title: "Name",
       dataIndex: "name",
       key: "name",
-      width: 180,
+      width: 210,
+      ellipsis: true,
       render: (_value, record) => record.name || record.tag,
     },
-    { title: "Type", dataIndex: "type", key: "type", width: 110 },
+    {
+      title: "Type",
+      dataIndex: "type",
+      key: "type",
+      width: 110,
+      render: (value: string) => value.toUpperCase(),
+    },
     {
       title: "Forwarding",
       dataIndex: "forwarding_enabled",
       key: "forwarding_enabled",
       width: 130,
-      render: (value: boolean) => (
-        <Tag color={value ? "blue" : "default"}>{value ? "Enabled" : "Disabled"}</Tag>
-      ),
+      render: (value: boolean) => <Tag color={value ? "blue" : "default"}>{value ? "Enabled" : "Disabled"}</Tag>,
     },
     {
       title: "Node Status",
       dataIndex: "enabled",
       key: "status",
       width: 130,
-      render: (value: boolean) => (
-        <Tag color={value ? "success" : "default"}>{value ? "Enabled" : "Disabled"}</Tag>
-      ),
+      render: (value: boolean) => <Tag color={value ? "success" : "default"}>{value ? "Enabled" : "Disabled"}</Tag>,
     },
     {
       title: "Latency",
@@ -358,9 +413,7 @@ function buildColumns({
       key: "latency",
       width: 120,
       render: (_value, record) =>
-        record.last_latency_ms !== null && record.last_latency_ms !== undefined
-          ? `${record.last_latency_ms} ms`
-          : "-",
+        record.last_latency_ms !== null && record.last_latency_ms !== undefined ? `${record.last_latency_ms} ms` : "-",
     },
     {
       title: "Last Test",
@@ -385,6 +438,8 @@ function buildColumns({
           <Tooltip title="Details">
             <Button
               type="text"
+              className="bp-row-action-btn"
+              aria-label="Show node details"
               icon={<EyeOutlined />}
               onClick={() => onShowDetails(record)}
             />
@@ -392,8 +447,9 @@ function buildColumns({
           <Tooltip title="Test">
             <Button
               type="text"
-              icon={<ThunderboltOutlined />}
-              loading={rowTestingId === record.id}
+              className="bp-row-action-btn"
+              aria-label="Test node"
+              icon={rowTestingId === record.id ? <LoadingOutlined spin /> : <ThunderboltOutlined />}
               onClick={() => onTest(record)}
             />
           </Tooltip>
@@ -406,13 +462,21 @@ function buildColumns({
               onConfirm={() => onToggleEnabled(record)}
             >
               <Tooltip title="Disable">
-                <Button type="text" icon={<PoweroffOutlined />} disabled={updating} />
+                <Button
+                  type="text"
+                  className="bp-row-action-btn"
+                  aria-label="Disable node"
+                  icon={<PoweroffOutlined />}
+                  disabled={updating}
+                />
               </Tooltip>
             </Popconfirm>
           ) : (
             <Tooltip title="Enable">
               <Button
                 type="text"
+                className="bp-row-action-btn"
+                aria-label="Enable node"
                 icon={<PoweroffOutlined />}
                 onClick={() => onToggleEnabled(record)}
                 disabled={updating}
@@ -422,6 +486,8 @@ function buildColumns({
           <Tooltip title={record.forwarding_enabled ? "Disable forwarding" : "Enable forwarding"}>
             <Button
               type="text"
+              className="bp-row-action-btn"
+              aria-label={record.forwarding_enabled ? "Disable forwarding" : "Enable forwarding"}
               icon={<SwapOutlined />}
               onClick={() => onToggleForwarding(record)}
               disabled={updating}

@@ -78,12 +78,19 @@ export default function App() {
                       {nodeList.map((node: ForwardingSummaryNode) => (
                         <div key={node.id} className="bp-forwarding-popover-item">
                           <span className="bp-forwarding-popover-name">{node.name || node.tag}</span>
-                          <span className="bp-forwarding-popover-side">
-                            {node.type.toUpperCase()}
+                          <div className="bp-forwarding-popover-side">
+                            <span>{node.type.toUpperCase()}</span>
+                            {node.last_status ? (
+                              <span className={`bp-forwarding-popover-status bp-forwarding-popover-status-${node.last_status.toLowerCase()}`}>
+                                {node.last_status.toUpperCase()}
+                              </span>
+                            ) : (
+                              <span className="bp-forwarding-popover-status">UNTESTED</span>
+                            )}
                             {node.last_latency_ms !== null && node.last_latency_ms !== undefined
-                              ? ` · ${node.last_latency_ms}ms`
-                              : ""}
-                          </span>
+                              ? <span>{node.last_latency_ms}ms</span>
+                              : null}
+                          </div>
                         </div>
                       ))}
                     </div>
