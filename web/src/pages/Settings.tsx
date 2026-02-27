@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Card, Form, Input, InputNumber, Select, Switch, Tag } from "antd";
 import type { ProxyConfig, ProxyType } from "../api/types";
-import { buildProxyUrl } from "../api/settings";
+import { buildProxyUrl, resolveProxyClientHost } from "../api/settings";
 import { useProxySettings, useUpdateProxySettings, useApplyProxySettings } from "../hooks/useProxySettings";
 import { useToast } from "../components/common/ToastContext";
 
@@ -71,10 +71,12 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
 
   const onCopy = async () => {
     if (!data) return;
-    const url = buildProxyUrl(data);
+    const preferredHost = window.location.hostname || undefined;
+    const clientHost = resolveProxyClientHost(data.listen_address, preferredHost);
+    const url = buildProxyUrl(data, preferredHost);
     try {
       await navigator.clipboard.writeText(url);
-      addToast("success", "Connection string copied");
+      addToast("success", `Connection string copied (${clientHost}:${data.port})`);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1200);
     } catch {
@@ -101,6 +103,15 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
         <span className="bp-muted">Current binding</span>
         <span className="bp-table-mono">
           {data?.listen_address ?? "0.0.0.0"}:{data?.port ?? "-"}
+        </span>
+      </div>
+      <div className="bp-settings-status-row">
+        <span className="bp-muted">Copy URL host</span>
+        <span className="bp-table-mono">
+          {resolveProxyClientHost(
+            data?.listen_address ?? "0.0.0.0",
+            window.location.hostname || undefined
+          )}
         </span>
       </div>
       {data?.error_message && (

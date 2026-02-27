@@ -55,9 +55,22 @@ export async function stopForwardingRuntime(): Promise<ForwardingRuntimeStatus> 
   return data.data;
 }
 
-export function buildProxyUrl(cfg: ProxyConfig): string {
+export function resolveProxyClientHost(
+  listenAddress: string,
+  preferredHost?: string
+): string {
+  if (preferredHost && preferredHost.trim() !== "") {
+    return preferredHost.trim();
+  }
+  if (listenAddress === "0.0.0.0") {
+    return "127.0.0.1";
+  }
+  return listenAddress;
+}
+
+export function buildProxyUrl(cfg: ProxyConfig, preferredHost?: string): string {
   const scheme = cfg.proxy_type === "http" ? "http" : "socks5";
-  const host = cfg.listen_address;
+  const host = resolveProxyClientHost(cfg.listen_address, preferredHost);
   const auth =
     cfg.auth_mode === "basic" && cfg.username && cfg.password
       ? `${encodeURIComponent(cfg.username)}:${encodeURIComponent(cfg.password)}@`

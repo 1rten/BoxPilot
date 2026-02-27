@@ -75,9 +75,9 @@ services:
     build: .
     container_name: boxpilot
     ports:
-      - "127.0.0.1:8080:8080"
-      - "127.0.0.1:7890:7890"
-      - "127.0.0.1:7891:7891"
+      - "${BIND_IP:-127.0.0.1}:8080:8080"
+      - "${BIND_IP:-127.0.0.1}:7890:7890"
+      - "${BIND_IP:-127.0.0.1}:7891:7891"
     volumes:
       - ./data:/data
     environment:
@@ -91,6 +91,13 @@ services:
 ## 3️⃣ Build & Run
 
 ```bash
+docker compose up --build
+```
+
+For remote access, set:
+
+```bash
+export BIND_IP=0.0.0.0
 docker compose up --build
 ```
 
