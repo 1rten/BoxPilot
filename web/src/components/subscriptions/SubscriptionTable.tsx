@@ -1,6 +1,7 @@
 import type { Subscription } from "../../api/types";
 import { formatDateTime } from "../../utils/datetime";
-import { Button, Table, Tag } from "antd";
+import { Button, Table, Tag, Tooltip } from "antd";
+import { DeleteOutlined, EditOutlined, LoadingOutlined, ReloadOutlined } from "@ant-design/icons";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 
 export interface SubscriptionTableProps {
@@ -100,29 +101,40 @@ export function SubscriptionTable({
       title: "Actions",
       key: "actions",
       align: "right",
-      width: 200,
+      width: 140,
       render: (_value, record) => {
         const refreshing = rowRefreshingId === record.id;
         return (
           <div className="bp-row-actions">
-            <Button type="link" onClick={() => onEdit(record)}>
-              Edit
-            </Button>
-            <Button
-              type="link"
-              danger
-              onClick={() => onDelete(record)}
-              style={{ paddingLeft: 0 }}
-            >
-              Delete
-            </Button>
-            <Button
-              type="link"
-              onClick={() => onRefreshRow(record)}
-              disabled={refreshing}
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </Button>
+            <Tooltip title="Edit">
+              <Button
+                type="text"
+                className="bp-row-action-btn"
+                aria-label="Edit subscription"
+                icon={<EditOutlined />}
+                onClick={() => onEdit(record)}
+              />
+            </Tooltip>
+            <Tooltip title="Delete">
+              <Button
+                type="text"
+                danger
+                className="bp-row-action-btn"
+                aria-label="Delete subscription"
+                icon={<DeleteOutlined />}
+                onClick={() => onDelete(record)}
+              />
+            </Tooltip>
+            <Tooltip title={refreshing ? "Refreshing..." : "Refresh"}>
+              <Button
+                type="text"
+                className="bp-row-action-btn"
+                aria-label="Refresh subscription"
+                icon={refreshing ? <LoadingOutlined spin /> : <ReloadOutlined />}
+                onClick={() => onRefreshRow(record)}
+                disabled={refreshing}
+              />
+            </Tooltip>
           </div>
         );
       },
