@@ -2,6 +2,15 @@
 
 * { box-sizing: border-box; }
 
+:focus-visible {
+  outline: 2px solid rgba(31, 94, 255, 0.45);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 :root {
   --color-primary: #171717;
   --color-secondary: #404040;
@@ -132,6 +141,22 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+}
+
+.bp-locale-switch select {
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid #d6deee;
+  background: #ffffff;
+  color: #1f2a44;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bp-locale-switch select:focus-visible {
+  outline: 2px solid rgba(31, 94, 255, 0.35);
+  outline-offset: 1px;
 }
 
 .bp-forwarding-toggle {
@@ -474,7 +499,7 @@ a {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  min-width: 240px;
+  min-width: 260px;
 }
 
 .bp-metric-pill {
@@ -488,7 +513,7 @@ a {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  min-width: 110px;
+  min-width: 132px;
 }
 
 .bp-metric-pill-active {
@@ -513,6 +538,29 @@ a {
 
 .bp-metric-subtle-hidden {
   visibility: hidden;
+}
+
+.bp-sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 72px;
+  color: var(--bp-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bp-sync-indicator-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.bp-sync-indicator-fetching .bp-sync-indicator-dot {
+  background: #1f5eff;
+  box-shadow: 0 0 0 3px rgba(31, 94, 255, 0.15);
 }
 
 .bp-log-modal-toolbar {
@@ -1230,6 +1278,10 @@ a {
   border: 1px solid var(--bp-border);
 }
 
+.bp-data-card .ant-table-wrapper {
+  overflow-x: auto;
+}
+
 .ant-table-thead > tr > th {
   background: #f4f6fb;
   color: #334155;
@@ -1446,6 +1498,8 @@ a {
 
   .bp-nav-right {
     margin-left: auto;
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .bp-tabs {
@@ -1464,6 +1518,12 @@ a {
   .bp-card-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .bp-card-header-meta {
+    min-width: 0;
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .bp-toolbar-actions-fixed {
@@ -1503,6 +1563,14 @@ a {
 
   .bp-drawer-kv {
     grid-template-columns: 1fr;
+  }
+
+  .bp-dashboard-table-toolbar {
+    justify-content: stretch;
+  }
+
+  .bp-dashboard-table-toolbar .bp-search-input {
+    max-width: none;
   }
 
   .bp-settings-grid {

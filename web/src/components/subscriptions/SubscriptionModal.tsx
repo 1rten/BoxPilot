@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Form, Input, InputNumber, Modal, Switch } from "antd";
+import { useI18n } from "../../i18n/context";
 
 export type SubscriptionModalMode = "create" | "edit";
 
@@ -27,6 +28,7 @@ export function SubscriptionModal({
   onCancel,
   onSubmit,
 }: SubscriptionModalProps) {
+  const { tr } = useI18n();
   const [form] = Form.useForm<SubscriptionModalValues>();
 
   useEffect(() => {
@@ -42,7 +44,9 @@ export function SubscriptionModal({
 
   if (!open) return null;
 
-  const title = mode === "create" ? "Create Subscription" : "Edit Subscription";
+  const title = mode === "create"
+    ? tr("subs.modal.create", "Create Subscription")
+    : tr("subs.modal.edit", "Edit Subscription");
 
   return (
     <Modal
@@ -50,8 +54,8 @@ export function SubscriptionModal({
       open={open}
       onCancel={onCancel}
       confirmLoading={submitting}
-      okText="Save"
-      cancelText="Cancel"
+      okText={tr("common.save", "Save")}
+      cancelText={tr("common.cancel", "Cancel")}
       onOk={() => {
         form.submit();
       }}
@@ -66,20 +70,20 @@ export function SubscriptionModal({
         <Form.Item
           label="URL"
           name="url"
-          rules={[{ required: true, message: "Please enter subscription URL" }]}
-          extra={mode === "edit" ? "Changing URL will trigger node refresh." : undefined}
+          rules={[{ required: true, message: tr("subs.modal.url.required", "Please enter subscription URL") }]}
+          extra={mode === "edit" ? tr("subs.modal.url.extra", "Changing URL will trigger node refresh.") : undefined}
         >
-          <Input placeholder="Subscription URL" />
+          <Input placeholder={tr("subs.modal.url.placeholder", "Subscription URL")} />
         </Form.Item>
         <Form.Item
-          label="Name"
+          label={tr("subs.modal.name", "Name")}
           name="name"
-          rules={[{ required: true, message: "Please enter name" }]}
+          rules={[{ required: true, message: tr("subs.modal.name.required", "Please enter name") }]}
         >
-          <Input placeholder="Name" />
+          <Input placeholder={tr("subs.modal.name.placeholder", "Name")} />
         </Form.Item>
         <Form.Item
-          label="Auto Update"
+          label={tr("subs.modal.auto", "Auto Update")}
           name="auto_update_enabled"
           valuePropName="checked"
         >
@@ -91,16 +95,16 @@ export function SubscriptionModal({
         >
           {({ getFieldValue }) => (
             <Form.Item
-              label="Update Interval (seconds)"
+              label={tr("subs.modal.interval", "Update Interval (seconds)")}
               name="refresh_interval_sec"
               rules={[
-                { required: true, message: "Please enter update interval" },
+                { required: true, message: tr("subs.modal.interval.required", "Please enter update interval") },
                 {
                   validator: async (_, value) => {
                     const autoEnabled = !!getFieldValue("auto_update_enabled");
                     if (!autoEnabled) return;
                     if (typeof value !== "number" || value < 60) {
-                      throw new Error("When auto update is enabled, interval must be >= 60 seconds");
+                      throw new Error(tr("subs.modal.interval.rule", "When auto update is enabled, interval must be >= 60 seconds"));
                     }
                   },
                 },

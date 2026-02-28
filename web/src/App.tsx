@@ -10,14 +10,17 @@ import {
   useStopForwardingRuntime,
 } from "./hooks/useProxySettings";
 import { Popover } from "antd";
+import { useI18n } from "./i18n/context";
 
 export default function App() {
+  const { locale, setLocale, tr } = useI18n();
   const { data: summary, refetch: refetchForwardingSummary } = useForwardingSummary();
   const startForwarding = useStartForwardingRuntime();
   const stopForwarding = useStopForwardingRuntime();
   const toggling = startForwarding.isPending || stopForwarding.isPending;
   const isRunning = !!summary?.running;
   const runtimeStatus = summary?.status ?? "stopped";
+  const runtimeStatusLabel = tr(`app.proxy.runtime.${runtimeStatus}`, runtimeStatus.toUpperCase());
   const nodeList = summary?.nodes ?? [];
 
   return (
@@ -37,7 +40,7 @@ export default function App() {
                   isActive ? "bp-tab bp-tab-active" : "bp-tab"
                 }
               >
-                Dashboard
+                {tr("nav.dashboard", "Dashboard")}
               </NavLink>
               <NavLink
                 to="/subscriptions"
@@ -45,7 +48,7 @@ export default function App() {
                   isActive ? "bp-tab bp-tab-active" : "bp-tab"
                 }
               >
-                Subscriptions
+                {tr("nav.subscriptions", "Subscriptions")}
               </NavLink>
               <NavLink
                 to="/nodes"
@@ -53,11 +56,20 @@ export default function App() {
                   isActive ? "bp-tab bp-tab-active" : "bp-tab"
                 }
               >
-                Nodes
+                {tr("nav.nodes", "Nodes")}
               </NavLink>
             </div>
           </div>
           <div className="bp-nav-right">
+            <label className="bp-locale-switch" aria-label={tr("nav.language", "Language")}>
+              <select
+                value={locale}
+                onChange={(event) => setLocale(event.target.value === "en" ? "en" : "zh")}
+              >
+                <option value="zh">{tr("nav.language.zh", "中文")}</option>
+                <option value="en">{tr("nav.language.en", "English")}</option>
+              </select>
+            </label>
             <Popover
               placement="bottomRight"
               trigger={["hover"]}
@@ -69,11 +81,11 @@ export default function App() {
               content={
                 <div className="bp-forwarding-popover">
                   <div className="bp-forwarding-popover-head">
-                    <span className="bp-forwarding-popover-title">Proxy</span>
+                    <span className="bp-forwarding-popover-title">{tr("nav.proxy", "Proxy")}</span>
                     <span className={`bp-runtime-dot bp-runtime-dot-${runtimeStatus}`} />
                   </div>
                   <p className="bp-forwarding-popover-meta">
-                    Status: {runtimeStatus.toUpperCase()} · Selected: {summary?.selected_nodes_count ?? 0}
+                    {tr("app.proxy.status", "Status")}: {runtimeStatusLabel} · {tr("app.proxy.selected", "Selected")}: {summary?.selected_nodes_count ?? 0}
                   </p>
                   {summary?.error_message && (
                     <p className="bp-forwarding-popover-error">{summary.error_message}</p>
@@ -90,7 +102,7 @@ export default function App() {
                                 {node.last_status.toUpperCase()}
                               </span>
                             ) : (
-                              <span className="bp-forwarding-popover-status">UNTESTED</span>
+                              <span className="bp-forwarding-popover-status">{tr("app.proxy.untested", "UNTESTED")}</span>
                             )}
                             {node.last_latency_ms !== null && node.last_latency_ms !== undefined
                               ? <span>{node.last_latency_ms}ms</span>
@@ -100,7 +112,7 @@ export default function App() {
                       ))}
                     </div>
                   ) : (
-                    <p className="bp-forwarding-popover-empty">No forwarding nodes selected.</p>
+                    <p className="bp-forwarding-popover-empty">{tr("app.proxy.empty", "No forwarding nodes selected.")}</p>
                   )}
                 </div>
               }
@@ -122,10 +134,10 @@ export default function App() {
                     startForwarding.mutate();
                   }
                 }}
-                title={summary?.error_message || "Forwarding runtime control"}
+                title={summary?.error_message || tr("app.proxy.control", "Forwarding runtime control")}
               >
                 <span className={`bp-runtime-dot bp-runtime-dot-${runtimeStatus}`} />
-                {toggling ? "Applying..." : "Proxy"}
+                {toggling ? tr("nav.proxy.applying", "Applying...") : tr("nav.proxy", "Proxy")}
               </button>
             </Popover>
             <NavLink
@@ -133,8 +145,8 @@ export default function App() {
               className={({ isActive }) =>
                 isActive ? "bp-settings-link bp-settings-link-active" : "bp-settings-link"
               }
-              aria-label="Settings"
-              title="Settings"
+              aria-label={tr("nav.settings", "Settings")}
+              title={tr("nav.settings", "Settings")}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M19.14 12.94a7.8 7.8 0 0 0 .05-.94 7.8 7.8 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.65l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.4 7.4 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.43h-3.84a.5.5 0 0 0-.5.43l-.36 2.54a7.4 7.4 0 0 0-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.71 8.83a.5.5 0 0 0 .12.65l2.03 1.58a7.8 7.8 0 0 0-.05.94 7.8 7.8 0 0 0 .05.94l-2.03 1.58a.5.5 0 0 0-.12.65l1.92 3.32a.5.5 0 0 0 .61.22l2.39-.96c.5.39 1.05.71 1.62.94l.36 2.54a.5.5 0 0 0 .5.43h3.84a.5.5 0 0 0 .5-.43l.36-2.54c.57-.23 1.12-.55 1.62-.94l2.39.96a.5.5 0 0 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.65zM12 15.2a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4z" />

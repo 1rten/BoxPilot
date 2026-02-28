@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { Node } from "../api/types";
 import { useToast } from "../components/common/ToastContext";
+import { useI18n } from "../i18n/context";
 
 export function useNodes(params?: { enabled?: number; sub_id?: string }) {
   return useQuery({
@@ -19,6 +20,7 @@ export function useNodes(params?: { enabled?: number; sub_id?: string }) {
 }
 
 export function useUpdateNode() {
+  const { tr } = useI18n();
   const q = useQueryClient();
   const { addToast } = useToast();
   return useMutation({
@@ -31,7 +33,7 @@ export function useUpdateNode() {
       q.invalidateQueries({ queryKey: ["forwarding-summary"] });
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
-      addToast("success", "Node updated");
+      addToast("success", tr("toast.node.updated", "Node updated"));
     },
     onError: (error: unknown) => {
       const anyErr = error as any;
@@ -39,13 +41,14 @@ export function useUpdateNode() {
         anyErr?.appError?.message ||
         anyErr?.response?.data?.error?.message ||
         anyErr?.message ||
-        "Unknown error";
-      addToast("error", `Update node failed: ${message}`);
+        tr("toast.unknown", "Unknown error");
+      addToast("error", tr("toast.node.update_failed", "Update node failed: {message}", { message }));
     },
   });
 }
 
 export function useTestNodes() {
+  const { tr } = useI18n();
   const q = useQueryClient();
   const { addToast } = useToast();
   return useMutation({
@@ -63,9 +66,9 @@ export function useTestNodes() {
       const ok = rows.filter((r) => r.status === "ok").length;
       const fail = rows.length - ok;
       if (fail === 0) {
-        addToast("success", `Tested ${ok} node${ok === 1 ? "" : "s"}`);
+        addToast("success", tr("toast.node.test_ok", "Tested {count} node(s)", { count: ok }));
       } else {
-        addToast("error", `Test finished: ${ok} ok, ${fail} failed`);
+        addToast("error", tr("toast.node.test_partial", "Test finished: {ok} ok, {fail} failed", { ok, fail }));
       }
     },
     onError: (error: unknown) => {
@@ -74,13 +77,14 @@ export function useTestNodes() {
         anyErr?.appError?.message ||
         anyErr?.response?.data?.error?.message ||
         anyErr?.message ||
-        "Unknown error";
-      addToast("error", `Node test failed: ${message}`);
+        tr("toast.unknown", "Unknown error");
+      addToast("error", tr("toast.node.test_failed", "Node test failed: {message}", { message }));
     },
   });
 }
 
 export function useBatchForwarding() {
+  const { tr } = useI18n();
   const q = useQueryClient();
   const { addToast } = useToast();
   return useMutation({
@@ -94,8 +98,10 @@ export function useBatchForwarding() {
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
       q.invalidateQueries({ queryKey: ["runtime-status"] });
-      const action = variables.forwarding_enabled ? "Enabled" : "Disabled";
-      addToast("success", `${action} forwarding for ${result.updated} node${result.updated === 1 ? "" : "s"}`);
+      const action = variables.forwarding_enabled
+        ? tr("nodes.forwarding.enable", "Enable forwarding")
+        : tr("nodes.forwarding.disable", "Disable forwarding");
+      addToast("success", tr("toast.forwarding.batch", "{action}: {count} node(s)", { action, count: result.updated }));
     },
     onError: (error: unknown) => {
       const anyErr = error as any;
@@ -103,8 +109,8 @@ export function useBatchForwarding() {
         anyErr?.appError?.message ||
         anyErr?.response?.data?.error?.message ||
         anyErr?.message ||
-        "Unknown error";
-      addToast("error", `Batch forwarding update failed: ${message}`);
+        tr("toast.unknown", "Unknown error");
+      addToast("error", tr("toast.forwarding.batch_failed", "Batch forwarding update failed: {message}", { message }));
     },
   });
 }

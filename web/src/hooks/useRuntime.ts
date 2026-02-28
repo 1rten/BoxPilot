@@ -7,6 +7,7 @@ import type {
   RuntimeTrafficData,
 } from "../api/types";
 import { useToast } from "../components/common/ToastContext";
+import { useI18n } from "../i18n/context";
 
 export function useRuntimeStatus() {
   return useQuery({
@@ -26,6 +27,7 @@ export function useRuntimeStatus() {
 }
 
 export function useRuntimeReload() {
+  const { tr } = useI18n();
   const q = useQueryClient();
   const { addToast } = useToast();
   return useMutation({
@@ -38,7 +40,7 @@ export function useRuntimeReload() {
       q.invalidateQueries({ queryKey: ["runtime-traffic"] });
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
-      addToast("success", "Runtime reloaded");
+      addToast("success", tr("toast.runtime.reloaded", "Runtime reloaded"));
     },
     onError: (error: unknown) => {
       const anyErr = error as any;
@@ -46,8 +48,8 @@ export function useRuntimeReload() {
         anyErr?.appError?.message ||
         anyErr?.response?.data?.error?.message ||
         anyErr?.message ||
-        "Unknown error";
-      addToast("error", `Runtime reload failed: ${message}`);
+        tr("toast.unknown", "Unknown error");
+      addToast("error", tr("toast.runtime.reload_failed", "Runtime reload failed: {message}", { message }));
     },
   });
 }

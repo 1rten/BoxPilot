@@ -14,6 +14,7 @@ import {
   type UpdateRoutingSettingsBody,
 } from "../api/settings";
 import { useToast } from "../components/common/ToastContext";
+import { useI18n } from "../i18n/context";
 
 export function useProxySettings() {
   return useQuery({
@@ -26,6 +27,7 @@ export function useProxySettings() {
 }
 
 export function useUpdateProxySettings() {
+  const { tr } = useI18n();
   const q = useQueryClient();
   const { addToast } = useToast();
   return useMutation({
@@ -36,7 +38,7 @@ export function useUpdateProxySettings() {
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
       q.invalidateQueries({ queryKey: ["runtime-traffic"] });
-      addToast("success", "Proxy settings saved");
+      addToast("success", tr("toast.proxy.saved", "Proxy settings saved"));
     },
     onError: (error: unknown) => {
       const anyErr = error as any;
@@ -44,13 +46,14 @@ export function useUpdateProxySettings() {
         anyErr?.appError?.message ||
         anyErr?.response?.data?.error?.message ||
         anyErr?.message ||
-        "Unknown error";
+        tr("toast.unknown", "Unknown error");
       addToast("error", message);
     },
   });
 }
 
 export function useApplyProxySettings() {
+  const { tr } = useI18n();
   const q = useQueryClient();
   const { addToast } = useToast();
   return useMutation({
@@ -63,7 +66,7 @@ export function useApplyProxySettings() {
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
       q.invalidateQueries({ queryKey: ["runtime-traffic"] });
-      addToast("success", "Proxy settings applied");
+      addToast("success", tr("toast.proxy.applied", "Proxy settings applied"));
     },
     onError: (error: unknown) => {
       const anyErr = error as any;
@@ -71,7 +74,7 @@ export function useApplyProxySettings() {
         anyErr?.appError?.message ||
         anyErr?.response?.data?.error?.message ||
         anyErr?.message ||
-        "Unknown error";
+        tr("toast.unknown", "Unknown error");
       addToast("error", message);
     },
   });
@@ -102,6 +105,7 @@ export function useForwardingSummary() {
 }
 
 export function useStartForwardingRuntime() {
+  const { tr } = useI18n();
   const q = useQueryClient();
   const { addToast } = useToast();
   return useMutation({
@@ -114,7 +118,7 @@ export function useStartForwardingRuntime() {
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
       q.invalidateQueries({ queryKey: ["runtime-traffic"] });
-      addToast("success", "Forwarding started");
+      addToast("success", tr("toast.forwarding.started", "Forwarding started"));
     },
     onError: (error: unknown) => {
       const anyErr = error as any;
@@ -122,13 +126,14 @@ export function useStartForwardingRuntime() {
         anyErr?.appError?.message ||
         anyErr?.response?.data?.error?.message ||
         anyErr?.message ||
-        "Unknown error";
+        tr("toast.unknown", "Unknown error");
       addToast("error", message);
     },
   });
 }
 
 export function useStopForwardingRuntime() {
+  const { tr } = useI18n();
   const q = useQueryClient();
   const { addToast } = useToast();
   return useMutation({
@@ -141,7 +146,7 @@ export function useStopForwardingRuntime() {
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
       q.invalidateQueries({ queryKey: ["runtime-traffic"] });
-      addToast("success", "Forwarding stopped");
+      addToast("success", tr("toast.forwarding.stopped", "Forwarding stopped"));
     },
     onError: (error: unknown) => {
       const anyErr = error as any;
@@ -149,7 +154,7 @@ export function useStopForwardingRuntime() {
         anyErr?.appError?.message ||
         anyErr?.response?.data?.error?.message ||
         anyErr?.message ||
-        "Unknown error";
+        tr("toast.unknown", "Unknown error");
       addToast("error", message);
     },
   });
@@ -166,6 +171,7 @@ export function useRoutingSettings() {
 }
 
 export function useUpdateRoutingSettings() {
+  const { tr } = useI18n();
   const q = useQueryClient();
   const { addToast } = useToast();
   return useMutation({
@@ -174,7 +180,7 @@ export function useUpdateRoutingSettings() {
       q.invalidateQueries({ queryKey: ["routing-settings"] });
       q.invalidateQueries({ queryKey: ["routing-summary"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
-      addToast("success", "Routing bypass settings saved");
+      addToast("success", tr("toast.routing.saved", "Routing bypass settings saved"));
     },
     onError: (error: unknown) => {
       const anyErr = error as any;
@@ -182,7 +188,7 @@ export function useUpdateRoutingSettings() {
         anyErr?.appError?.message ||
         anyErr?.response?.data?.error?.message ||
         anyErr?.message ||
-        "Unknown error";
+        tr("toast.unknown", "Unknown error");
       addToast("error", message);
     },
   });

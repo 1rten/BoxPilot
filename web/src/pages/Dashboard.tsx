@@ -10,8 +10,10 @@ import { ErrorState } from "../components/common/ErrorState";
 import { formatDateTime } from "../utils/datetime";
 import type { ColumnsType } from "antd/es/table";
 import type { RuntimeConnection, RuntimeLogItem } from "../api/types";
+import { useI18n } from "../i18n/context";
 
 export default function Dashboard() {
+  const { tr } = useI18n();
   const {
     data: runtime,
     isLoading: runtimeLoading,
@@ -44,13 +46,14 @@ export default function Dashboard() {
     isFetching: connectionsFetching,
   } = useRuntimeConnections(connQuery);
 
-  const runtimeState = runtimeLoading
-    ? "Loading"
+  const runtimeStateKey = runtimeLoading
+    ? "loading"
     : runtimeError
-      ? "Offline"
+      ? "offline"
       : runtime
-        ? "Online"
-        : "Unknown";
+        ? "online"
+        : "unknown";
+  const runtimeState = tr(`dashboard.runtime.state.${runtimeStateKey}`, runtimeStateKey.toUpperCase());
   const runtimeTone = runtimeError
     ? "danger"
     : runtimeLoading
@@ -59,7 +62,7 @@ export default function Dashboard() {
         ? "success"
         : "muted";
   const configHash = runtime?.config_hash ? runtime.config_hash.slice(0, 8) : "--";
-  const trafficSourceMeta = getTrafficSourceMeta(traffic?.source);
+  const trafficSourceMeta = getTrafficSourceMeta(traffic?.source, tr);
 
   const forwardingTone =
     forwardingSummary?.status === "running"
@@ -67,6 +70,8 @@ export default function Dashboard() {
       : forwardingSummary?.status === "error"
         ? "danger"
         : "muted";
+  const forwardingStatus = forwardingSummary?.status || "stopped";
+  const forwardingStatusLabel = tr(`app.proxy.runtime.${forwardingStatus}`, forwardingStatus.toUpperCase());
 
   const connections = connectionsData?.items ?? [];
   const recentLogs = logsData?.items?.slice(0, 8) ?? [];
@@ -74,7 +79,7 @@ export default function Dashboard() {
   const connectionColumns: ColumnsType<RuntimeConnection> = useMemo(
     () => [
       {
-        title: "Node",
+        title: tr("dashboard.connections.node", "Node"),
         dataIndex: "node_name",
         key: "node_name",
         sorter: (a, b) => a.node_name.localeCompare(b.node_name),
@@ -86,13 +91,13 @@ export default function Dashboard() {
         ),
       },
       {
-        title: "Target",
+        title: tr("dashboard.connections.target", "Target"),
         dataIndex: "target",
         key: "target",
         className: "bp-table-mono",
       },
       {
-        title: "Status",
+        title: tr("dashboard.connections.status", "Status"),
         dataIndex: "status",
         key: "status",
         width: 120,
@@ -104,7 +109,7 @@ export default function Dashboard() {
         ),
       },
       {
-        title: "Latency",
+        title: tr("dashboard.connections.latency", "Latency"),
         dataIndex: "latency_ms",
         key: "latency_ms",
         width: 120,
@@ -116,7 +121,7 @@ export default function Dashboard() {
         ),
       },
       {
-        title: "Last Test",
+        title: tr("dashboard.connections.last_test", "Last Test"),
         dataIndex: "last_test_at",
         key: "last_test_at",
         className: "bp-table-mono",
@@ -124,7 +129,7 @@ export default function Dashboard() {
         render: (v: string | null | undefined) => (v ? formatDateTime(v) : "-"),
       },
     ],
-    []
+    [tr]
   );
 
   return (
@@ -132,13 +137,13 @@ export default function Dashboard() {
       <section className="bp-dashboard-hero">
         <div>
           <p className="bp-eyebrow">BoxPilot</p>
-          <h1 className="bp-page-title">Dashboard</h1>
-          <p className="bp-subtitle">Runtime overview, forwarding status, and live diagnostics.</p>
+          <h1 className="bp-page-title">{tr("nav.dashboard", "Dashboard")}</h1>
+          <p className="bp-subtitle">{tr("dashboard.subtitle", "Runtime overview, forwarding status, and live diagnostics.")}</p>
         </div>
         <div className="bp-hero-actions">
-          <span className={`bp-badge bp-badge--${runtimeTone}`}>Runtime: {runtimeState}</span>
+          <span className={`bp-badge bp-badge--${runtimeTone}`}>{tr("dashboard.runtime", "Runtime")}: {runtimeState}</span>
           <span className={`bp-badge bp-badge--${forwardingTone}`}>
-            Forwarding: {(forwardingSummary?.status || "stopped").toUpperCase()}
+            {tr("dashboard.forwarding", "Forwarding")}: {forwardingStatusLabel}
           </span>
         </div>
       </section>
@@ -147,46 +152,48 @@ export default function Dashboard() {
         <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
           <div className="bp-card-header">
             <div>
-              <p className="bp-card-kicker">System</p>
-              <h2 className="bp-card-title">Runtime</h2>
+              <p className="bp-card-kicker">{tr("dashboard.kicker.system", "System")}</p>
+              <h2 className="bp-card-title">{tr("dashboard.runtime", "Runtime")}</h2>
             </div>
             <span className={`bp-badge bp-badge--${runtimeTone}`}>{runtimeState}</span>
           </div>
 
           {runtimeLoading && !runtime && (
-            <p className="bp-muted">Loading runtime status...</p>
+            <p className="bp-muted">{tr("dashboard.runtime.loading", "Loading runtime status...")}</p>
           )}
           {runtimeError && (
             <ErrorState
-              message={`Failed to load runtime status: ${(runtimeError as Error).message}`}
+              message={tr("dashboard.runtime.error", "Failed to load runtime status: {message}", {
+                message: (runtimeError as Error).message,
+              })}
             />
           )}
           {runtime && !runtimeError && (
             <div className="bp-runtime-grid">
               <div className="bp-runtime-item">
-                <span className="bp-runtime-label">Config version</span>
+                <span className="bp-runtime-label">{tr("dashboard.runtime.config_version", "Config version")}</span>
                 <span className="bp-runtime-value">{runtime.config_version}</span>
               </div>
               <div className="bp-runtime-item">
-                <span className="bp-runtime-label">Hash</span>
+                <span className="bp-runtime-label">{tr("dashboard.runtime.hash", "Hash")}</span>
                 <span className="bp-runtime-value bp-mono">{configHash}</span>
               </div>
               <div className="bp-runtime-item">
-                <span className="bp-runtime-label">HTTP Port</span>
+                <span className="bp-runtime-label">{tr("dashboard.runtime.http_port", "HTTP Port")}</span>
                 <span className="bp-runtime-value">{runtime.ports.http}</span>
               </div>
               <div className="bp-runtime-item">
-                <span className="bp-runtime-label">SOCKS Port</span>
+                <span className="bp-runtime-label">{tr("dashboard.runtime.socks_port", "SOCKS Port")}</span>
                 <span className="bp-runtime-value">{runtime.ports.socks}</span>
               </div>
               <div className="bp-runtime-item">
-                <span className="bp-runtime-label">Last Reload</span>
+                <span className="bp-runtime-label">{tr("dashboard.runtime.last_reload", "Last Reload")}</span>
                 <span className="bp-runtime-value bp-mono">
                   {runtime.last_reload_at ? formatDateTime(runtime.last_reload_at) : "-"}
                 </span>
               </div>
               <div className="bp-runtime-item">
-                <span className="bp-runtime-label">Last Error</span>
+                <span className="bp-runtime-label">{tr("dashboard.runtime.last_error", "Last Error")}</span>
                 <span className="bp-runtime-value">{runtime.last_reload_error || "-"}</span>
               </div>
             </div>
@@ -196,12 +203,12 @@ export default function Dashboard() {
         <div className="bp-card bp-dashboard-card">
           <div className="bp-card-header">
             <div>
-              <p className="bp-card-kicker">Forwarding</p>
-              <h2 className="bp-card-title">Traffic</h2>
+              <p className="bp-card-kicker">{tr("dashboard.kicker.forwarding", "Forwarding")}</p>
+              <h2 className="bp-card-title">{tr("dashboard.traffic", "Traffic")}</h2>
             </div>
             <span
               className={`bp-link-pill bp-source-pill bp-source-pill--${trafficSourceMeta.tone}`}
-              title={traffic?.source || "unknown"}
+              title={traffic?.source || tr("common.unknown", "unknown")}
             >
               {trafficSourceMeta.label}
             </span>
@@ -209,19 +216,19 @@ export default function Dashboard() {
           <p className="bp-muted">{trafficSourceMeta.description}</p>
           <div className="bp-runtime-grid">
             <div className="bp-runtime-item">
-              <span className="bp-runtime-label">Download Rate</span>
+              <span className="bp-runtime-label">{tr("dashboard.traffic.download", "Download Rate")}</span>
               <span className="bp-runtime-value">{formatRate(traffic?.rx_rate_bps ?? 0)}</span>
             </div>
             <div className="bp-runtime-item">
-              <span className="bp-runtime-label">Upload Rate</span>
+              <span className="bp-runtime-label">{tr("dashboard.traffic.upload", "Upload Rate")}</span>
               <span className="bp-runtime-value">{formatRate(traffic?.tx_rate_bps ?? 0)}</span>
             </div>
             <div className="bp-runtime-item">
-              <span className="bp-runtime-label">RX Total</span>
+              <span className="bp-runtime-label">{tr("dashboard.traffic.rx_total", "RX Total")}</span>
               <span className="bp-runtime-value">{formatBytes(traffic?.rx_total_bytes ?? 0)}</span>
             </div>
             <div className="bp-runtime-item">
-              <span className="bp-runtime-label">TX Total</span>
+              <span className="bp-runtime-label">{tr("dashboard.traffic.tx_total", "TX Total")}</span>
               <span className="bp-runtime-value">{formatBytes(traffic?.tx_total_bytes ?? 0)}</span>
             </div>
           </div>
@@ -230,68 +237,66 @@ export default function Dashboard() {
         <div className="bp-card bp-dashboard-card">
           <div className="bp-card-header">
             <div>
-              <p className="bp-card-kicker">Inventory</p>
-              <h2 className="bp-card-title">Subscriptions</h2>
+              <p className="bp-card-kicker">{tr("dashboard.kicker.inventory", "Inventory")}</p>
+              <h2 className="bp-card-title">{tr("nav.subscriptions", "Subscriptions")}</h2>
             </div>
             <Link to="/subscriptions" className="bp-link-pill">
-              View All
+              {tr("dashboard.view_all", "View All")}
             </Link>
           </div>
           <div className="bp-stat">
             <span className="bp-stat-value">{subs?.length ?? 0}</span>
-            <span className="bp-stat-label">Total active subscriptions</span>
+            <span className="bp-stat-label">{tr("dashboard.subs.total", "Total active subscriptions")}</span>
           </div>
-          <p className="bp-muted">Track usage and refresh subscriptions in one place.</p>
+          <p className="bp-muted">{tr("dashboard.subs.desc", "Track usage and refresh subscriptions in one place.")}</p>
         </div>
 
         <div className="bp-card bp-dashboard-card">
           <div className="bp-card-header">
             <div>
-              <p className="bp-card-kicker">Topology</p>
-              <h2 className="bp-card-title">Nodes</h2>
+              <p className="bp-card-kicker">{tr("dashboard.kicker.topology", "Topology")}</p>
+              <h2 className="bp-card-title">{tr("nav.nodes", "Nodes")}</h2>
             </div>
             <Link to="/nodes" className="bp-link-pill">
-              View All
+              {tr("dashboard.view_all", "View All")}
             </Link>
           </div>
           <div className="bp-stat">
             <span className="bp-stat-value">{nodes?.length ?? 0}</span>
-            <span className="bp-stat-label">Nodes configured</span>
+            <span className="bp-stat-label">{tr("dashboard.nodes.total", "Nodes configured")}</span>
           </div>
           <p className="bp-muted">
-            Forwarding selected: {forwardingSummary?.selected_nodes_count ?? 0}
+            {tr("dashboard.nodes.selected", "Forwarding selected")}: {forwardingSummary?.selected_nodes_count ?? 0}
           </p>
         </div>
 
         <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
           <div className="bp-card-header">
             <div>
-              <p className="bp-card-kicker">Routing</p>
-              <h2 className="bp-card-title">Routing / Geo</h2>
+              <p className="bp-card-kicker">{tr("dashboard.kicker.routing", "Routing")}</p>
+              <h2 className="bp-card-title">{tr("dashboard.routing.title", "Routing / Geo")}</h2>
             </div>
             <Link to="/settings" className="bp-link-pill">
-              Edit Rules
+              {tr("dashboard.routing.edit", "Edit Rules")}
             </Link>
           </div>
           <div className="bp-runtime-grid">
             <div className="bp-runtime-item">
-              <span className="bp-runtime-label">Bypass Private</span>
-              <span className="bp-runtime-value">
-                {routingSummary?.bypass_private_enabled ? "Enabled" : "Disabled"}
-              </span>
+              <span className="bp-runtime-label">{tr("dashboard.routing.private", "Bypass Private")}</span>
+              <span className="bp-runtime-value">{routingSummary?.bypass_private_enabled ? tr("nodes.status.enabled", "Enabled") : tr("nodes.status.disabled", "Disabled")}</span>
             </div>
             <div className="bp-runtime-item">
-              <span className="bp-runtime-label">Bypass Domains</span>
+              <span className="bp-runtime-label">{tr("dashboard.routing.domains", "Bypass Domains")}</span>
               <span className="bp-runtime-value">{routingSummary?.bypass_domains_count ?? 0}</span>
             </div>
             <div className="bp-runtime-item">
-              <span className="bp-runtime-label">Bypass CIDRs</span>
+              <span className="bp-runtime-label">{tr("dashboard.routing.cidrs", "Bypass CIDRs")}</span>
               <span className="bp-runtime-value">{routingSummary?.bypass_cidrs_count ?? 0}</span>
             </div>
             <div className="bp-runtime-item">
-              <span className="bp-runtime-label">GeoIP / GeoSite</span>
+              <span className="bp-runtime-label">{tr("dashboard.routing.geo", "GeoIP / GeoSite")}</span>
               <span className="bp-runtime-value">
-                {routingSummary?.geoip_status || "unknown"} / {routingSummary?.geosite_status || "unknown"}
+                {(routingSummary?.geoip_status || tr("common.unknown", "unknown")).toUpperCase()} / {(routingSummary?.geosite_status || tr("common.unknown", "unknown")).toUpperCase()}
               </span>
             </div>
           </div>
@@ -309,18 +314,22 @@ export default function Dashboard() {
         <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
           <div className="bp-card-header">
             <div>
-              <p className="bp-card-kicker">Diagnostics</p>
-              <h2 className="bp-card-title">Runtime Logs</h2>
+              <p className="bp-card-kicker">{tr("dashboard.kicker.diagnostics", "Diagnostics")}</p>
+              <h2 className="bp-card-title">{tr("dashboard.logs.title", "Runtime Logs")}</h2>
             </div>
             <div className="bp-card-header-meta">
               <span className="bp-metric-pill bp-metric-pill-neutral">
-                Showing {recentLogs.length} / {recentLogsTotal}
+                {tr("dashboard.logs.showing", "Showing {shown}/{total}", {
+                  shown: recentLogs.length,
+                  total: recentLogsTotal,
+                })}
               </span>
-              <span className={logsFetching ? "bp-metric-subtle" : "bp-metric-subtle bp-metric-subtle-hidden"}>
-                Updating...
+              <span className={logsFetching ? "bp-sync-indicator bp-sync-indicator-fetching" : "bp-sync-indicator"}>
+                <span className="bp-sync-indicator-dot" />
+                {tr("dashboard.sync", "Sync")}
               </span>
               <Button size="small" onClick={() => setLogsModalOpen(true)}>
-                View More
+                {tr("dashboard.logs.more", "View More")}
               </Button>
             </div>
           </div>
@@ -344,28 +353,25 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <p className="bp-muted">{logsFetching ? "Loading runtime logs..." : "No runtime logs yet."}</p>
+            <p className="bp-muted">{logsFetching ? tr("dashboard.logs.loading", "Loading runtime logs...") : tr("dashboard.logs.empty", "No runtime logs yet.")}</p>
           )}
         </div>
 
         <div className="bp-card bp-dashboard-card bp-dashboard-card--full">
           <div className="bp-card-header">
             <div>
-              <p className="bp-card-kicker">Diagnostics</p>
-              <h2 className="bp-card-title">Connections</h2>
+              <p className="bp-card-kicker">{tr("dashboard.kicker.diagnostics", "Diagnostics")}</p>
+              <h2 className="bp-card-title">{tr("dashboard.connections.title", "Connections")}</h2>
             </div>
             <div className="bp-card-header-meta">
               <span className="bp-metric-pill bp-metric-pill-active">
-                Active {connectionsData?.active_count ?? 0}
+                {tr("dashboard.connections.active", "Active {count}", {
+                  count: connectionsData?.active_count ?? 0,
+                })}
               </span>
-              <span
-                className={
-                  connectionsFetching
-                    ? "bp-metric-subtle"
-                    : "bp-metric-subtle bp-metric-subtle-hidden"
-                }
-              >
-                Updating...
+              <span className={connectionsFetching ? "bp-sync-indicator bp-sync-indicator-fetching" : "bp-sync-indicator"}>
+                <span className="bp-sync-indicator-dot" />
+                {tr("dashboard.sync", "Sync")}
               </span>
             </div>
           </div>
@@ -376,7 +382,7 @@ export default function Dashboard() {
               onChange={(e) => setConnQuery(e.target.value)}
               allowClear
               prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
-              placeholder="Filter connections by node/target/status"
+              placeholder={tr("dashboard.connections.filter", "Filter connections by node/target/status")}
             />
           </div>
           <Table<RuntimeConnection>
@@ -390,7 +396,7 @@ export default function Dashboard() {
         </div>
       </div>
       <Modal
-        title="Runtime Logs"
+        title={tr("dashboard.logs.title", "Runtime Logs")}
         open={logsModalOpen}
         onCancel={() => setLogsModalOpen(false)}
         footer={null}
@@ -403,10 +409,10 @@ export default function Dashboard() {
             onChange={setLogsLevel}
             style={{ width: 140 }}
             options={[
-              { value: "all", label: "All Levels" },
-              { value: "info", label: "Info" },
-              { value: "warn", label: "Warn" },
-              { value: "error", label: "Error" },
+              { value: "all", label: tr("dashboard.logs.level.all", "All Levels") },
+              { value: "info", label: tr("dashboard.logs.level.info", "Info") },
+              { value: "warn", label: tr("dashboard.logs.level.warn", "Warn") },
+              { value: "error", label: tr("dashboard.logs.level.error", "Error") },
             ]}
           />
           <Input
@@ -414,7 +420,7 @@ export default function Dashboard() {
             allowClear
             value={logsQuery}
             onChange={(e) => setLogsQuery(e.target.value)}
-            placeholder="Search source/message"
+            placeholder={tr("dashboard.logs.search", "Search source/message")}
             prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
           />
         </div>
@@ -425,7 +431,7 @@ export default function Dashboard() {
           dataSource={logsModalData?.items || []}
           columns={[
             {
-              title: "Time",
+              title: tr("dashboard.logs.col.time", "Time"),
               dataIndex: "timestamp",
               key: "timestamp",
               width: 210,
@@ -434,7 +440,7 @@ export default function Dashboard() {
               render: (value: string) => formatDateTime(value),
             },
             {
-              title: "Level",
+              title: tr("dashboard.logs.col.level", "Level"),
               dataIndex: "level",
               key: "level",
               width: 100,
@@ -446,14 +452,14 @@ export default function Dashboard() {
               ),
             },
             {
-              title: "Source",
+              title: tr("dashboard.logs.col.source", "Source"),
               dataIndex: "source",
               key: "source",
               width: 120,
               className: "bp-table-mono",
             },
             {
-              title: "Message",
+              title: tr("dashboard.logs.col.message", "Message"),
               dataIndex: "message",
               key: "message",
             },
@@ -523,7 +529,10 @@ function formatLatency(latencyMs?: number | null): string {
 
 type TrafficSourceTone = "success" | "warning" | "danger" | "muted";
 
-function getTrafficSourceMeta(source?: string | null): {
+function getTrafficSourceMeta(
+  source: string | null | undefined,
+  tr: (key: string, fallback?: string, params?: Record<string, string | number | boolean | null | undefined>) => string
+): {
   label: string;
   description: string;
   tone: TrafficSourceTone;
@@ -531,28 +540,28 @@ function getTrafficSourceMeta(source?: string | null): {
   const normalized = (source || "").trim().toLowerCase();
   if (normalized === "singbox_clash_api") {
     return {
-      label: "Proxy Only",
-      description: "Only traffic forwarded by sing-box is counted.",
+      label: tr("dashboard.traffic.source.proxy_only", "Proxy Only"),
+      description: tr("dashboard.traffic.source.proxy_only_desc", "Only traffic forwarded by sing-box is counted."),
       tone: "success",
     };
   }
   if (normalized === "singbox_clash_api_disabled") {
     return {
-      label: "Disabled",
-      description: "Proxy traffic metrics are disabled by config.",
+      label: tr("dashboard.traffic.source.disabled", "Disabled"),
+      description: tr("dashboard.traffic.source.disabled_desc", "Proxy traffic metrics are disabled by config."),
       tone: "warning",
     };
   }
   if (normalized === "singbox_clash_api_unavailable") {
     return {
-      label: "Unavailable",
-      description: "Cannot reach sing-box Clash API, metrics are temporarily unavailable.",
+      label: tr("dashboard.traffic.source.unavailable", "Unavailable"),
+      description: tr("dashboard.traffic.source.unavailable_desc", "Cannot reach sing-box Clash API, metrics are temporarily unavailable."),
       tone: "danger",
     };
   }
   return {
-    label: "Unknown",
-    description: "Traffic source is not recognized.",
+    label: tr("dashboard.traffic.source.unknown", "Unknown"),
+    description: tr("dashboard.traffic.source.unknown_desc", "Traffic source is not recognized."),
     tone: "muted",
   };
 }

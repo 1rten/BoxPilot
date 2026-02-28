@@ -10,6 +10,7 @@ import {
   useUpdateRoutingSettings,
 } from "../hooks/useProxySettings";
 import { useToast } from "../components/common/ToastContext";
+import { useI18n } from "../i18n/context";
 
 interface ProxyCardProps {
   title: string;
@@ -18,28 +19,29 @@ interface ProxyCardProps {
 }
 
 export default function Settings() {
+  const { tr } = useI18n();
   const { data, isLoading } = useProxySettings();
   const { data: routingData, isLoading: routingLoading } = useRoutingSettings();
   return (
     <div className="bp-page">
       <div className="bp-page-header">
         <div>
-          <h1 className="bp-page-title">Settings</h1>
+          <h1 className="bp-page-title">{tr("settings.title", "Settings")}</h1>
           <p className="bp-page-subtitle">
-            Configure global HTTP and SOCKS5 forwarding behavior.
+            {tr("settings.subtitle", "Configure global HTTP and SOCKS5 forwarding behavior.")}
           </p>
         </div>
       </div>
       <div className="bp-settings-grid">
-        <ProxySettingsCard title="HTTP Proxy" proxyType="http" data={data?.http} />
-        <ProxySettingsCard title="SOCKS5 Proxy" proxyType="socks" data={data?.socks} />
+        <ProxySettingsCard title={tr("settings.http.title", "HTTP Proxy")} proxyType="http" data={data?.http} />
+        <ProxySettingsCard title={tr("settings.socks.title", "SOCKS5 Proxy")} proxyType="socks" data={data?.socks} />
       </div>
       <div style={{ marginTop: 16 }}>
         <RoutingSettingsCard data={routingData} />
       </div>
       {(isLoading || routingLoading) && (
         <p className="bp-muted" style={{ marginTop: 12 }}>
-          Loading settings...
+          {tr("common.loading", "Loading...")}
         </p>
       )}
     </div>
@@ -47,6 +49,7 @@ export default function Settings() {
 }
 
 function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
+  const { tr } = useI18n();
   const [form] = Form.useForm();
   const { addToast } = useToast();
   const update = useUpdateProxySettings();
@@ -86,17 +89,21 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
     const url = buildProxyUrl(data, preferredHost);
     try {
       await navigator.clipboard.writeText(url);
-      addToast("success", `Connection string copied (${clientHost}:${data.port})`);
+      addToast("success", tr("settings.copy.success", "Connection string copied ({host}:{port})", { host: clientHost, port: data.port }));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1200);
     } catch {
-      addToast("error", "Copy failed");
+      addToast("error", tr("settings.copy.failed", "Copy failed"));
     }
   };
 
   const statusTag = data?.status ? (
     <Tag color={data.status === "running" ? "success" : data.status === "error" ? "error" : "default"}>
-      {data.status === "running" ? "Running" : data.status === "error" ? "Error" : "Stopped"}
+      {data.status === "running"
+        ? tr("settings.status.running", "Running")
+        : data.status === "error"
+          ? tr("settings.status.error", "Error")
+          : tr("settings.status.stopped", "Stopped")}
     </Tag>
   ) : null;
 
@@ -104,19 +111,19 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
     <Card className="bp-settings-card">
       <div className="bp-card-header">
         <div>
-          <p className="bp-card-kicker">Global Forwarding</p>
+          <p className="bp-card-kicker">{tr("settings.proxy.kicker", "Global Forwarding")}</p>
           <h2 className="bp-card-title">{title}</h2>
         </div>
         {statusTag}
       </div>
       <div className="bp-settings-status-row">
-        <span className="bp-muted">Current binding</span>
+        <span className="bp-muted">{tr("settings.proxy.binding", "Current binding")}</span>
         <span className="bp-table-mono">
           {data?.listen_address ?? "0.0.0.0"}:{data?.port ?? "-"}
         </span>
       </div>
       <div className="bp-settings-status-row">
-        <span className="bp-muted">Copy URL host</span>
+        <span className="bp-muted">{tr("settings.proxy.copy_host", "Copy URL host")}</span>
         <span className="bp-table-mono">
           {resolveProxyClientHost(
             data?.listen_address ?? "0.0.0.0",
@@ -141,10 +148,10 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
           password: "",
         }}
       >
-        <Form.Item name="enabled" label="Enabled" valuePropName="checked">
+        <Form.Item name="enabled" label={tr("settings.status.enabled", "Enabled")} valuePropName="checked">
           <Switch />
         </Form.Item>
-        <Form.Item name="listen_address" label="Listen Address">
+        <Form.Item name="listen_address" label={tr("settings.proxy.listen", "Listen Address")}>
           <Select
             options={[
               { value: "127.0.0.1", label: "127.0.0.1 (Localhost)" },
@@ -154,19 +161,19 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
         </Form.Item>
         <Form.Item
           name="port"
-          label="Port"
+          label={tr("settings.proxy.port", "Port")}
           rules={[
-            { required: true, message: "Port is required" },
-            { type: "number", min: 1, max: 65535, message: "Port must be 1-65535" },
+            { required: true, message: tr("settings.proxy.port.required", "Port is required") },
+            { type: "number", min: 1, max: 65535, message: tr("settings.proxy.port.range", "Port must be 1-65535") },
           ]}
         >
           <InputNumber min={1} max={65535} style={{ width: "100%" }} />
         </Form.Item>
-        <Form.Item name="auth_mode" label="Auth Mode">
+        <Form.Item name="auth_mode" label={tr("settings.proxy.auth_mode", "Auth Mode")}>
           <Select
             options={[
-              { value: "none", label: "None" },
-              { value: "basic", label: "Basic" },
+              { value: "none", label: tr("settings.proxy.auth.none", "None") },
+              { value: "basic", label: tr("settings.proxy.auth.basic", "Basic") },
             ]}
           />
         </Form.Item>
@@ -174,11 +181,11 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
           <>
             <Form.Item
               name="username"
-              label="Username"
+              label={tr("settings.proxy.username", "Username")}
               rules={[
                 {
                   required: true,
-                  message: "Username is required for Basic auth",
+                  message: tr("settings.proxy.username.required", "Username is required for Basic auth"),
                 },
               ]}
             >
@@ -186,11 +193,11 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
             </Form.Item>
             <Form.Item
               name="password"
-              label="Password"
+              label={tr("settings.proxy.password", "Password")}
               rules={[
                 {
                   required: true,
-                  message: "Password is required for Basic auth",
+                  message: tr("settings.proxy.password.required", "Password is required for Basic auth"),
                 },
               ]}
             >
@@ -201,13 +208,13 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
       </Form>
       <div className="bp-page-actions bp-settings-actions">
         <Button onClick={onSave} type="primary" loading={update.isPending}>
-          Save
+          {tr("common.save", "Save")}
         </Button>
         <Button onClick={() => apply.mutate()} loading={apply.isPending}>
-          Apply / Restart
+          {tr("settings.proxy.apply", "Apply / Restart")}
         </Button>
         <Button onClick={onCopy} disabled={!data}>
-          {copied ? "Copied" : "Copy URL"}
+          {copied ? tr("settings.copy.done", "Copied") : tr("settings.copy.url", "Copy URL")}
         </Button>
       </div>
     </Card>
@@ -219,6 +226,7 @@ interface RoutingCardProps {
 }
 
 function RoutingSettingsCard({ data }: RoutingCardProps) {
+  const { tr } = useI18n();
   const [form] = Form.useForm();
   const update = useUpdateRoutingSettings();
   const apply = useApplyProxySettings();
@@ -245,13 +253,13 @@ function RoutingSettingsCard({ data }: RoutingCardProps) {
     <Card className="bp-settings-card">
       <div className="bp-card-header">
         <div>
-          <p className="bp-card-kicker">Route Rules</p>
-          <h2 className="bp-card-title">Routing Bypass</h2>
+          <p className="bp-card-kicker">{tr("settings.routing.kicker", "Route Rules")}</p>
+          <h2 className="bp-card-title">{tr("settings.routing.title", "Routing Bypass")}</h2>
         </div>
-        {data?.updated_at ? <span className="bp-muted">Updated {data.updated_at}</span> : null}
+        {data?.updated_at ? <span className="bp-muted">{tr("settings.routing.updated", "Updated {time}", { time: data.updated_at })}</span> : null}
       </div>
       <p className="bp-muted" style={{ marginTop: 0 }}>
-        Matched domains and CIDRs will go direct instead of proxy.
+        {tr("settings.routing.desc", "Matched domains and CIDRs will go direct instead of proxy.")}
       </p>
       <Form
         form={form}
@@ -263,22 +271,22 @@ function RoutingSettingsCard({ data }: RoutingCardProps) {
             "127.0.0.0/8\n10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16\n169.254.0.0/16\n::1/128\nfc00::/7\nfe80::/10",
         }}
       >
-        <Form.Item name="bypass_private_enabled" label="Enable bypass rules" valuePropName="checked">
+        <Form.Item name="bypass_private_enabled" label={tr("settings.routing.enable", "Enable bypass rules")} valuePropName="checked">
           <Switch />
         </Form.Item>
-        <Form.Item name="bypass_domains_text" label="Bypass domains (one per line)">
+        <Form.Item name="bypass_domains_text" label={tr("settings.routing.domains", "Bypass domains (one per line)")}>
           <Input.TextArea rows={4} placeholder="localhost&#10;local" />
         </Form.Item>
-        <Form.Item name="bypass_cidrs_text" label="Bypass CIDRs (one per line)">
+        <Form.Item name="bypass_cidrs_text" label={tr("settings.routing.cidrs", "Bypass CIDRs (one per line)")}>
           <Input.TextArea rows={6} placeholder="192.168.0.0/16&#10;10.0.0.0/8" />
         </Form.Item>
       </Form>
       <div className="bp-page-actions bp-settings-actions">
         <Button onClick={onSave} type="primary" loading={update.isPending}>
-          Save
+          {tr("common.save", "Save")}
         </Button>
         <Button onClick={() => apply.mutate()} loading={apply.isPending}>
-          Apply / Restart
+          {tr("settings.proxy.apply", "Apply / Restart")}
         </Button>
       </div>
     </Card>

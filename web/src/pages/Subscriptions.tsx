@@ -16,8 +16,10 @@ import {
 } from "../components/subscriptions/SubscriptionModal";
 import { SearchOutlined } from "@ant-design/icons";
 import { Button, Card, Input, Modal, Skeleton, Switch } from "antd";
+import { useI18n } from "../i18n/context";
 
 export default function Subscriptions() {
+  const { tr } = useI18n();
   const {
     data: list,
     isLoading,
@@ -82,17 +84,17 @@ export default function Subscriptions() {
     <div className="bp-page">
       <div className="bp-page-header">
         <div>
-          <h1 className="bp-page-title">Subscriptions</h1>
+          <h1 className="bp-page-title">{tr("subs.title", "Subscriptions")}</h1>
           <p className="bp-page-subtitle">
-            Manage source feeds, refresh cadence, and sync health.
+            {tr("subs.subtitle", "Manage source feeds, refresh cadence, and sync health.")}
           </p>
         </div>
         <div className="bp-page-actions">
           <Button type="primary" onClick={handleCreate} loading={create.isPending}>
-            New Subscription
+            {tr("subs.new", "New Subscription")}
           </Button>
           <Button onClick={() => refetch()} loading={isFetching}>
-            Refresh
+            {tr("common.refresh", "Refresh")}
           </Button>
         </div>
       </div>
@@ -105,7 +107,7 @@ export default function Subscriptions() {
             allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or URL"
+            placeholder={tr("subs.search.placeholder", "Search by name or URL")}
           />
           <div className="bp-toolbar-actions-fixed bp-subscriptions-toolbar-actions">
             <span className="bp-inline-control">
@@ -114,7 +116,7 @@ export default function Subscriptions() {
                 checked={autoRefresh}
                 onChange={(checked) => setAutoRefresh(checked)}
               />
-              Auto poll list every 30s
+              {tr("subs.autopoll", "Auto poll list every 30s")}
             </span>
           </div>
         </div>
@@ -122,7 +124,7 @@ export default function Subscriptions() {
         {isLoading && !list && <Skeleton active paragraph={{ rows: 4 }} />}
         {error && (
           <ErrorState
-            message={`Failed to load subscriptions: ${(error as Error).message}`}
+            message={tr("subs.error.load", "Failed to load subscriptions: {message}", { message: (error as Error).message })}
             onRetry={() => refetch()}
           />
         )}
@@ -167,13 +169,13 @@ export default function Subscriptions() {
         ) : (
           !isLoading && (
             <EmptyState
-              title={list && list.length > 0 ? "No results" : "No subscriptions yet"}
+              title={list && list.length > 0 ? tr("subs.empty.search.title", "No results") : tr("subs.empty.base.title", "No subscriptions yet")}
               description={
                 list && list.length > 0
-                  ? "Try adjusting your search keywords."
-                  : "Create your first subscription to start syncing."
+                  ? tr("subs.empty.search", "Try adjusting your search keywords.")
+                  : tr("subs.empty.base", "Create your first subscription to start syncing.")
               }
-              actionLabel={list && list.length > 0 ? undefined : "New Subscription"}
+              actionLabel={list && list.length > 0 ? undefined : tr("subs.new", "New Subscription")}
               onActionClick={list && list.length > 0 ? undefined : handleCreate}
             />
           )
@@ -242,10 +244,10 @@ export default function Subscriptions() {
       {deleteId && (
         <Modal
           open={!!deleteId}
-          title="Delete Subscription"
-          okText="Delete"
+          title={tr("subs.delete.title", "Delete Subscription")}
+          okText={tr("subs.delete.confirm", "Delete")}
           okButtonProps={{ danger: true, loading: del.isPending }}
-          cancelText="Cancel"
+          cancelText={tr("common.cancel", "Cancel")}
           onCancel={() => setDeleteId(null)}
           onOk={() => {
             if (!deleteId) return;
@@ -255,7 +257,7 @@ export default function Subscriptions() {
           }}
         >
           <p className="bp-text-danger" style={{ fontSize: 14 }}>
-            This will remove the subscription and its nodes from DB. Continue?
+            {tr("subs.delete.desc", "This will remove the subscription and its nodes from DB. Continue?")}
           </p>
         </Modal>
       )}

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Alert, Button } from "antd";
+import { useI18n } from "../../i18n/context";
 
 interface ErrorStateProps {
   message: string;
@@ -7,6 +8,7 @@ interface ErrorStateProps {
 }
 
 export function ErrorState({ message, onRetry }: ErrorStateProps): ReactNode {
+  const { tr } = useI18n();
   return (
     <Alert
       type="error"
@@ -15,7 +17,7 @@ export function ErrorState({ message, onRetry }: ErrorStateProps): ReactNode {
       action={
         onRetry && (
           <Button size="small" type="primary" onClick={onRetry}>
-            Retry
+            {tr("common.retry", "Retry")}
           </Button>
         )
       }
@@ -23,4 +25,3 @@ export function ErrorState({ message, onRetry }: ErrorStateProps): ReactNode {
     />
   );
 }
-

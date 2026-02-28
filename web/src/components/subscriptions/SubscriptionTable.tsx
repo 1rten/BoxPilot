@@ -3,6 +3,7 @@ import { formatDateTime } from "../../utils/datetime";
 import { Button, Table, Tag, Tooltip } from "antd";
 import { DeleteOutlined, EditOutlined, LoadingOutlined, ReloadOutlined } from "@ant-design/icons";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
+import { useI18n } from "../../i18n/context";
 
 export interface SubscriptionTableProps {
   list: Subscription[];
@@ -27,11 +28,12 @@ export function SubscriptionTable({
   onToggleSort,
   pagination,
 }: SubscriptionTableProps) {
+  const { tr } = useI18n();
   if (!list.length) return null;
 
   const columns: ColumnsType<Subscription> = [
     {
-      title: "Name",
+      title: tr("subs.table.name", "Name"),
       dataIndex: "name",
       key: "name",
       width: 140,
@@ -51,20 +53,20 @@ export function SubscriptionTable({
       ),
     },
     {
-      title: "Status",
+      title: tr("subs.table.status", "Status"),
       dataIndex: "status",
       key: "status",
       width: 90,
-      render: (_value, record) => renderStatusTag(record),
+      render: (_value, record) => renderStatusTag(record, tr),
     },
     {
-      title: "Auto Update",
+      title: tr("subs.table.auto", "Auto Update"),
       dataIndex: "auto_update_enabled",
       key: "auto_update_enabled",
       width: 130,
       render: (value: boolean, record) => (
         <Tag color={value ? "blue" : "default"}>
-          {value ? `${record.refresh_interval_sec}s` : "Off"}
+          {value ? `${record.refresh_interval_sec}s` : tr("subs.table.off", "Off")}
         </Tag>
       ),
     },
@@ -74,7 +76,7 @@ export function SubscriptionTable({
           style={{ cursor: onToggleSort ? "pointer" : "default" }}
           onClick={onToggleSort}
         >
-          Updated at{" "}
+          {tr("subs.table.updated", "Updated at")}{" "}
           {sortOrder === "asc" ? "↑" : sortOrder === "desc" ? "↓" : ""}
         </span>
       ),
@@ -86,7 +88,7 @@ export function SubscriptionTable({
       ),
     },
     {
-      title: "Last error",
+      title: tr("subs.table.last_error", "Last error"),
       dataIndex: "last_error",
       key: "last_error",
       width: 180,
@@ -98,7 +100,7 @@ export function SubscriptionTable({
       ),
     },
     {
-      title: "Actions",
+      title: tr("subs.table.actions", "Actions"),
       key: "actions",
       align: "right",
       width: 140,
@@ -106,7 +108,7 @@ export function SubscriptionTable({
         const refreshing = rowRefreshingId === record.id;
         return (
           <div className="bp-row-actions">
-            <Tooltip title="Edit">
+            <Tooltip title={tr("subs.table.action.edit", "Edit")}>
               <Button
                 type="text"
                 className="bp-row-action-btn"
@@ -115,7 +117,7 @@ export function SubscriptionTable({
                 onClick={() => onEdit(record)}
               />
             </Tooltip>
-            <Tooltip title="Delete">
+            <Tooltip title={tr("subs.table.action.delete", "Delete")}>
               <Button
                 type="text"
                 danger
@@ -125,7 +127,7 @@ export function SubscriptionTable({
                 onClick={() => onDelete(record)}
               />
             </Tooltip>
-            <Tooltip title={refreshing ? "Refreshing..." : "Refresh"}>
+            <Tooltip title={refreshing ? tr("subs.table.action.refreshing", "Refreshing...") : tr("common.refresh", "Refresh")}>
               <Button
                 type="text"
                 className="bp-row-action-btn"
@@ -157,9 +159,16 @@ function truncate(s: string, max = 40): string {
   return s.length > max ? s.slice(0, max - 3) + "..." : s;
 }
 
-function renderStatusTag(s: Subscription): JSX.Element {
+function renderStatusTag(
+  s: Subscription,
+  tr: (key: string, fallback?: string, params?: Record<string, string | number | boolean | null | undefined>) => string
+): JSX.Element {
   const hasError = !!s.last_error;
   const paused = !s.enabled && !hasError;
-  const label = hasError ? "Error" : paused ? "Paused" : "Active";
+  const label = hasError
+    ? tr("subs.status.error", "Error")
+    : paused
+      ? tr("subs.status.paused", "Paused")
+      : tr("subs.status.active", "Active");
   return <Tag color={hasError ? "error" : paused ? "warning" : "success"}>{label}</Tag>;
 }

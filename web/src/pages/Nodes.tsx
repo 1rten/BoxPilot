@@ -17,8 +17,10 @@ import { Button, Card, Drawer, Dropdown, Input, Popconfirm, Table, Tag, Tooltip 
 import type { MenuProps } from "antd";
 import type { ColumnsType, TableRowSelection } from "antd/es/table/interface";
 import type { Node } from "../api/types";
+import { useI18n } from "../i18n/context";
 
 export default function Nodes() {
+  const { tr } = useI18n();
   const { data: list, isLoading, error, refetch } = useNodes({});
   const { data: subscriptions } = useSubscriptions();
   const update = useUpdateNode();
@@ -70,8 +72,8 @@ export default function Nodes() {
   }, [selectedNode, subscriptions]);
   const forwardingMenu: MenuProps = {
     items: [
-      { key: "enable", label: "Enable Forwarding" },
-      { key: "disable", label: "Disable Forwarding" },
+      { key: "enable", label: tr("nodes.forwarding.enable", "Enable Forwarding") },
+      { key: "disable", label: tr("nodes.forwarding.disable", "Disable Forwarding") },
     ],
     onClick: ({ key }) => {
       if (key === "enable") {
@@ -99,15 +101,15 @@ export default function Nodes() {
     <div className="bp-page">
       <div className="bp-page-header">
         <div>
-          <h1 className="bp-page-title">Nodes</h1>
+          <h1 className="bp-page-title">{tr("nodes.title", "Nodes")}</h1>
           <p className="bp-page-subtitle">
-            Select forwarding nodes and run connectivity tests.
+            {tr("nodes.subtitle", "Select forwarding nodes and run connectivity tests.")}
           </p>
         </div>
         <div className="bp-page-actions">
           <Dropdown menu={testMenu} trigger={["click"]}>
             <Button className="bp-btn-fixed bp-btn-test-mode">
-              Mode: {testModeLabel}
+              {tr("nodes.test.mode", "Mode")}: {testModeLabel}
             </Button>
           </Dropdown>
           <Button
@@ -116,10 +118,10 @@ export default function Nodes() {
             loading={testNodes.isPending}
             onClick={() => void runSelectedTest(testMode)}
           >
-            Test Selected
+            {tr("nodes.test.selected", "Test Selected")}
           </Button>
           <Button className="bp-btn-fixed" onClick={() => refetch()} loading={isLoading}>
-            Refresh
+            {tr("common.refresh", "Refresh")}
           </Button>
         </div>
       </div>
@@ -132,10 +134,12 @@ export default function Nodes() {
             allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or address"
+            placeholder={tr("nodes.search.placeholder", "Search by name or address")}
           />
           <div className="bp-toolbar-actions-fixed bp-nodes-toolbar-actions">
-            <span className="bp-selection-pill bp-selection-pill-static">Selected {selectedCount}</span>
+            <span className="bp-selection-pill bp-selection-pill-static">
+              {tr("nodes.selected", "Selected {count}", { count: selectedCount })}
+            </span>
             <Dropdown menu={forwardingMenu} disabled={selectedCount === 0} trigger={["click"]}>
               <Button
                 className="bp-batch-forwarding-btn bp-btn-fixed"
@@ -143,7 +147,7 @@ export default function Nodes() {
                 loading={batchForwarding.isPending}
                 icon={<MoreOutlined />}
               >
-                Batch Forwarding
+                {tr("nodes.forwarding.batch", "Batch Forwarding")}
               </Button>
             </Dropdown>
           </div>
@@ -151,7 +155,7 @@ export default function Nodes() {
 
         {error && (
           <ErrorState
-            message={`Failed to load nodes: ${(error as Error).message}`}
+            message={tr("nodes.error.load", "Failed to load nodes: {message}", { message: (error as Error).message })}
             onRetry={() => refetch()}
           />
         )}
@@ -189,6 +193,7 @@ export default function Nodes() {
               },
             }}
             columns={buildColumns({
+              tr,
               onToggleForwarding: (row) =>
                 update.mutate({ id: row.id, forwarding_enabled: !row.forwarding_enabled }),
               onToggleEnabled: (row) =>
@@ -208,11 +213,11 @@ export default function Nodes() {
         ) : (
           !isLoading && (
             <EmptyState
-              title={list && list.length > 0 ? "No results" : "No nodes yet"}
+              title={list && list.length > 0 ? tr("nodes.empty.search.title", "No results") : tr("nodes.empty.base.title", "No nodes yet")}
               description={
                 list && list.length > 0
-                  ? "Try adjusting your search keywords."
-                  : "Add a subscription and refresh to import nodes."
+                  ? tr("nodes.empty.search.desc", "Try adjusting your search keywords.")
+                  : tr("nodes.empty.base.desc", "Add a subscription and refresh to import nodes.")
               }
             />
           )
@@ -226,37 +231,37 @@ export default function Nodes() {
         rootStyle={{ position: "fixed" }}
         onClose={() => setDetailOpen(false)}
         open={detailOpen}
-        title={selectedNode ? selectedNode.name || selectedNode.tag : "Node Details"}
+        title={selectedNode ? selectedNode.name || selectedNode.tag : tr("nodes.drawer.title", "Node Details")}
       >
         {selectedNode && (
           <>
             <div className="bp-node-drawer-header">
               <Tag className="bp-node-status-pill" color={selectedNode.enabled ? "success" : "default"}>
-                {selectedNode.enabled ? "Online" : "Offline"}
+                {selectedNode.enabled ? tr("nodes.online", "Online") : tr("nodes.offline", "Offline")}
               </Tag>
             </div>
 
             <div className="bp-node-drawer-section">
-              <h3 className="bp-drawer-section-title">Type</h3>
+              <h3 className="bp-drawer-section-title">{tr("nodes.drawer.type_block", "Type")}</h3>
               <div className="bp-node-info-list">
                 <div className="bp-node-info-row">
-                  <span>Type</span>
+                  <span>{tr("nodes.col.type", "Type")}</span>
                   <strong>{selectedNode.type.toUpperCase()}</strong>
                 </div>
                 <div className="bp-node-info-row">
-                  <span>IP</span>
+                  <span>{tr("nodes.ip", "IP")}</span>
                   <strong className="bp-table-mono">{selectedNode.server || "-"}</strong>
                 </div>
                 <div className="bp-node-info-row">
-                  <span>Port</span>
+                  <span>{tr("settings.proxy.port", "Port")}</span>
                   <strong className="bp-table-mono">{selectedNode.server_port ?? "-"}</strong>
                 </div>
                 <div className="bp-node-info-row">
-                  <span>Created At</span>
+                  <span>{tr("nodes.created_at", "Created At")}</span>
                   <strong className="bp-table-mono">{formatDateTime(selectedNode.created_at)}</strong>
                 </div>
                 <div className="bp-node-info-row">
-                  <span>Last Seen</span>
+                  <span>{tr("nodes.last_seen", "Last Seen")}</span>
                   <strong className="bp-table-mono">
                     {selectedNode.last_test_at ? formatDateTime(selectedNode.last_test_at) : "-"}
                   </strong>
@@ -266,13 +271,13 @@ export default function Nodes() {
 
             <div className="bp-node-drawer-section">
               <div className="bp-node-section-header">
-                <h3 className="bp-drawer-section-title">Ports</h3>
+                <h3 className="bp-drawer-section-title">{tr("nodes.drawer.ports", "Ports")}</h3>
               </div>
               <div className="bp-node-ports">
                 <div className="bp-node-ports-head">
-                  <span>Port</span>
-                  <span>Protocol</span>
-                  <span>Status</span>
+                  <span>{tr("settings.proxy.port", "Port")}</span>
+                  <span>{tr("nodes.drawer.protocol", "Protocol")}</span>
+                  <span>{tr("subs.table.status", "Status")}</span>
                 </div>
                 <div className="bp-node-ports-row">
                   <span>{selectedNode.server_port ?? "-"}</span>
@@ -290,8 +295,8 @@ export default function Nodes() {
                       {selectedNode.last_test_status
                         ? selectedNode.last_test_status.toUpperCase()
                         : selectedNode.enabled
-                        ? "ACTIVE"
-                        : "INACTIVE"}
+                        ? tr("nodes.drawer.active", "ACTIVE")
+                        : tr("nodes.drawer.inactive", "INACTIVE")}
                     </Tag>
                   </span>
                 </div>
@@ -304,7 +309,7 @@ export default function Nodes() {
             </div>
 
             <div className="bp-node-drawer-section">
-              <h3 className="bp-drawer-section-title">Bound Subscriptions</h3>
+              <h3 className="bp-drawer-section-title">{tr("nodes.drawer.bound_subs", "Bound Subscriptions")}</h3>
               <ul className="bp-node-bound-list">
                 <li>{boundSubName || selectedNode.sub_id}</li>
               </ul>
@@ -317,7 +322,7 @@ export default function Nodes() {
                 loading={testNodes.isPending}
                 onClick={() => testNodes.mutate({ node_ids: [selectedNode.id], mode: testMode })}
               >
-                Test Node ({testModeLabel})
+                {tr("nodes.test.node", "Test Node")} ({testModeLabel})
               </Button>
               <Button
                 className="bp-btn-fixed"
@@ -325,7 +330,7 @@ export default function Nodes() {
                 onClick={() => update.mutate({ id: selectedNode.id, enabled: !selectedNode.enabled })}
                 disabled={update.isPending}
               >
-                {selectedNode.enabled ? "Disable Node" : "Enable Node"}
+                {selectedNode.enabled ? tr("nodes.disable", "Disable Node") : tr("nodes.enable", "Enable Node")}
               </Button>
             </div>
           </>
@@ -367,6 +372,7 @@ export default function Nodes() {
 }
 
 function buildColumns({
+  tr,
   updating,
   rowTestingId,
   onToggleForwarding,
@@ -374,6 +380,7 @@ function buildColumns({
   onTest,
   onShowDetails,
 }: {
+  tr: (key: string, fallback?: string, params?: Record<string, string | number | boolean | null | undefined>) => string;
   updating: boolean;
   rowTestingId: string | null;
   onToggleForwarding: (row: Node) => void;
@@ -383,7 +390,7 @@ function buildColumns({
 }): ColumnsType<Node> {
   return [
     {
-      title: "Name",
+      title: tr("subs.table.name", "Name"),
       dataIndex: "name",
       key: "name",
       width: 210,
@@ -391,28 +398,28 @@ function buildColumns({
       render: (_value, record) => record.name || record.tag,
     },
     {
-      title: "Type",
+      title: tr("nodes.col.type", "Type"),
       dataIndex: "type",
       key: "type",
       width: 110,
       render: (value: string) => value.toUpperCase(),
     },
     {
-      title: "Forwarding",
+      title: tr("nodes.col.forwarding", "Forwarding"),
       dataIndex: "forwarding_enabled",
       key: "forwarding_enabled",
       width: 130,
-      render: (value: boolean) => <Tag color={value ? "blue" : "default"}>{value ? "Enabled" : "Disabled"}</Tag>,
+      render: (value: boolean) => <Tag color={value ? "blue" : "default"}>{value ? tr("nodes.status.enabled", "Enabled") : tr("nodes.status.disabled", "Disabled")}</Tag>,
     },
     {
-      title: "Node Status",
+      title: tr("nodes.col.node_status", "Node Status"),
       dataIndex: "enabled",
       key: "status",
       width: 130,
-      render: (value: boolean) => <Tag color={value ? "success" : "default"}>{value ? "Enabled" : "Disabled"}</Tag>,
+      render: (value: boolean) => <Tag color={value ? "success" : "default"}>{value ? tr("nodes.status.enabled", "Enabled") : tr("nodes.status.disabled", "Disabled")}</Tag>,
     },
     {
-      title: "Latency",
+      title: tr("nodes.col.latency", "Latency"),
       dataIndex: "last_latency_ms",
       key: "latency",
       width: 120,
@@ -428,7 +435,7 @@ function buildColumns({
       ),
     },
     {
-      title: "Last Test",
+      title: tr("nodes.col.last_test", "Last Test"),
       dataIndex: "last_test_at",
       key: "last_test_at",
       width: 190,
@@ -436,7 +443,7 @@ function buildColumns({
         value ? <span className="bp-table-mono">{formatDateTime(value)}</span> : "-",
     },
     {
-      title: "Actions",
+      title: tr("subs.table.actions", "Actions"),
       key: "actions",
       align: "right",
       width: 180,
@@ -447,59 +454,59 @@ function buildColumns({
             event.stopPropagation();
           }}
         >
-          <Tooltip title="Details">
+          <Tooltip title={tr("nodes.action.details", "Details")}>
             <Button
               type="text"
               className="bp-row-action-btn"
-              aria-label="Show node details"
+              aria-label={tr("nodes.action.details", "Details")}
               icon={<EyeOutlined />}
               onClick={() => onShowDetails(record)}
             />
           </Tooltip>
-          <Tooltip title="Test">
+          <Tooltip title={tr("nodes.action.test", "Test")}>
             <Button
               type="text"
               className="bp-row-action-btn"
-              aria-label="Test node"
+              aria-label={tr("nodes.action.test", "Test")}
               icon={rowTestingId === record.id ? <LoadingOutlined spin /> : <ThunderboltOutlined />}
               onClick={() => onTest(record)}
             />
           </Tooltip>
           {record.enabled ? (
             <Popconfirm
-              title="Disable this node?"
-              description="Disabled nodes will be excluded from forwarding and tests."
-              okText="Disable"
-              cancelText="Cancel"
+              title={tr("nodes.disable.confirm", "Disable this node?")}
+              description={tr("nodes.disable.desc", "Disabled nodes will be excluded from forwarding and tests.")}
+              okText={tr("nodes.disable.short", "Disable")}
+              cancelText={tr("common.cancel", "Cancel")}
               onConfirm={() => onToggleEnabled(record)}
             >
-              <Tooltip title="Disable">
+              <Tooltip title={tr("nodes.disable.short", "Disable")}>
                 <Button
                   type="text"
                   className="bp-row-action-btn"
-                  aria-label="Disable node"
+                  aria-label={tr("nodes.disable.short", "Disable")}
                   icon={<PoweroffOutlined />}
                   disabled={updating}
                 />
               </Tooltip>
             </Popconfirm>
           ) : (
-            <Tooltip title="Enable">
+            <Tooltip title={tr("nodes.enable.short", "Enable")}>
               <Button
                 type="text"
                 className="bp-row-action-btn"
-                aria-label="Enable node"
+                aria-label={tr("nodes.enable.short", "Enable")}
                 icon={<PoweroffOutlined />}
                 onClick={() => onToggleEnabled(record)}
                 disabled={updating}
               />
             </Tooltip>
           )}
-          <Tooltip title={record.forwarding_enabled ? "Disable forwarding" : "Enable forwarding"}>
+          <Tooltip title={record.forwarding_enabled ? tr("nodes.forwarding.disable", "Disable forwarding") : tr("nodes.forwarding.enable", "Enable forwarding")}>
             <Button
               type="text"
               className="bp-row-action-btn"
-              aria-label={record.forwarding_enabled ? "Disable forwarding" : "Enable forwarding"}
+              aria-label={record.forwarding_enabled ? tr("nodes.forwarding.disable", "Disable forwarding") : tr("nodes.forwarding.enable", "Enable forwarding")}
               icon={<SwapOutlined />}
               onClick={() => onToggleForwarding(record)}
               disabled={updating}
