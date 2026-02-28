@@ -190,7 +190,6 @@ func (h *Settings) RoutingSummary(c *gin.Context) {
 
 	notes := []string{
 		"Routing bypass is applied during runtime config build.",
-		"GeoIP/GeoSite are currently handled by sing-box defaults in process mode.",
 	}
 	if settings.BypassPrivateEnabled {
 		notes = append(notes, "Private/local CIDR bypass is enabled.")
@@ -204,8 +203,6 @@ func (h *Settings) RoutingSummary(c *gin.Context) {
 			BypassDomainsCount:   len(settings.BypassDomains),
 			BypassCIDRsCount:     len(settings.BypassCIDRs),
 			UpdatedAt:            updatedAt,
-			GeoIPStatus:          "builtin",
-			GeoSiteStatus:        "builtin",
 			Notes:                notes,
 		},
 	})

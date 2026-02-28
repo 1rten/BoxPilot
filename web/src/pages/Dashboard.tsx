@@ -274,7 +274,7 @@ export default function Dashboard() {
           <div className="bp-card-header">
             <div>
               <p className="bp-card-kicker">{tr("dashboard.kicker.routing", "Routing")}</p>
-              <h2 className="bp-card-title">{tr("dashboard.routing.title", "Routing / Geo")}</h2>
+              <h2 className="bp-card-title">{tr("dashboard.routing.title", "Routing")}</h2>
             </div>
             <Link to="/settings" className="bp-link-pill">
               {tr("dashboard.routing.edit", "Edit Rules")}
@@ -292,12 +292,6 @@ export default function Dashboard() {
             <div className="bp-runtime-item">
               <span className="bp-runtime-label">{tr("dashboard.routing.cidrs", "Bypass CIDRs")}</span>
               <span className="bp-runtime-value">{routingSummary?.bypass_cidrs_count ?? 0}</span>
-            </div>
-            <div className="bp-runtime-item">
-              <span className="bp-runtime-label">{tr("dashboard.routing.geo", "GeoIP / GeoSite")}</span>
-              <span className="bp-runtime-value">
-                {(routingSummary?.geoip_status || tr("common.unknown", "unknown")).toUpperCase()} / {(routingSummary?.geosite_status || tr("common.unknown", "unknown")).toUpperCase()}
-              </span>
             </div>
           </div>
           {routingSummary?.notes?.length ? (

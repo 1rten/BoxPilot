@@ -755,12 +755,10 @@ components:
             bypass_domains_count: { type: integer }
             bypass_cidrs_count: { type: integer }
             updated_at: { type: string }
-            geoip_status: { type: string }
-            geosite_status: { type: string }
             notes:
               type: array
               items: { type: string }
-          required: [bypass_private_enabled, bypass_domains_count, bypass_cidrs_count, geoip_status, geosite_status, notes]
+          required: [bypass_private_enabled, bypass_domains_count, bypass_cidrs_count, notes]
       required: [data]
 
     UpdateRoutingSettingsRequest:
