@@ -84,10 +84,18 @@ export function useRuntimeConnections(query?: string) {
   });
 }
 
-export function useRuntimeLogs(params?: { level?: string; q?: string; limit?: number }) {
+export function useRuntimeLogs(params?: {
+  level?: string;
+  q?: string;
+  limit?: number;
+  enabled?: boolean;
+  refetchIntervalMs?: number;
+}) {
   const level = (params?.level || "all").trim();
   const q = (params?.q || "").trim();
   const limit = params?.limit ?? 80;
+  const enabled = params?.enabled ?? true;
+  const refetchIntervalMs = params?.refetchIntervalMs ?? 5000;
 
   return useQuery({
     queryKey: ["runtime-logs", level, q, limit],
@@ -101,10 +109,11 @@ export function useRuntimeLogs(params?: { level?: string; q?: string; limit?: nu
       });
       return data.data;
     },
+    enabled,
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
-    refetchInterval: 5000,
+    refetchInterval: refetchIntervalMs,
     refetchIntervalInBackground: true,
   });
 }

@@ -30,6 +30,8 @@ export default function Nodes() {
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const [testMode, setTestMode] = useState<"ping" | "http">("ping");
   const [rowTestingId, setRowTestingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const filtered = useMemo(() => {
     if (!list) return list;
@@ -55,6 +57,10 @@ export default function Nodes() {
     setSelectedRowKeys((prev) => prev.filter((key) => validKeys.has(key)));
   }, [list]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, list?.length]);
+
   const selectedCount = selectedRowKeys.length;
   const testModeLabel = testMode.toUpperCase();
   const boundSubName = useMemo(() => {
@@ -78,13 +84,12 @@ export default function Nodes() {
   };
   const testMenu: MenuProps = {
     items: [
-      { key: "ping", label: "Test Selected via PING" },
-      { key: "http", label: "Test Selected via HTTP" },
+      { key: "ping", label: "PING" },
+      { key: "http", label: "HTTP" },
     ],
     onClick: ({ key }) => {
       const mode = key === "http" ? "http" : "ping";
       setTestMode(mode);
-      void runSelectedTest(mode);
     },
   };
 
@@ -100,8 +105,8 @@ export default function Nodes() {
           </p>
         </div>
         <div className="bp-page-actions">
-          <Dropdown menu={testMenu} disabled={selectedCount === 0} trigger={["click"]}>
-            <Button className="bp-btn-fixed bp-btn-test-mode" disabled={selectedCount === 0}>
+          <Dropdown menu={testMenu} trigger={["click"]}>
+            <Button className="bp-btn-fixed bp-btn-test-mode">
               Mode: {testModeLabel}
             </Button>
           </Dropdown>
@@ -169,8 +174,19 @@ export default function Nodes() {
               className: "bp-clickable-row",
             })}
             pagination={{
-              pageSize: 10,
+              current: page,
+              pageSize,
               showSizeChanger: true,
+              pageSizeOptions: [10, 20, 50, 100],
+              onChange: (nextPage, nextPageSize) => {
+                const resolvedPageSize = nextPageSize || pageSize;
+                if (resolvedPageSize !== pageSize) {
+                  setPageSize(resolvedPageSize);
+                  setPage(1);
+                  return;
+                }
+                setPage(nextPage);
+              },
             }}
             columns={buildColumns({
               onToggleForwarding: (row) =>
@@ -400,8 +416,16 @@ function buildColumns({
       dataIndex: "last_latency_ms",
       key: "latency",
       width: 120,
-      render: (_value, record) =>
-        record.last_latency_ms !== null && record.last_latency_ms !== undefined ? `${record.last_latency_ms} ms` : "-",
+      render: (_value, record) => (
+        <span
+          className={`bp-latency-badge bp-latency-badge-${latencyTone(
+            record.last_latency_ms,
+            record.last_test_status
+          )}`}
+        >
+          {formatLatency(record.last_latency_ms)}
+        </span>
+      ),
     },
     {
       title: "Last Test",
@@ -498,4 +522,43 @@ function statusColor(status: string): string {
     default:
       return "default";
   }
+}
+
+type LatencyTone =
+  | "excellent"
+  | "good"
+  | "medium"
+  | "slow"
+  | "poor"
+  | "error"
+  | "unknown";
+
+function latencyTone(latencyMs?: number | null, testStatus?: string | null): LatencyTone {
+  const status = (testStatus || "").toLowerCase();
+  if (status === "error") {
+    return "error";
+  }
+  if (latencyMs === null || latencyMs === undefined) {
+    return status === "warn" ? "warn" : "unknown";
+  }
+  if (latencyMs <= 80) {
+    return "excellent";
+  }
+  if (latencyMs <= 150) {
+    return "good";
+  }
+  if (latencyMs <= 300) {
+    return "medium";
+  }
+  if (latencyMs <= 600) {
+    return "slow";
+  }
+  return "poor";
+}
+
+function formatLatency(latencyMs?: number | null): string {
+  if (latencyMs === null || latencyMs === undefined) {
+    return "-";
+  }
+  return `${latencyMs} ms`;
 }

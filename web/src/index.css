@@ -472,7 +472,9 @@ a {
 .bp-card-header-meta {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
+  min-width: 240px;
 }
 
 .bp-metric-pill {
@@ -486,6 +488,7 @@ a {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  min-width: 110px;
 }
 
 .bp-metric-pill-active {
@@ -504,6 +507,19 @@ a {
   font-size: 12px;
   color: var(--bp-muted);
   font-variant-numeric: tabular-nums;
+  width: 64px;
+  text-align: left;
+}
+
+.bp-metric-subtle-hidden {
+  visibility: hidden;
+}
+
+.bp-log-modal-toolbar {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .bp-dashboard-table-toolbar {
@@ -989,6 +1005,62 @@ a {
   align-items: center;
   justify-content: flex-end;
   gap: 0;
+}
+
+.bp-latency-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bp-latency-badge-excellent {
+  color: #065f46;
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+.bp-latency-badge-good {
+  color: #067647;
+  background: #ecfdf3;
+  border-color: #baf0cc;
+}
+
+.bp-latency-badge-medium {
+  color: #92400e;
+  background: #fff7e6;
+  border-color: #f6d4a5;
+}
+
+.bp-latency-badge-slow {
+  color: #b45309;
+  background: #ffedd5;
+  border-color: #fdba74;
+}
+
+.bp-latency-badge-poor {
+  color: #b91c1c;
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.bp-latency-badge-error {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.bp-latency-badge-unknown {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 .bp-row-action-btn.ant-btn {

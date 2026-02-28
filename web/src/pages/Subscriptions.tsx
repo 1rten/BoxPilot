@@ -38,6 +38,8 @@ export default function Subscriptions() {
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -46,6 +48,10 @@ export default function Subscriptions() {
     }, 30000);
     return () => window.clearInterval(id);
   }, [autoRefresh, refetch]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, sortOrder, list?.length]);
 
   const filteredList = useMemo(() => {
     if (!list) return list;
@@ -131,8 +137,19 @@ export default function Subscriptions() {
               setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))
             }
             pagination={{
-              pageSize: 10,
+              current: page,
+              pageSize,
               showSizeChanger: true,
+              pageSizeOptions: [10, 20, 50, 100],
+              onChange: (nextPage, nextPageSize) => {
+                const resolvedPageSize = nextPageSize || pageSize;
+                if (resolvedPageSize !== pageSize) {
+                  setPageSize(resolvedPageSize);
+                  setPage(1);
+                  return;
+                }
+                setPage(nextPage);
+              },
             }}
             onEdit={(row) => {
               setEditingSub(row);

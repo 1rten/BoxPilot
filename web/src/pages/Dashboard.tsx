@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Input, Table, Tag } from "antd";
+import { Button, Input, Modal, Select, Table, Tag } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { useRuntimeStatus, useRuntimeTraffic, useRuntimeConnections, useRuntimeLogs } from "../hooks/useRuntime";
 import { useSubscriptions } from "../hooks/useSubscriptions";
@@ -9,7 +9,7 @@ import { useForwardingSummary, useRoutingSummary } from "../hooks/useProxySettin
 import { ErrorState } from "../components/common/ErrorState";
 import { formatDateTime } from "../utils/datetime";
 import type { ColumnsType } from "antd/es/table";
-import type { RuntimeConnection } from "../api/types";
+import type { RuntimeConnection, RuntimeLogItem } from "../api/types";
 
 export default function Dashboard() {
   const {
@@ -23,6 +23,20 @@ export default function Dashboard() {
   const { data: forwardingSummary } = useForwardingSummary();
   const { data: routingSummary } = useRoutingSummary();
   const { data: logsData, isFetching: logsFetching } = useRuntimeLogs({ level: "all", limit: 12 });
+  const [logsModalOpen, setLogsModalOpen] = useState(false);
+  const [logsLevel, setLogsLevel] = useState("all");
+  const [logsQuery, setLogsQuery] = useState("");
+  const {
+    data: logsModalData,
+    isLoading: logsModalLoading,
+    isFetching: logsModalFetching,
+  } = useRuntimeLogs({
+    level: logsLevel,
+    q: logsQuery,
+    limit: 200,
+    enabled: logsModalOpen,
+    refetchIntervalMs: 8000,
+  });
   const [connQuery, setConnQuery] = useState("");
   const {
     data: connectionsData,
@@ -94,7 +108,11 @@ export default function Dashboard() {
         key: "latency_ms",
         width: 120,
         sorter: (a, b) => (a.latency_ms ?? Number.MAX_SAFE_INTEGER) - (b.latency_ms ?? Number.MAX_SAFE_INTEGER),
-        render: (v: number | null | undefined) => (v || v === 0 ? `${v} ms` : "-"),
+        render: (v: number | null | undefined, row) => (
+          <span className={`bp-latency-badge bp-latency-badge-${latencyTone(v, row.status)}`}>
+            {formatLatency(v)}
+          </span>
+        ),
       },
       {
         title: "Last Test",
@@ -291,7 +309,12 @@ export default function Dashboard() {
               <span className="bp-metric-pill bp-metric-pill-neutral">
                 Showing {recentLogs.length} / {recentLogsTotal}
               </span>
-              {logsFetching ? <span className="bp-metric-subtle">Updating...</span> : null}
+              <span className={logsFetching ? "bp-metric-subtle" : "bp-metric-subtle bp-metric-subtle-hidden"}>
+                Updating...
+              </span>
+              <Button size="small" onClick={() => setLogsModalOpen(true)}>
+                View More
+              </Button>
             </div>
           </div>
           {recentLogs.length ? (
@@ -328,7 +351,15 @@ export default function Dashboard() {
               <span className="bp-metric-pill bp-metric-pill-active">
                 Active {connectionsData?.active_count ?? 0}
               </span>
-              {connectionsFetching ? <span className="bp-metric-subtle">Updating...</span> : null}
+              <span
+                className={
+                  connectionsFetching
+                    ? "bp-metric-subtle"
+                    : "bp-metric-subtle bp-metric-subtle-hidden"
+                }
+              >
+                Updating...
+              </span>
             </div>
           </div>
           <div className="bp-dashboard-table-toolbar">
@@ -344,13 +375,85 @@ export default function Dashboard() {
           <Table<RuntimeConnection>
             rowKey="id"
             size="small"
-            loading={connectionsLoading || connectionsFetching}
+            loading={connectionsLoading}
             dataSource={connections}
             columns={connectionColumns}
             pagination={{ pageSize: 5, showSizeChanger: false }}
           />
         </div>
       </div>
+      <Modal
+        title="Runtime Logs"
+        open={logsModalOpen}
+        onCancel={() => setLogsModalOpen(false)}
+        footer={null}
+        width={980}
+        destroyOnClose
+      >
+        <div className="bp-log-modal-toolbar">
+          <Select
+            value={logsLevel}
+            onChange={setLogsLevel}
+            style={{ width: 140 }}
+            options={[
+              { value: "all", label: "All Levels" },
+              { value: "info", label: "Info" },
+              { value: "warn", label: "Warn" },
+              { value: "error", label: "Error" },
+            ]}
+          />
+          <Input
+            className="bp-input"
+            allowClear
+            value={logsQuery}
+            onChange={(e) => setLogsQuery(e.target.value)}
+            placeholder="Search source/message"
+            prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
+          />
+        </div>
+        <Table<RuntimeLogItem>
+          rowKey={(item) => `${item.timestamp}-${item.level}-${item.source}-${item.message}`}
+          size="small"
+          loading={logsModalLoading || logsModalFetching}
+          dataSource={logsModalData?.items || []}
+          columns={[
+            {
+              title: "Time",
+              dataIndex: "timestamp",
+              key: "timestamp",
+              width: 210,
+              className: "bp-table-mono",
+              sorter: (a, b) => a.timestamp.localeCompare(b.timestamp),
+              render: (value: string) => formatDateTime(value),
+            },
+            {
+              title: "Level",
+              dataIndex: "level",
+              key: "level",
+              width: 100,
+              sorter: (a, b) => a.level.localeCompare(b.level),
+              render: (value: string) => (
+                <Tag color={value === "error" ? "error" : value === "warn" ? "warning" : "processing"}>
+                  {value.toUpperCase()}
+                </Tag>
+              ),
+            },
+            {
+              title: "Source",
+              dataIndex: "source",
+              key: "source",
+              width: 120,
+              className: "bp-table-mono",
+            },
+            {
+              title: "Message",
+              dataIndex: "message",
+              key: "message",
+            },
+          ]}
+          pagination={{ pageSize: 12, showSizeChanger: true }}
+        />
+      </Modal>
     </div>
   );
 }
@@ -369,4 +472,43 @@ function formatBytes(value: number): string {
   }
   const formatted = idx === 0 ? v.toFixed(0) : v.toFixed(1);
   return `${formatted} ${units[idx]}`;
+}
+
+type LatencyTone =
+  | "excellent"
+  | "good"
+  | "medium"
+  | "slow"
+  | "poor"
+  | "error"
+  | "unknown";
+
+function latencyTone(latencyMs?: number | null, testStatus?: string | null): LatencyTone {
+  const status = (testStatus || "").toLowerCase();
+  if (status === "error") {
+    return "error";
+  }
+  if (latencyMs === null || latencyMs === undefined) {
+    return status === "warn" ? "warn" : "unknown";
+  }
+  if (latencyMs <= 80) {
+    return "excellent";
+  }
+  if (latencyMs <= 150) {
+    return "good";
+  }
+  if (latencyMs <= 300) {
+    return "medium";
+  }
+  if (latencyMs <= 600) {
+    return "slow";
+  }
+  return "poor";
+}
+
+function formatLatency(latencyMs?: number | null): string {
+  if (latencyMs === null || latencyMs === undefined) {
+    return "-";
+  }
+  return `${latencyMs} ms`;
 }
