@@ -210,77 +210,58 @@ export default function Nodes() {
         rootStyle={{ position: "fixed" }}
         onClose={() => setDetailOpen(false)}
         open={detailOpen}
-        title={
-          selectedNode ? (
-            <div className="bp-drawer-title">
-              <span className="bp-drawer-name">{selectedNode.name || selectedNode.tag}</span>
-              <span className="bp-drawer-status">
-                <Tag color={selectedNode.enabled ? "success" : "default"}>
-                  {selectedNode.enabled ? "Online" : "Offline"}
-                </Tag>
-              </span>
-            </div>
-          ) : (
-            "Node Details"
-          )
-        }
+        title={selectedNode ? selectedNode.name || selectedNode.tag : "Node Details"}
       >
         {selectedNode && (
           <>
-            <div className="bp-drawer-section">
-              <h3 className="bp-card-title">Overview</h3>
-              <div className="bp-drawer-kv">
-                <div>
-                  <p className="bp-kv-label">Type</p>
-                  <p className="bp-kv-value">{selectedNode.type.toUpperCase()}</p>
+            <div className="bp-node-drawer-header">
+              <Tag className="bp-node-status-pill" color={selectedNode.enabled ? "success" : "default"}>
+                {selectedNode.enabled ? "Online" : "Offline"}
+              </Tag>
+            </div>
+
+            <div className="bp-node-drawer-section">
+              <h3 className="bp-drawer-section-title">Type</h3>
+              <div className="bp-node-info-list">
+                <div className="bp-node-info-row">
+                  <span>Type</span>
+                  <strong>{selectedNode.type.toUpperCase()}</strong>
                 </div>
-                <div>
-                  <p className="bp-kv-label">IP</p>
-                  <p className="bp-kv-value bp-table-mono">{selectedNode.server || "-"}</p>
+                <div className="bp-node-info-row">
+                  <span>IP</span>
+                  <strong className="bp-table-mono">{selectedNode.server || "-"}</strong>
                 </div>
-                <div>
-                  <p className="bp-kv-label">Port</p>
-                  <p className="bp-kv-value bp-table-mono">{selectedNode.server_port ?? "-"}</p>
+                <div className="bp-node-info-row">
+                  <span>Port</span>
+                  <strong className="bp-table-mono">{selectedNode.server_port ?? "-"}</strong>
                 </div>
-                <div>
-                  <p className="bp-kv-label">Created</p>
-                  <p className="bp-kv-value bp-table-mono">{formatDateTime(selectedNode.created_at)}</p>
+                <div className="bp-node-info-row">
+                  <span>Created At</span>
+                  <strong className="bp-table-mono">{formatDateTime(selectedNode.created_at)}</strong>
                 </div>
-                <div>
-                  <p className="bp-kv-label">Forwarding</p>
-                  <p className="bp-kv-value">
-                    <Tag color={selectedNode.forwarding_enabled ? "blue" : "default"}>
-                      {selectedNode.forwarding_enabled ? "Enabled" : "Disabled"}
-                    </Tag>
-                  </p>
-                </div>
-                <div>
-                  <p className="bp-kv-label">Subscription</p>
-                  <p className="bp-kv-value">{boundSubName || selectedNode.sub_id}</p>
+                <div className="bp-node-info-row">
+                  <span>Last Seen</span>
+                  <strong className="bp-table-mono">
+                    {selectedNode.last_test_at ? formatDateTime(selectedNode.last_test_at) : "-"}
+                  </strong>
                 </div>
               </div>
             </div>
 
-            <div className="bp-drawer-section">
-              <h3 className="bp-card-title">Connectivity</h3>
-              <div className="bp-drawer-kv">
-                <div>
-                  <p className="bp-kv-label">Last Test</p>
-                  <p className="bp-kv-value bp-table-mono">
-                    {selectedNode.last_test_at ? formatDateTime(selectedNode.last_test_at) : "-"}
-                  </p>
+            <div className="bp-node-drawer-section">
+              <div className="bp-node-section-header">
+                <h3 className="bp-drawer-section-title">Ports</h3>
+              </div>
+              <div className="bp-node-ports">
+                <div className="bp-node-ports-head">
+                  <span>Port</span>
+                  <span>Protocol</span>
+                  <span>Status</span>
                 </div>
-                <div>
-                  <p className="bp-kv-label">Latency</p>
-                  <p className="bp-kv-value bp-table-mono">
-                    {selectedNode.last_latency_ms !== null && selectedNode.last_latency_ms !== undefined
-                      ? `${selectedNode.last_latency_ms} ms`
-                      : "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="bp-kv-label">Status</p>
-                  <p className="bp-kv-value">
+                <div className="bp-node-ports-row">
+                  <span>{selectedNode.server_port ?? "-"}</span>
+                  <span>{selectedNode.type.toUpperCase()}</span>
+                  <span>
                     <Tag
                       color={
                         selectedNode.last_test_status
@@ -296,7 +277,7 @@ export default function Nodes() {
                         ? "ACTIVE"
                         : "INACTIVE"}
                     </Tag>
-                  </p>
+                  </span>
                 </div>
               </div>
               {selectedNode.last_test_error && (
@@ -304,6 +285,13 @@ export default function Nodes() {
                   {selectedNode.last_test_error}
                 </p>
               )}
+            </div>
+
+            <div className="bp-node-drawer-section">
+              <h3 className="bp-drawer-section-title">Bound Subscriptions</h3>
+              <ul className="bp-node-bound-list">
+                <li>{boundSubName || selectedNode.sub_id}</li>
+              </ul>
             </div>
 
             <div className="bp-node-drawer-footer">
