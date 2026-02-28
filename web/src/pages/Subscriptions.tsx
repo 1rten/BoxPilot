@@ -100,17 +100,17 @@ export default function Subscriptions() {
       </div>
 
       <Card className="bp-data-card">
-        <div className="bp-toolbar-inline bp-subscriptions-toolbar">
+        <div className="bp-toolbar-inline bp-list-toolbar bp-subscriptions-toolbar">
           <Input
-            className="bp-input bp-search-input bp-toolbar-search"
+            className="bp-input bp-search-input bp-toolbar-search bp-list-toolbar-search"
             prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
             allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={tr("subs.search.placeholder", "Search by name or URL")}
           />
-          <div className="bp-toolbar-actions-fixed bp-subscriptions-toolbar-actions">
-            <span className="bp-inline-control">
+          <div className="bp-toolbar-actions-fixed bp-list-toolbar-actions bp-subscriptions-toolbar-actions">
+            <span className="bp-inline-control bp-subscriptions-autopoll">
               <Switch
                 size="small"
                 checked={autoRefresh}

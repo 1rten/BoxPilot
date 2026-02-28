@@ -2,6 +2,7 @@ services:
   boxpilot:
     build: .
     image: boxpilot:latest
+    container_name: boxpilot
     ports:
       - "${BIND_IP:-0.0.0.0}:8080:8080"
       - "${BIND_IP:-0.0.0.0}:7890:7890"

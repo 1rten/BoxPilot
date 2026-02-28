@@ -106,37 +106,32 @@ export default function Nodes() {
             {tr("nodes.subtitle", "Select forwarding nodes and run connectivity tests.")}
           </p>
         </div>
-        <div className="bp-page-actions">
-          <Dropdown menu={testMenu} trigger={["click"]}>
-            <Button className="bp-btn-fixed bp-btn-test-mode">
-              {tr("nodes.test.mode", "Mode")}: {testModeLabel}
-            </Button>
-          </Dropdown>
-          <Button
-            className="bp-btn-fixed bp-btn-test-selected"
-            disabled={selectedCount === 0}
-            loading={testNodes.isPending}
-            onClick={() => void runSelectedTest(testMode)}
-          >
-            {tr("nodes.test.selected", "Test Selected")}
-          </Button>
-          <Button className="bp-btn-fixed" onClick={() => refetch()} loading={isLoading}>
-            {tr("common.refresh", "Refresh")}
-          </Button>
-        </div>
       </div>
 
       <Card className="bp-data-card">
-        <div className="bp-toolbar-inline bp-nodes-toolbar">
+        <div className="bp-toolbar-inline bp-list-toolbar bp-nodes-toolbar">
           <Input
-            className="bp-input bp-search-input bp-toolbar-search bp-nodes-search"
+            className="bp-input bp-search-input bp-toolbar-search bp-list-toolbar-search bp-nodes-search"
             prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
             allowClear
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={tr("nodes.search.placeholder", "Search by name or address")}
           />
-          <div className="bp-toolbar-actions-fixed bp-nodes-toolbar-actions">
+          <div className="bp-toolbar-actions-fixed bp-list-toolbar-actions bp-nodes-toolbar-actions">
+            <Dropdown menu={testMenu} trigger={["click"]}>
+              <Button className="bp-btn-fixed bp-btn-test-mode">
+                {tr("nodes.test.mode", "Mode")}: {testModeLabel}
+              </Button>
+            </Dropdown>
+            <Button
+              className="bp-btn-fixed bp-btn-test-selected"
+              disabled={selectedCount === 0}
+              loading={testNodes.isPending}
+              onClick={() => void runSelectedTest(testMode)}
+            >
+              {tr("nodes.test.selected", "Test Selected")}
+            </Button>
             <span className="bp-selection-pill bp-selection-pill-static">
               {tr("nodes.selected", "Selected {count}", { count: selectedCount })}
             </span>
@@ -150,6 +145,9 @@ export default function Nodes() {
                 {tr("nodes.forwarding.batch", "Batch Forwarding")}
               </Button>
             </Dropdown>
+            <Button className="bp-btn-fixed" onClick={() => refetch()} loading={isLoading}>
+              {tr("common.refresh", "Refresh")}
+            </Button>
           </div>
         </div>
 
@@ -231,14 +229,22 @@ export default function Nodes() {
         rootStyle={{ position: "fixed" }}
         onClose={() => setDetailOpen(false)}
         open={detailOpen}
-        title={selectedNode ? selectedNode.name || selectedNode.tag : tr("nodes.drawer.title", "Node Details")}
+        title={null}
       >
         {selectedNode && (
-          <>
-            <div className="bp-node-drawer-header">
-              <Tag className="bp-node-status-pill" color={selectedNode.enabled ? "success" : "default"}>
-                {selectedNode.enabled ? tr("nodes.online", "Online") : tr("nodes.offline", "Offline")}
-              </Tag>
+          <div className="bp-node-drawer-content">
+            <div className="bp-node-drawer-identity">
+              <h2 className="bp-node-drawer-name">{selectedNode.name || selectedNode.tag}</h2>
+              <div
+                className={
+                  selectedNode.enabled
+                    ? "bp-node-status-pill bp-node-status-pill-online"
+                    : "bp-node-status-pill bp-node-status-pill-offline"
+                }
+              >
+                <span className="bp-node-status-dot" />
+                <span>{selectedNode.enabled ? tr("nodes.online", "Online") : tr("nodes.offline", "Offline")}</span>
+              </div>
             </div>
 
             <div className="bp-node-drawer-section">
@@ -333,7 +339,7 @@ export default function Nodes() {
                 {selectedNode.enabled ? tr("nodes.disable", "Disable Node") : tr("nodes.enable", "Enable Node")}
               </Button>
             </div>
-          </>
+          </div>
         )}
       </Drawer>
     </div>
