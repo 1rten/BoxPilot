@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bpGrad" x1="10%" x2="90%" y1="10%" y2="90%">
+      <stop offset="0%" stop-color="#1f5eff" />
+      <stop offset="100%" stop-color="#5ea1ff" />
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#bpGrad)" />
+  <path
+    d="M32 14 16 22v20l16 8 16-8V22l-16-8zm0 3.6 10.6 5.3L32 28.2l-10.6-5.3L32 17.6zm-12.4 8.5L30.2 31v14.2l-10.6-5.3V26.1zm14.2 19.1V31l10.6-4.9v13.8l-10.6 5.3z"
+    fill="#fff"
+  />
+</svg>

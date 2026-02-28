@@ -75,13 +75,10 @@ func RefreshSubscription(db *sql.DB, subID string) (notModified bool, nodesTotal
 	repo.SetSubscriptionFetchResult(db, row.ID, etag, lastMod, "", true)
 	meta := parseSubscriptionUsageMeta(resp.Header)
 	if err := repo.UpdateSubscriptionUsageMeta(db, row.ID, meta); err != nil {
-		// Keep node refresh successful when old dev DB misses new columns.
-		if !strings.Contains(strings.ToLower(err.Error()), "no such column") {
-			return false, 0, 0, errorx.New(errorx.DBError, "update subscription usage meta").WithDetails(map[string]any{
-				"id":  subID,
-				"err": err.Error(),
-			})
-		}
+		return false, 0, 0, errorx.New(errorx.DBError, "update subscription usage meta").WithDetails(map[string]any{
+			"id":  subID,
+			"err": err.Error(),
+		})
 	}
 	return false, len(nodes), len(nodes), nil
 }

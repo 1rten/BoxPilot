@@ -4,7 +4,6 @@ import (
 	"boxpilot/server/internal/util"
 	"boxpilot/server/internal/util/errorx"
 	"database/sql"
-	"strings"
 )
 
 type SubscriptionRow struct {
@@ -54,32 +53,6 @@ func ListSubscriptions(db *sql.DB, onlyEnabled bool) ([]SubscriptionRow, error) 
 	} else {
 		rows, err = db.Query(query + " ORDER BY created_at")
 	}
-	if isMissingColumnErr(err) {
-		legacy := "SELECT id, name, url, type, enabled, auto_update_enabled, refresh_interval_sec, etag, last_modified, last_fetch_at, last_success_at, last_error, created_at, updated_at FROM subscriptions"
-		if onlyEnabled {
-			rows, err = db.Query(legacy + " WHERE enabled = 1 ORDER BY created_at")
-		} else {
-			rows, err = db.Query(legacy + " ORDER BY created_at")
-		}
-		if err != nil {
-			return nil, err
-		}
-		defer rows.Close()
-		var list []SubscriptionRow
-		for rows.Next() {
-			var r SubscriptionRow
-			err := rows.Scan(
-				&r.ID, &r.Name, &r.URL, &r.Type, &r.Enabled, &r.AutoUpdateEnabled, &r.RefreshIntervalSec, &r.Etag, &r.LastModified,
-				&r.LastFetchAt, &r.LastSuccessAt, &r.LastError,
-				&r.CreatedAt, &r.UpdatedAt,
-			)
-			if err != nil {
-				return nil, err
-			}
-			list = append(list, r)
-		}
-		return list, rows.Err()
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -111,12 +84,6 @@ func GetSubscription(db *sql.DB, id string) (*SubscriptionRow, error) {
 		&r.SubUploadBytes, &r.SubDownloadBytes, &r.SubTotalBytes, &r.SubExpireUnix, &r.SubUserinfoRaw, &r.SubProfileWebPage, &r.SubProfileInterval, &r.SubUserinfoUpdated,
 		&r.CreatedAt, &r.UpdatedAt,
 	)
-	if isMissingColumnErr(err) {
-		err = db.QueryRow("SELECT id, name, url, type, enabled, auto_update_enabled, refresh_interval_sec, etag, last_modified, last_fetch_at, last_success_at, last_error, created_at, updated_at FROM subscriptions WHERE id = ?", id).Scan(
-			&r.ID, &r.Name, &r.URL, &r.Type, &r.Enabled, &r.AutoUpdateEnabled, &r.RefreshIntervalSec, &r.Etag, &r.LastModified,
-			&r.LastFetchAt, &r.LastSuccessAt, &r.LastError, &r.CreatedAt, &r.UpdatedAt,
-		)
-	}
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -230,10 +197,6 @@ func nullString(v *string) interface{} {
 		return nil
 	}
 	return *v
-}
-
-func isMissingColumnErr(err error) bool {
-	return err != nil && strings.Contains(strings.ToLower(err.Error()), "no such column")
 }
 
 // EnsureSubscriptionExists returns error if not found.
