@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
+	"time"
 
 	"boxpilot/server/internal/api/dto"
 	"boxpilot/server/internal/service"
@@ -220,6 +221,51 @@ func subRowToDTO(r repo.SubscriptionRow) dto.Subscription {
 	}
 	if r.LastError.Valid {
 		d.LastError = &r.LastError.String
+	}
+	var used int64
+	var hasUsed bool
+	if r.SubUploadBytes.Valid {
+		used += r.SubUploadBytes.Int64
+		hasUsed = true
+	}
+	if r.SubDownloadBytes.Valid {
+		used += r.SubDownloadBytes.Int64
+		hasUsed = true
+	}
+	if hasUsed {
+		d.UsedBytes = &used
+	}
+	if r.SubTotalBytes.Valid {
+		total := r.SubTotalBytes.Int64
+		d.TotalBytes = &total
+		if hasUsed {
+			remaining := total - used
+			if remaining < 0 {
+				remaining = 0
+			}
+			d.RemainingBytes = &remaining
+			if total > 0 {
+				pct := float64(used) * 100 / float64(total)
+				if pct < 0 {
+					pct = 0
+				}
+				if pct > 100 {
+					pct = 100
+				}
+				d.UsagePercent = &pct
+			}
+		}
+	}
+	if r.SubExpireUnix.Valid && r.SubExpireUnix.Int64 > 0 {
+		exp := time.Unix(r.SubExpireUnix.Int64, 0).UTC().Format(time.RFC3339)
+		d.ExpireAt = &exp
+	}
+	if r.SubProfileWebPage.Valid {
+		d.ProfileWebPage = &r.SubProfileWebPage.String
+	}
+	if r.SubProfileInterval.Valid {
+		n := int(r.SubProfileInterval.Int64)
+		d.ProfileUpdateSec = &n
 	}
 	return d
 }

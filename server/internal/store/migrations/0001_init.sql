@@ -13,6 +13,14 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   last_fetch_at TEXT,
   last_success_at TEXT,
   last_error TEXT,
+  sub_upload_bytes INTEGER,
+  sub_download_bytes INTEGER,
+  sub_total_bytes INTEGER,
+  sub_expire_unix INTEGER,
+  sub_userinfo_raw TEXT,
+  sub_profile_web_page TEXT,
+  sub_profile_update_interval_sec INTEGER,
+  sub_userinfo_updated_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

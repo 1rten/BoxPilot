@@ -1,6 +1,6 @@
 import type { Subscription } from "../../api/types";
 import { formatDateTime } from "../../utils/datetime";
-import { Button, Table, Tag, Tooltip } from "antd";
+import { Button, Progress, Table, Tag, Tooltip } from "antd";
 import { DeleteOutlined, EditOutlined, LoadingOutlined, ReloadOutlined } from "@ant-design/icons";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import { useI18n } from "../../i18n/context";
@@ -69,6 +69,12 @@ export function SubscriptionTable({
           {value ? `${record.refresh_interval_sec}s` : tr("subs.table.off", "Off")}
         </Tag>
       ),
+    },
+    {
+      title: tr("subs.table.plan", "Plan"),
+      key: "plan",
+      width: 230,
+      render: (_value, record) => renderPlanCell(record, tr),
     },
     {
       title: (
@@ -146,13 +152,73 @@ export function SubscriptionTable({
   return (
     <Table<Subscription>
       rowKey="id"
-      scroll={{ x: 1160 }}
+      scroll={{ x: 1380 }}
       dataSource={list}
       columns={columns}
       pagination={pagination}
       loading={loading}
     />
   );
+}
+
+function renderPlanCell(
+  s: Subscription,
+  tr: (key: string, fallback?: string, params?: Record<string, string | number | boolean | null | undefined>) => string
+): JSX.Element {
+  const hasQuota = typeof s.total_bytes === "number" && s.total_bytes > 0 && typeof s.used_bytes === "number";
+  const percent = hasQuota
+    ? typeof s.usage_percent === "number"
+      ? Math.max(0, Math.min(100, s.usage_percent))
+      : Math.max(0, Math.min(100, (s.used_bytes || 0) * 100 / (s.total_bytes || 1)))
+    : 0;
+  const expireText = s.expire_at ? formatDateTime(s.expire_at) : "-";
+
+  if (!hasQuota && !s.expire_at && !s.profile_web_page) {
+    return <span style={{ color: "#64748B" }}>{tr("subs.plan.unavailable", "Unavailable")}</span>;
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 6 }}>
+      {hasQuota ? (
+        <>
+          <div className="bp-table-mono" style={{ fontSize: 12 }}>
+            {tr("subs.plan.used_total", "Used / Total")}: {formatBytes(s.used_bytes || 0)} / {formatBytes(s.total_bytes || 0)}
+          </div>
+          <Progress size="small" percent={percent} showInfo={false} />
+        </>
+      ) : null}
+      {s.expire_at ? (
+        <div style={{ color: "#64748B", fontSize: 12 }}>
+          {tr("subs.plan.expire", "Expire")}: <span className="bp-table-mono">{expireText}</span>
+        </div>
+      ) : null}
+      {s.profile_web_page ? (
+        <a
+          href={s.profile_web_page}
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: "#2563eb", fontSize: 12, fontWeight: 600 }}
+        >
+          {tr("subs.plan.portal", "Portal")}
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value < 0) {
+    return "-";
+  }
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let n = value;
+  let idx = 0;
+  while (n >= 1024 && idx < units.length - 1) {
+    n /= 1024;
+    idx++;
+  }
+  const digits = idx === 0 ? 0 : 1;
+  return `${n.toFixed(digits)} ${units[idx]}`;
 }
 
 function truncate(s: string, max = 40): string {

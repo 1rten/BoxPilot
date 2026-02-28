@@ -533,6 +533,13 @@ components:
         enabled: { type: boolean }
         auto_update_enabled: { type: boolean }
         refresh_interval_sec: { type: integer }
+        used_bytes: { type: integer, nullable: true }
+        total_bytes: { type: integer, nullable: true }
+        remaining_bytes: { type: integer, nullable: true }
+        usage_percent: { type: number, nullable: true }
+        expire_at: { type: string, nullable: true }
+        profile_web_page: { type: string, nullable: true }
+        profile_update_interval_sec: { type: integer, nullable: true }
         created_at: { type: string }
         updated_at: { type: string }
       required: [id, name, url, type, enabled, auto_update_enabled, refresh_interval_sec, created_at, updated_at]

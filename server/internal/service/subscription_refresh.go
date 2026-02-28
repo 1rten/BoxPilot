@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"boxpilot/server/internal/parser"
@@ -72,6 +73,71 @@ func RefreshSubscription(db *sql.DB, subID string) (notModified bool, nodesTotal
 	etag := resp.Header.Get("Etag")
 	lastMod := resp.Header.Get("Last-Modified")
 	repo.SetSubscriptionFetchResult(db, row.ID, etag, lastMod, "", true)
+	meta := parseSubscriptionUsageMeta(resp.Header)
+	if err := repo.UpdateSubscriptionUsageMeta(db, row.ID, meta); err != nil {
+		// Keep node refresh successful when old dev DB misses new columns.
+		if !strings.Contains(strings.ToLower(err.Error()), "no such column") {
+			return false, 0, 0, errorx.New(errorx.DBError, "update subscription usage meta").WithDetails(map[string]any{
+				"id":  subID,
+				"err": err.Error(),
+			})
+		}
+	}
 	return false, len(nodes), len(nodes), nil
 }
 
+func parseSubscriptionUsageMeta(headers http.Header) repo.SubscriptionUsageMeta {
+	meta := repo.SubscriptionUsageMeta{}
+
+	userinfo := strings.TrimSpace(headers.Get("subscription-userinfo"))
+	if userinfo != "" {
+		meta.UserinfoRaw = &userinfo
+		for _, part := range strings.Split(userinfo, ";") {
+			pair := strings.SplitN(strings.TrimSpace(part), "=", 2)
+			if len(pair) != 2 {
+				continue
+			}
+			key := strings.ToLower(strings.TrimSpace(pair[0]))
+			value := strings.TrimSpace(pair[1])
+			n, ok := parseNonNegativeInt64(value)
+			if !ok {
+				continue
+			}
+			switch key {
+			case "upload":
+				meta.UploadBytes = &n
+			case "download":
+				meta.DownloadBytes = &n
+			case "total":
+				meta.TotalBytes = &n
+			case "expire":
+				meta.ExpireUnix = &n
+			}
+		}
+	}
+
+	if page := strings.TrimSpace(headers.Get("profile-web-page")); page != "" {
+		meta.ProfileWebPage = &page
+	}
+
+	if intervalRaw := strings.TrimSpace(headers.Get("profile-update-interval")); intervalRaw != "" {
+		if interval, err := strconv.Atoi(intervalRaw); err == nil && interval > 0 {
+			meta.ProfileUpdateSeconds = &interval
+		}
+	}
+
+	if userinfo != "" || meta.ProfileWebPage != nil || meta.ProfileUpdateSeconds != nil {
+		now := util.NowRFC3339()
+		meta.UserinfoUpdatedAt = &now
+	}
+
+	return meta
+}
+
+func parseNonNegativeInt64(raw string) (int64, bool) {
+	n, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	return n, true
+}
