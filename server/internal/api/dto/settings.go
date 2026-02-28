@@ -60,6 +60,20 @@ type UpdateRoutingSettingsRequest struct {
 	BypassCIDRs          []string `json:"bypass_cidrs"`
 }
 
+type RoutingSummaryResponse struct {
+	Data RoutingSummaryData `json:"data"`
+}
+
+type RoutingSummaryData struct {
+	BypassPrivateEnabled bool     `json:"bypass_private_enabled"`
+	BypassDomainsCount   int      `json:"bypass_domains_count"`
+	BypassCIDRsCount     int      `json:"bypass_cidrs_count"`
+	UpdatedAt            string   `json:"updated_at,omitempty"`
+	GeoIPStatus          string   `json:"geoip_status"`
+	GeoSiteStatus        string   `json:"geosite_status"`
+	Notes                []string `json:"notes"`
+}
+
 type ForwardingRuntimeStatusResponse struct {
 	Data ForwardingRuntimeStatus `json:"data"`
 }

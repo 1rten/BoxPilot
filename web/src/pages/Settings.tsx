@@ -1,15 +1,25 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Form, Input, InputNumber, Select, Switch, Tag } from "antd";
-import type { ProxyConfig, ProxyType, RoutingSettingsData } from "../api/types";
+import { Button, Card, Form, Input, InputNumber, Select, Switch, Table, Tag } from "antd";
+import type {
+  ProxyConfig,
+  ProxyType,
+  RoutingSettingsData,
+  RoutingSummaryData,
+  RuntimeLogItem,
+} from "../api/types";
 import { buildProxyUrl, resolveProxyClientHost } from "../api/settings";
 import {
   useProxySettings,
   useUpdateProxySettings,
   useApplyProxySettings,
   useRoutingSettings,
+  useRoutingSummary,
   useUpdateRoutingSettings,
 } from "../hooks/useProxySettings";
+import { useRuntimeLogs } from "../hooks/useRuntime";
 import { useToast } from "../components/common/ToastContext";
+import { formatDateTime } from "../utils/datetime";
+import type { ColumnsType } from "antd/es/table";
 
 interface ProxyCardProps {
   title: string;
@@ -20,6 +30,7 @@ interface ProxyCardProps {
 export default function Settings() {
   const { data, isLoading } = useProxySettings();
   const { data: routingData, isLoading: routingLoading } = useRoutingSettings();
+  const { data: routingSummary } = useRoutingSummary();
   return (
     <div className="bp-page">
       <div className="bp-page-header">
@@ -36,6 +47,12 @@ export default function Settings() {
       </div>
       <div style={{ marginTop: 16 }}>
         <RoutingSettingsCard data={routingData} />
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <RoutingSummaryCard data={routingSummary} />
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <RuntimeLogsCard />
       </div>
       {(isLoading || routingLoading) && (
         <p className="bp-muted" style={{ marginTop: 12 }}>
@@ -290,4 +307,134 @@ function splitLines(raw: string): string[] {
     .split(/\r?\n|,/)
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
+}
+
+interface RoutingSummaryCardProps {
+  data?: RoutingSummaryData;
+}
+
+function RoutingSummaryCard({ data }: RoutingSummaryCardProps) {
+  return (
+    <Card className="bp-settings-card">
+      <div className="bp-card-header">
+        <div>
+          <p className="bp-card-kicker">Runtime Route Status</p>
+          <h2 className="bp-card-title">Routing / Geo Summary</h2>
+        </div>
+        {data?.updated_at ? <span className="bp-muted">Updated {data.updated_at}</span> : null}
+      </div>
+      <div className="bp-runtime-grid">
+        <div className="bp-runtime-item">
+          <span className="bp-runtime-label">Bypass Private</span>
+          <span className="bp-runtime-value">{data?.bypass_private_enabled ? "Enabled" : "Disabled"}</span>
+        </div>
+        <div className="bp-runtime-item">
+          <span className="bp-runtime-label">Bypass Domains</span>
+          <span className="bp-runtime-value">{data?.bypass_domains_count ?? 0}</span>
+        </div>
+        <div className="bp-runtime-item">
+          <span className="bp-runtime-label">Bypass CIDRs</span>
+          <span className="bp-runtime-value">{data?.bypass_cidrs_count ?? 0}</span>
+        </div>
+        <div className="bp-runtime-item">
+          <span className="bp-runtime-label">GeoIP / GeoSite</span>
+          <span className="bp-runtime-value">
+            {data?.geoip_status || "unknown"} / {data?.geosite_status || "unknown"}
+          </span>
+        </div>
+      </div>
+      {data?.notes?.length ? (
+        <div className="bp-list-compact" style={{ marginTop: 14 }}>
+          {data.notes.map((note) => (
+            <p key={note} className="bp-muted">
+              - {note}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+function RuntimeLogsCard() {
+  const [level, setLevel] = useState("all");
+  const [query, setQuery] = useState("");
+  const { data, isLoading, refetch } = useRuntimeLogs({ level, q: query, limit: 80 });
+
+  const columns: ColumnsType<RuntimeLogItem> = [
+    {
+      title: "Time",
+      dataIndex: "timestamp",
+      key: "timestamp",
+      width: 200,
+      className: "bp-table-mono",
+      sorter: (a, b) => a.timestamp.localeCompare(b.timestamp),
+      render: (value: string) => formatDateTime(value),
+    },
+    {
+      title: "Level",
+      dataIndex: "level",
+      key: "level",
+      width: 100,
+      sorter: (a, b) => a.level.localeCompare(b.level),
+      render: (value: string) => (
+        <Tag color={value === "error" ? "error" : value === "warn" ? "warning" : "processing"}>
+          {value.toUpperCase()}
+        </Tag>
+      ),
+    },
+    {
+      title: "Source",
+      dataIndex: "source",
+      key: "source",
+      width: 120,
+      className: "bp-table-mono",
+    },
+    {
+      title: "Message",
+      dataIndex: "message",
+      key: "message",
+    },
+  ];
+
+  return (
+    <Card className="bp-settings-card">
+      <div className="bp-card-header">
+        <div>
+          <p className="bp-card-kicker">Diagnostics</p>
+          <h2 className="bp-card-title">Runtime Logs</h2>
+        </div>
+        <Button onClick={() => refetch()} loading={isLoading}>
+          Refresh
+        </Button>
+      </div>
+      <div className="bp-toolbar-inline bp-settings-log-toolbar">
+        <Select
+          value={level}
+          onChange={setLevel}
+          style={{ width: 140 }}
+          options={[
+            { value: "all", label: "All Levels" },
+            { value: "info", label: "Info" },
+            { value: "warn", label: "Warn" },
+            { value: "error", label: "Error" },
+          ]}
+        />
+        <Input
+          allowClear
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Filter logs by source or message"
+        />
+      </div>
+      <Table<RuntimeLogItem>
+        rowKey={(item) => `${item.timestamp}-${item.level}-${item.source}-${item.message}`}
+        size="small"
+        loading={isLoading}
+        dataSource={data?.items || []}
+        columns={columns}
+        pagination={{ pageSize: 8, showSizeChanger: false }}
+      />
+    </Card>
+  );
 }

@@ -6,6 +6,7 @@ import type {
   ProxyType,
   ProxyConfig,
   RoutingSettingsData,
+  RoutingSummaryData,
 } from "./types";
 
 export async function getProxySettings(): Promise<ProxySettingsData> {
@@ -77,6 +78,11 @@ export async function updateRoutingSettings(
   body: UpdateRoutingSettingsBody
 ): Promise<RoutingSettingsData> {
   const { data } = await api.post<{ data: RoutingSettingsData }>("/settings/routing/update", body);
+  return data.data;
+}
+
+export async function getRoutingSummary(): Promise<RoutingSummaryData> {
+  const { data } = await api.get<{ data: RoutingSummaryData }>("/settings/routing/summary");
   return data.data;
 }
 

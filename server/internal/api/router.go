@@ -42,6 +42,9 @@ func Router(db *sql.DB) *gin.Engine {
 
 		rt := &handlers.Runtime{DB: db}
 		v1.GET("/runtime/status", rt.Status)
+		v1.GET("/runtime/traffic", rt.Traffic)
+		v1.GET("/runtime/connections", rt.Connections)
+		v1.GET("/runtime/logs", rt.Logs)
 		v1.POST("/runtime/plan", rt.Plan)
 		v1.POST("/runtime/reload", rt.Reload)
 
@@ -51,6 +54,7 @@ func Router(db *sql.DB) *gin.Engine {
 		v1.POST("/settings/proxy/apply", settings.ApplyProxySettings)
 		v1.GET("/settings/routing", settings.GetRoutingSettings)
 		v1.POST("/settings/routing/update", settings.UpdateRoutingSettings)
+		v1.GET("/settings/routing/summary", settings.RoutingSummary)
 		v1.GET("/settings/forwarding/status", settings.ForwardingStatus)
 		v1.GET("/settings/forwarding/summary", settings.ForwardingSummary)
 		v1.POST("/settings/forwarding/start", settings.StartForwarding)

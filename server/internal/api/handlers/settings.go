@@ -177,6 +177,40 @@ func (h *Settings) UpdateRoutingSettings(c *gin.Context) {
 	})
 }
 
+func (h *Settings) RoutingSummary(c *gin.Context) {
+	settings, updatedAt, err := service.LoadRoutingSettings(h.DB)
+	if err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.DBError, "get routing settings"))
+		return
+	}
+
+	notes := []string{
+		"Routing bypass is applied during runtime config build.",
+		"GeoIP/GeoSite are currently handled by sing-box defaults in process mode.",
+	}
+	if settings.BypassPrivateEnabled {
+		notes = append(notes, "Private/local CIDR bypass is enabled.")
+	} else {
+		notes = append(notes, "Private/local CIDR bypass is disabled.")
+	}
+
+	c.JSON(http.StatusOK, dto.RoutingSummaryResponse{
+		Data: dto.RoutingSummaryData{
+			BypassPrivateEnabled: settings.BypassPrivateEnabled,
+			BypassDomainsCount:   len(settings.BypassDomains),
+			BypassCIDRsCount:     len(settings.BypassCIDRs),
+			UpdatedAt:            updatedAt,
+			GeoIPStatus:          "builtin",
+			GeoSiteStatus:        "builtin",
+			Notes:                notes,
+		},
+	})
+}
+
 func (h *Settings) ForwardingStatus(c *gin.Context) {
 	running, status, errMsg := runtimeStatus(h.DB)
 	c.JSON(http.StatusOK, dto.ForwardingRuntimeStatusResponse{

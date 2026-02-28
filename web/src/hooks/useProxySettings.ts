@@ -8,6 +8,7 @@ import {
   startForwardingRuntime,
   stopForwardingRuntime,
   getRoutingSettings,
+  getRoutingSummary,
   updateRoutingSettings,
   type UpdateProxySettingsBody,
   type UpdateRoutingSettingsBody,
@@ -150,5 +151,13 @@ export function useUpdateRoutingSettings() {
         "Unknown error";
       addToast("error", message);
     },
+  });
+}
+
+export function useRoutingSummary() {
+  return useQuery({
+    queryKey: ["routing-summary"],
+    queryFn: getRoutingSummary,
+    refetchInterval: 10_000,
   });
 }

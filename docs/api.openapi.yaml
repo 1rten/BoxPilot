@@ -40,6 +40,69 @@ paths:
               schema:
                 $ref: '#/components/schemas/RuntimeStatusResponse'
 
+  /api/v1/runtime/traffic:
+    get:
+      tags: [Runtime]
+      summary: Get runtime traffic snapshot
+      responses:
+        '200':
+          description: Traffic snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeTrafficResponse'
+
+  /api/v1/runtime/connections:
+    get:
+      tags: [Runtime]
+      summary: Get runtime forwarding connections snapshot
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Connections snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeConnectionsResponse'
+
+  /api/v1/runtime/logs:
+    get:
+      tags: [Runtime]
+      summary: Get runtime diagnostic logs
+      parameters:
+        - name: level
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, info, warn, error]
+            default: all
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 80
+      responses:
+        '200':
+          description: Runtime logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeLogsResponse'
+
   /api/v1/runtime/plan:
     post:
       tags: [Runtime]
@@ -169,6 +232,18 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '500':
           $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/settings/routing/summary:
+    get:
+      tags: [Settings]
+      summary: Get routing and geo summary
+      responses:
+        '200':
+          description: Routing diagnostics summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutingSummaryResponse'
 
   /api/v1/subscriptions:
     get:
@@ -551,6 +626,67 @@ components:
           required: [config_version, config_hash, forwarding_running, ports]
       required: [data]
 
+    RuntimeTrafficResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            sampled_at: { type: string }
+            source: { type: string }
+            rx_rate_bps: { type: integer }
+            tx_rate_bps: { type: integer }
+            rx_total_bytes: { type: integer }
+            tx_total_bytes: { type: integer }
+          required: [sampled_at, source, rx_rate_bps, tx_rate_bps, rx_total_bytes, tx_total_bytes]
+      required: [data]
+
+    RuntimeConnectionsResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            active_count: { type: integer }
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  node_id: { type: string }
+                  node_name: { type: string }
+                  node_type: { type: string }
+                  target: { type: string }
+                  status: { type: string }
+                  last_test_at: { type: string, nullable: true }
+                  latency_ms: { type: integer, nullable: true }
+                  error: { type: string, nullable: true }
+                  forwarding: { type: boolean }
+                  last_updated: { type: string }
+                required: [id, node_id, node_name, node_type, target, status, forwarding, last_updated]
+          required: [active_count, items]
+      required: [data]
+
+    RuntimeLogsResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp: { type: string }
+                  level: { type: string }
+                  source: { type: string }
+                  message: { type: string }
+                required: [timestamp, level, source, message]
+          required: [items]
+      required: [data]
+
     ForwardingRuntimeStatusResponse:
       type: object
       properties:
@@ -607,6 +743,24 @@ components:
               items: { type: string }
             updated_at: { type: string }
           required: [bypass_private_enabled, bypass_domains, bypass_cidrs]
+      required: [data]
+
+    RoutingSummaryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            bypass_private_enabled: { type: boolean }
+            bypass_domains_count: { type: integer }
+            bypass_cidrs_count: { type: integer }
+            updated_at: { type: string }
+            geoip_status: { type: string }
+            geosite_status: { type: string }
+            notes:
+              type: array
+              items: { type: string }
+          required: [bypass_private_enabled, bypass_domains_count, bypass_cidrs_count, geoip_status, geosite_status, notes]
       required: [data]
 
     UpdateRoutingSettingsRequest:

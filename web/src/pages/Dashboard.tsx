@@ -1,8 +1,15 @@
-import { useRuntimeStatus, useRuntimeReload } from "../hooks/useRuntime";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Input, Table, Tag } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
+import { useRuntimeStatus, useRuntimeTraffic, useRuntimeConnections } from "../hooks/useRuntime";
 import { useSubscriptions } from "../hooks/useSubscriptions";
 import { useNodes } from "../hooks/useNodes";
+import { useForwardingSummary } from "../hooks/useProxySettings";
 import { ErrorState } from "../components/common/ErrorState";
-import { Link } from "react-router-dom";
+import { formatDateTime } from "../utils/datetime";
+import type { ColumnsType } from "antd/es/table";
+import type { RuntimeConnection } from "../api/types";
 
 export default function Dashboard() {
   const {
@@ -10,9 +17,13 @@ export default function Dashboard() {
     isLoading: runtimeLoading,
     error: runtimeError,
   } = useRuntimeStatus();
-  const reload = useRuntimeReload();
+  const { data: traffic } = useRuntimeTraffic();
   const { data: subs } = useSubscriptions();
   const { data: nodes } = useNodes({});
+  const { data: forwardingSummary } = useForwardingSummary();
+  const [connQuery, setConnQuery] = useState("");
+  const { data: connectionsData, isLoading: connectionsLoading } = useRuntimeConnections(connQuery);
+
   const runtimeState = runtimeLoading
     ? "Loading"
     : runtimeError
@@ -29,23 +40,79 @@ export default function Dashboard() {
         : "muted";
   const configHash = runtime?.config_hash ? runtime.config_hash.slice(0, 8) : "--";
 
+  const forwardingTone =
+    forwardingSummary?.status === "running"
+      ? "success"
+      : forwardingSummary?.status === "error"
+        ? "danger"
+        : "muted";
+
+  const connections = connectionsData?.items ?? [];
+  const connectionColumns: ColumnsType<RuntimeConnection> = useMemo(
+    () => [
+      {
+        title: "Node",
+        dataIndex: "node_name",
+        key: "node_name",
+        sorter: (a, b) => a.node_name.localeCompare(b.node_name),
+        render: (name: string, row) => (
+          <div>
+            <div>{name}</div>
+            <span className="bp-muted bp-table-mono">{row.node_type.toUpperCase()}</span>
+          </div>
+        ),
+      },
+      {
+        title: "Target",
+        dataIndex: "target",
+        key: "target",
+        className: "bp-table-mono",
+      },
+      {
+        title: "Status",
+        dataIndex: "status",
+        key: "status",
+        width: 120,
+        sorter: (a, b) => a.status.localeCompare(b.status),
+        render: (value: string) => (
+          <Tag color={value === "ok" ? "success" : value === "error" ? "error" : "processing"}>
+            {value.toUpperCase()}
+          </Tag>
+        ),
+      },
+      {
+        title: "Latency",
+        dataIndex: "latency_ms",
+        key: "latency_ms",
+        width: 120,
+        sorter: (a, b) => (a.latency_ms ?? Number.MAX_SAFE_INTEGER) - (b.latency_ms ?? Number.MAX_SAFE_INTEGER),
+        render: (v: number | null | undefined) => (v || v === 0 ? `${v} ms` : "-"),
+      },
+      {
+        title: "Last Test",
+        dataIndex: "last_test_at",
+        key: "last_test_at",
+        className: "bp-table-mono",
+        sorter: (a, b) => (a.last_test_at || "").localeCompare(b.last_test_at || ""),
+        render: (v: string | null | undefined) => (v ? formatDateTime(v) : "-"),
+      },
+    ],
+    []
+  );
+
   return (
     <div className="bp-page bp-dashboard">
       <section className="bp-dashboard-hero">
         <div>
           <p className="bp-eyebrow">BoxPilot</p>
           <h1 className="bp-page-title">Dashboard</h1>
-          <p className="bp-subtitle">Runtime overview, subscriptions, and node health.</p>
+          <p className="bp-subtitle">Runtime overview, forwarding status, and live diagnostics.</p>
         </div>
         <div className="bp-hero-actions">
-          <span className={`bp-badge bp-badge--${runtimeTone}`}>Status: {runtimeState}</span>
-          <button
-            className="bp-btn-primary bp-btn-primary--wide"
-            onClick={() => reload.mutate()}
-            disabled={reload.isPending || runtimeLoading}
-          >
-            {reload.isPending ? "Reloading..." : "Reload runtime"}
-          </button>
+          <span className={`bp-badge bp-badge--${runtimeTone}`}>Runtime: {runtimeState}</span>
+          <span className={`bp-badge bp-badge--${forwardingTone}`}>
+            Forwarding: {(forwardingSummary?.status || "stopped").toUpperCase()}
+          </span>
         </div>
       </section>
 
@@ -85,8 +152,46 @@ export default function Dashboard() {
                 <span className="bp-runtime-label">SOCKS Port</span>
                 <span className="bp-runtime-value">{runtime.ports.socks}</span>
               </div>
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">Last Reload</span>
+                <span className="bp-runtime-value bp-mono">
+                  {runtime.last_reload_at ? formatDateTime(runtime.last_reload_at) : "-"}
+                </span>
+              </div>
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">Last Error</span>
+                <span className="bp-runtime-value">{runtime.last_reload_error || "-"}</span>
+              </div>
             </div>
           )}
+        </div>
+
+        <div className="bp-card bp-dashboard-card">
+          <div className="bp-card-header">
+            <div>
+              <p className="bp-card-kicker">Forwarding</p>
+              <h2 className="bp-card-title">Traffic</h2>
+            </div>
+            <span className="bp-link-pill">{traffic?.source || "unknown"}</span>
+          </div>
+          <div className="bp-runtime-grid">
+            <div className="bp-runtime-item">
+              <span className="bp-runtime-label">Download Rate</span>
+              <span className="bp-runtime-value">{formatRate(traffic?.rx_rate_bps ?? 0)}</span>
+            </div>
+            <div className="bp-runtime-item">
+              <span className="bp-runtime-label">Upload Rate</span>
+              <span className="bp-runtime-value">{formatRate(traffic?.tx_rate_bps ?? 0)}</span>
+            </div>
+            <div className="bp-runtime-item">
+              <span className="bp-runtime-label">RX Total</span>
+              <span className="bp-runtime-value">{formatBytes(traffic?.rx_total_bytes ?? 0)}</span>
+            </div>
+            <div className="bp-runtime-item">
+              <span className="bp-runtime-label">TX Total</span>
+              <span className="bp-runtime-value">{formatBytes(traffic?.tx_total_bytes ?? 0)}</span>
+            </div>
+          </div>
         </div>
 
         <div className="bp-card bp-dashboard-card">
@@ -120,9 +225,55 @@ export default function Dashboard() {
             <span className="bp-stat-value">{nodes?.length ?? 0}</span>
             <span className="bp-stat-label">Nodes configured</span>
           </div>
-          <p className="bp-muted">Quickly validate node health and routing.</p>
+          <p className="bp-muted">
+            Forwarding selected: {forwardingSummary?.selected_nodes_count ?? 0}
+          </p>
+        </div>
+
+        <div className="bp-card bp-dashboard-card bp-dashboard-card--full">
+          <div className="bp-card-header">
+            <div>
+              <p className="bp-card-kicker">Diagnostics</p>
+              <h2 className="bp-card-title">Connections</h2>
+            </div>
+            <span className="bp-muted">Active {connectionsData?.active_count ?? 0}</span>
+          </div>
+          <div className="bp-dashboard-table-toolbar">
+            <Input
+              className="bp-input bp-search-input"
+              value={connQuery}
+              onChange={(e) => setConnQuery(e.target.value)}
+              allowClear
+              prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
+              placeholder="Filter connections by node/target/status"
+            />
+          </div>
+          <Table<RuntimeConnection>
+            rowKey="id"
+            size="small"
+            loading={connectionsLoading}
+            dataSource={connections}
+            columns={connectionColumns}
+            pagination={{ pageSize: 5, showSizeChanger: false }}
+          />
         </div>
       </div>
     </div>
   );
+}
+
+function formatRate(value: number): string {
+  return `${formatBytes(value)}/s`;
+}
+
+function formatBytes(value: number): string {
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let v = Math.max(0, value);
+  let idx = 0;
+  while (v >= 1024 && idx < units.length - 1) {
+    v /= 1024;
+    idx++;
+  }
+  const formatted = idx === 0 ? v.toFixed(0) : v.toFixed(1);
+  return `${formatted} ${units[idx]}`;
 }

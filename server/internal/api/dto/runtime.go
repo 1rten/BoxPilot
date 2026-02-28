@@ -47,3 +47,54 @@ type RuntimeReloadData struct {
 	RestartOutput string `json:"restart_output"`
 	ReloadedAt    string `json:"reloaded_at"`
 }
+
+type RuntimeTrafficResponse struct {
+	Data RuntimeTrafficData `json:"data"`
+}
+
+type RuntimeTrafficData struct {
+	SampledAt    string `json:"sampled_at"`
+	Source       string `json:"source"`
+	RXRateBps    int64  `json:"rx_rate_bps"`
+	TXRateBps    int64  `json:"tx_rate_bps"`
+	RXTotalBytes int64  `json:"rx_total_bytes"`
+	TXTotalBytes int64  `json:"tx_total_bytes"`
+}
+
+type RuntimeConnectionsResponse struct {
+	Data RuntimeConnectionsData `json:"data"`
+}
+
+type RuntimeConnectionsData struct {
+	ActiveCount int                 `json:"active_count"`
+	Items       []RuntimeConnection `json:"items"`
+}
+
+type RuntimeConnection struct {
+	ID          string  `json:"id"`
+	NodeID      string  `json:"node_id"`
+	NodeName    string  `json:"node_name"`
+	NodeType    string  `json:"node_type"`
+	Target      string  `json:"target"`
+	Status      string  `json:"status"`
+	LastTestAt  *string `json:"last_test_at,omitempty"`
+	LatencyMs   *int64  `json:"latency_ms,omitempty"`
+	Error       *string `json:"error,omitempty"`
+	Forwarding  bool    `json:"forwarding"`
+	LastUpdated string  `json:"last_updated"`
+}
+
+type RuntimeLogsResponse struct {
+	Data RuntimeLogsData `json:"data"`
+}
+
+type RuntimeLogsData struct {
+	Items []RuntimeLogItem `json:"items"`
+}
+
+type RuntimeLogItem struct {
+	Timestamp string `json:"timestamp"`
+	Level     string `json:"level"`
+	Source    string `json:"source"`
+	Message   string `json:"message"`
+}
