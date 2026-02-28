@@ -2,6 +2,8 @@ package generator
 
 import (
 	"encoding/json"
+	"os"
+	"strings"
 
 	"boxpilot/server/internal/util/errorx"
 )
@@ -123,11 +125,33 @@ func BuildConfig(httpProxy ProxyInbound, socksProxy ProxyInbound, routing Routin
 		"outbounds": outbounds,
 		"route":     route,
 	}
+	applyClashAPI(cfg)
 	b, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return nil, errorx.New(errorx.CFGJSONInvalid, "marshal config")
 	}
 	return b, nil
+}
+
+func applyClashAPI(cfg map[string]any) {
+	controller := strings.TrimSpace(os.Getenv("SINGBOX_CLASH_API_ADDR"))
+	if controller == "" {
+		controller = "127.0.0.1:9090"
+	}
+	if controller == "off" {
+		return
+	}
+
+	clashAPI := map[string]any{
+		"external_controller": controller,
+	}
+	if secret := strings.TrimSpace(os.Getenv("SINGBOX_CLASH_API_SECRET")); secret != "" {
+		clashAPI["secret"] = secret
+	}
+
+	cfg["experimental"] = map[string]any{
+		"clash_api": clashAPI,
+	}
 }
 
 func buildInbound(inType, tag string, p ProxyInbound) map[string]any {

@@ -205,6 +205,8 @@ Environment variables:
 | -------------------- | ------------------------------- | ----------- |
 | SINGBOX_RESTART_CMD  |                                 | required; command used to reload/restart sing-box process (container default: `/app/docker/restart-singbox.sh`) |
 | SINGBOX_CONFIG       | `/data/sing-box.json` or `data/sing-box.json` | config path; auto picks `/data` if exists |
+| SINGBOX_CLASH_API_ADDR | `127.0.0.1:9090`             | sing-box Clash API address used by runtime traffic metrics (`off` to disable) |
+| SINGBOX_CLASH_API_SECRET |                             | optional Clash API bearer token |
 | DATA_DIR             | /data                           | storage path |
 
 ---

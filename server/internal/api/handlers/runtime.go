@@ -1,10 +1,11 @@
 package handlers
 
 import (
-	"bufio"
-	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"sort"
@@ -30,9 +31,18 @@ type Runtime struct {
 type runtimeTrafficSnapshot struct {
 	mu          sync.Mutex
 	lastAt      time.Time
-	lastRX      uint64
-	lastTX      uint64
+	rxTotal     uint64
+	txTotal     uint64
 	initialized bool
+}
+
+type proxyTrafficSample struct {
+	source    string
+	rxRateBps int64
+	txRateBps int64
+	rxTotal   uint64
+	txTotal   uint64
+	hasTotals bool
 }
 
 var trafficSnapshot runtimeTrafficSnapshot
@@ -81,31 +91,39 @@ func (h *Runtime) Status(c *gin.Context) {
 }
 
 func (h *Runtime) Traffic(c *gin.Context) {
-	rxTotal, txTotal, err := readNetDevTotals()
 	now := time.Now().UTC()
-	source := "proc_net_dev"
-	if err != nil {
-		source = "unavailable"
+	sample, err := fetchProxyTraffic(c.Request.Context())
+	source := sample.source
+	if source == "" {
+		source = "singbox_clash_api_unavailable"
 	}
 
-	var rxRate, txRate int64
+	rxRate := sample.rxRateBps
+	txRate := sample.txRateBps
+	if err != nil {
+		rxRate = 0
+		txRate = 0
+	}
+
 	trafficSnapshot.mu.Lock()
-	if err == nil && trafficSnapshot.initialized {
-		elapsed := now.Sub(trafficSnapshot.lastAt).Seconds()
-		if elapsed > 0 {
-			if rxTotal >= trafficSnapshot.lastRX {
-				rxRate = int64(float64(rxTotal-trafficSnapshot.lastRX) / elapsed)
-			}
-			if txTotal >= trafficSnapshot.lastTX {
-				txRate = int64(float64(txTotal-trafficSnapshot.lastTX) / elapsed)
+	rxTotal := trafficSnapshot.rxTotal
+	txTotal := trafficSnapshot.txTotal
+	if err == nil {
+		switch {
+		case sample.hasTotals:
+			rxTotal = sample.rxTotal
+			txTotal = sample.txTotal
+		case trafficSnapshot.initialized:
+			elapsed := now.Sub(trafficSnapshot.lastAt).Seconds()
+			if elapsed > 0 {
+				rxTotal += uint64(float64(rxRate) * elapsed)
+				txTotal += uint64(float64(txRate) * elapsed)
 			}
 		}
-	}
-	if err == nil {
 		trafficSnapshot.initialized = true
 		trafficSnapshot.lastAt = now
-		trafficSnapshot.lastRX = rxTotal
-		trafficSnapshot.lastTX = txTotal
+		trafficSnapshot.rxTotal = rxTotal
+		trafficSnapshot.txTotal = txTotal
 	}
 	trafficSnapshot.mu.Unlock()
 
@@ -115,8 +133,8 @@ func (h *Runtime) Traffic(c *gin.Context) {
 			Source:       source,
 			RXRateBps:    rxRate,
 			TXRateBps:    txRate,
-			RXTotalBytes: int64(rxTotal),
-			TXTotalBytes: int64(txTotal),
+			RXTotalBytes: clampUint64ToInt64(rxTotal),
+			TXTotalBytes: clampUint64ToInt64(txTotal),
 		},
 	})
 }
@@ -440,53 +458,150 @@ func runtimeProxyRowsToInbounds(httpRow, socksRow repo.ProxySettingsRow) (genera
 	return httpProxy, socksProxy
 }
 
-func readNetDevTotals() (uint64, uint64, error) {
-	data, err := os.ReadFile("/proc/net/dev")
-	if err != nil {
-		return 0, 0, err
+func fetchProxyTraffic(parent context.Context) (proxyTrafficSample, error) {
+	baseURL, enabled := resolveClashAPIBaseURL()
+	if !enabled {
+		return proxyTrafficSample{source: "singbox_clash_api_disabled"}, nil
 	}
-	var rxTotal uint64
-	var txTotal uint64
 
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	lineNo := 0
-	for scanner.Scan() {
-		lineNo++
-		// Skip headers.
-		if lineNo <= 2 {
-			continue
-		}
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		iface := strings.TrimSpace(parts[0])
-		if iface == "lo" {
-			continue
-		}
-		fields := strings.Fields(parts[1])
-		if len(fields) < 16 {
-			continue
-		}
-		rx, err := strconv.ParseUint(fields[0], 10, 64)
-		if err != nil {
-			continue
-		}
-		tx, err := strconv.ParseUint(fields[8], 10, 64)
-		if err != nil {
-			continue
-		}
-		rxTotal += rx
-		txTotal += tx
+	sample := proxyTrafficSample{source: "singbox_clash_api_unavailable"}
+	ctx, cancel := context.WithTimeout(parent, 2*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/traffic", nil)
+	if err != nil {
+		return sample, err
 	}
-	if err := scanner.Err(); err != nil {
-		return 0, 0, err
+	if secret := strings.TrimSpace(os.Getenv("SINGBOX_CLASH_API_SECRET")); secret != "" {
+		req.Header.Set("Authorization", "Bearer "+secret)
 	}
-	return rxTotal, txTotal, nil
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return sample, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return sample, fmt.Errorf("clash api /traffic status %d", resp.StatusCode)
+	}
+
+	decoder := json.NewDecoder(resp.Body)
+	decoder.UseNumber()
+	payload := map[string]any{}
+	if err := decoder.Decode(&payload); err != nil {
+		return sample, err
+	}
+
+	downRate, downOK := pickInt64FromMap(payload, "down", "download")
+	upRate, upOK := pickInt64FromMap(payload, "up", "upload")
+	if !downOK && !upOK {
+		return sample, fmt.Errorf("clash api /traffic missing rate fields")
+	}
+	if downRate < 0 {
+		downRate = 0
+	}
+	if upRate < 0 {
+		upRate = 0
+	}
+
+	sample.source = "singbox_clash_api"
+	sample.rxRateBps = downRate
+	sample.txRateBps = upRate
+
+	downTotal, downTotalOK := pickUint64FromMap(payload,
+		"down_total", "download_total", "total_download", "downTotal", "downloadTotal")
+	upTotal, upTotalOK := pickUint64FromMap(payload,
+		"up_total", "upload_total", "total_upload", "upTotal", "uploadTotal")
+	if downTotalOK && upTotalOK {
+		sample.hasTotals = true
+		sample.rxTotal = downTotal
+		sample.txTotal = upTotal
+	}
+
+	return sample, nil
+}
+
+func resolveClashAPIBaseURL() (string, bool) {
+	controller := strings.TrimSpace(os.Getenv("SINGBOX_CLASH_API_ADDR"))
+	if controller == "" {
+		controller = "127.0.0.1:9090"
+	}
+	if strings.EqualFold(controller, "off") {
+		return "", false
+	}
+	if !strings.HasPrefix(controller, "http://") && !strings.HasPrefix(controller, "https://") {
+		controller = "http://" + controller
+	}
+	return strings.TrimRight(controller, "/"), true
+}
+
+func pickInt64FromMap(payload map[string]any, keys ...string) (int64, bool) {
+	for _, key := range keys {
+		value, ok := payload[key]
+		if !ok {
+			continue
+		}
+		f, ok := numberToFloat64(value)
+		if !ok {
+			continue
+		}
+		return int64(f + 0.5), true
+	}
+	return 0, false
+}
+
+func pickUint64FromMap(payload map[string]any, keys ...string) (uint64, bool) {
+	for _, key := range keys {
+		value, ok := payload[key]
+		if !ok {
+			continue
+		}
+		f, ok := numberToFloat64(value)
+		if !ok || f < 0 {
+			continue
+		}
+		return uint64(f), true
+	}
+	return 0, false
+}
+
+func numberToFloat64(value any) (float64, bool) {
+	switch v := value.(type) {
+	case json.Number:
+		f, err := v.Float64()
+		if err != nil {
+			return 0, false
+		}
+		return f, true
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case uint64:
+		return float64(v), true
+	case string:
+		s := strings.TrimSpace(v)
+		if s == "" {
+			return 0, false
+		}
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return 0, false
+		}
+		return f, true
+	default:
+		return 0, false
+	}
+}
+
+func clampUint64ToInt64(v uint64) int64 {
+	if v > uint64(math.MaxInt64) {
+		return math.MaxInt64
+	}
+	return int64(v)
 }
 
 func parseTargetFromOutbound(raw string) string {

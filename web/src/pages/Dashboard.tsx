@@ -59,6 +59,7 @@ export default function Dashboard() {
         ? "success"
         : "muted";
   const configHash = runtime?.config_hash ? runtime.config_hash.slice(0, 8) : "--";
+  const trafficSourceMeta = getTrafficSourceMeta(traffic?.source);
 
   const forwardingTone =
     forwardingSummary?.status === "running"
@@ -198,8 +199,14 @@ export default function Dashboard() {
               <p className="bp-card-kicker">Forwarding</p>
               <h2 className="bp-card-title">Traffic</h2>
             </div>
-            <span className="bp-link-pill">{traffic?.source || "unknown"}</span>
+            <span
+              className={`bp-link-pill bp-source-pill bp-source-pill--${trafficSourceMeta.tone}`}
+              title={traffic?.source || "unknown"}
+            >
+              {trafficSourceMeta.label}
+            </span>
           </div>
+          <p className="bp-muted">{trafficSourceMeta.description}</p>
           <div className="bp-runtime-grid">
             <div className="bp-runtime-item">
               <span className="bp-runtime-label">Download Rate</span>
@@ -511,4 +518,40 @@ function formatLatency(latencyMs?: number | null): string {
     return "-";
   }
   return `${latencyMs} ms`;
+}
+
+type TrafficSourceTone = "success" | "warning" | "danger" | "muted";
+
+function getTrafficSourceMeta(source?: string | null): {
+  label: string;
+  description: string;
+  tone: TrafficSourceTone;
+} {
+  const normalized = (source || "").trim().toLowerCase();
+  if (normalized === "singbox_clash_api") {
+    return {
+      label: "Proxy Only",
+      description: "Only traffic forwarded by sing-box is counted.",
+      tone: "success",
+    };
+  }
+  if (normalized === "singbox_clash_api_disabled") {
+    return {
+      label: "Disabled",
+      description: "Proxy traffic metrics are disabled by config.",
+      tone: "warning",
+    };
+  }
+  if (normalized === "singbox_clash_api_unavailable") {
+    return {
+      label: "Unavailable",
+      description: "Cannot reach sing-box Clash API, metrics are temporarily unavailable.",
+      tone: "danger",
+    };
+  }
+  return {
+    label: "Unknown",
+    description: "Traffic source is not recognized.",
+    tone: "muted",
+  };
 }
