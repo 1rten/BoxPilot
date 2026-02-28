@@ -12,7 +12,7 @@ import {
 import { Popover } from "antd";
 
 export default function App() {
-  const { data: summary } = useForwardingSummary();
+  const { data: summary, refetch: refetchForwardingSummary } = useForwardingSummary();
   const startForwarding = useStartForwardingRuntime();
   const stopForwarding = useStopForwardingRuntime();
   const toggling = startForwarding.isPending || stopForwarding.isPending;
@@ -61,6 +61,11 @@ export default function App() {
             <Popover
               placement="bottomRight"
               trigger={["hover"]}
+              onOpenChange={(open) => {
+                if (open) {
+                  void refetchForwardingSummary();
+                }
+              }}
               content={
                 <div className="bp-forwarding-popover">
                   <div className="bp-forwarding-popover-head">

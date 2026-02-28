@@ -19,6 +19,9 @@ export function useProxySettings() {
   return useQuery({
     queryKey: ["proxy-settings"],
     queryFn: getProxySettings,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -29,6 +32,10 @@ export function useUpdateProxySettings() {
     mutationFn: (body: UpdateProxySettingsBody) => updateProxySettings(body),
     onSuccess: () => {
       q.invalidateQueries({ queryKey: ["proxy-settings"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
       addToast("success", "Proxy settings saved");
     },
     onError: (error: unknown) => {
@@ -50,6 +57,12 @@ export function useApplyProxySettings() {
     mutationFn: applyProxySettings,
     onSuccess: () => {
       q.invalidateQueries({ queryKey: ["proxy-settings"] });
+      q.invalidateQueries({ queryKey: ["forwarding-runtime-status"] });
+      q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
       addToast("success", "Proxy settings applied");
     },
     onError: (error: unknown) => {
@@ -68,7 +81,11 @@ export function useForwardingRuntimeStatus() {
   return useQuery({
     queryKey: ["forwarding-runtime-status"],
     queryFn: getForwardingRuntimeStatus,
-    refetchInterval: 10_000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
   });
 }
 
@@ -76,7 +93,11 @@ export function useForwardingSummary() {
   return useQuery({
     queryKey: ["forwarding-summary"],
     queryFn: getForwardingSummary,
-    refetchInterval: 10_000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
   });
 }
 
@@ -89,6 +110,10 @@ export function useStartForwardingRuntime() {
       q.invalidateQueries({ queryKey: ["forwarding-runtime-status"] });
       q.invalidateQueries({ queryKey: ["forwarding-summary"] });
       q.invalidateQueries({ queryKey: ["proxy-settings"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
       addToast("success", "Forwarding started");
     },
     onError: (error: unknown) => {
@@ -112,6 +137,10 @@ export function useStopForwardingRuntime() {
       q.invalidateQueries({ queryKey: ["forwarding-runtime-status"] });
       q.invalidateQueries({ queryKey: ["forwarding-summary"] });
       q.invalidateQueries({ queryKey: ["proxy-settings"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
       addToast("success", "Forwarding stopped");
     },
     onError: (error: unknown) => {
@@ -130,6 +159,9 @@ export function useRoutingSettings() {
   return useQuery({
     queryKey: ["routing-settings"],
     queryFn: getRoutingSettings,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -140,6 +172,8 @@ export function useUpdateRoutingSettings() {
     mutationFn: (body: UpdateRoutingSettingsBody) => updateRoutingSettings(body),
     onSuccess: () => {
       q.invalidateQueries({ queryKey: ["routing-settings"] });
+      q.invalidateQueries({ queryKey: ["routing-summary"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
       addToast("success", "Routing bypass settings saved");
     },
     onError: (error: unknown) => {
@@ -158,6 +192,10 @@ export function useRoutingSummary() {
   return useQuery({
     queryKey: ["routing-summary"],
     queryFn: getRoutingSummary,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
   });
 }

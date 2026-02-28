@@ -16,6 +16,11 @@ export function useSubscriptions() {
   return useQuery<Subscription[]>({
     queryKey: ["subscriptions"],
     queryFn: getSubscriptions,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: true,
   });
 }
 
@@ -36,6 +41,9 @@ export function useCreateSubscription() {
       }
       q.invalidateQueries({ queryKey: ["subscriptions"] });
       q.invalidateQueries({ queryKey: ["nodes"] });
+      q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
       if (!refreshed) {
         addToast("success", "Subscription created");
       }
@@ -55,6 +63,9 @@ export function useUpdateSubscription() {
     onSuccess: () => {
       q.invalidateQueries({ queryKey: ["subscriptions"] });
       q.invalidateQueries({ queryKey: ["nodes"] });
+      q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
       addToast("success", "Subscription updated");
     },
     onError: (error: unknown) => {
@@ -72,6 +83,9 @@ export function useDeleteSubscription() {
     onSuccess: () => {
       q.invalidateQueries({ queryKey: ["subscriptions"] });
       q.invalidateQueries({ queryKey: ["nodes"] });
+      q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
       addToast("success", "Subscription deleted");
     },
     onError: (error: unknown) => {
@@ -89,6 +103,9 @@ export function useRefreshSubscription() {
     onSuccess: (result) => {
       q.invalidateQueries({ queryKey: ["subscriptions"] });
       q.invalidateQueries({ queryKey: ["nodes"] });
+      q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
       addToast("success", buildRefreshMessage(result, false));
     },
     onError: (error: unknown) => {

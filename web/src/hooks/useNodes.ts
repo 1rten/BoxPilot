@@ -10,6 +10,11 @@ export function useNodes(params?: { enabled?: number; sub_id?: string }) {
       const { data } = await api.get<{ data: Node[] }>("/nodes", { params });
       return data.data;
     },
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: true,
   });
 }
 
@@ -23,6 +28,9 @@ export function useUpdateNode() {
     },
     onSuccess: () => {
       q.invalidateQueries({ queryKey: ["nodes"] });
+      q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
       addToast("success", "Node updated");
     },
     onError: (error: unknown) => {
@@ -50,6 +58,8 @@ export function useTestNodes() {
     },
     onSuccess: (rows) => {
       q.invalidateQueries({ queryKey: ["nodes"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
       const ok = rows.filter((r) => r.status === "ok").length;
       const fail = rows.length - ok;
       if (fail === 0) {
@@ -80,6 +90,10 @@ export function useBatchForwarding() {
     },
     onSuccess: (result, variables) => {
       q.invalidateQueries({ queryKey: ["nodes"] });
+      q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
       const action = variables.forwarding_enabled ? "Enabled" : "Disabled";
       addToast("success", `${action} forwarding for ${result.updated} node${result.updated === 1 ? "" : "s"}`);
     },

@@ -479,6 +479,34 @@ a {
   max-width: 420px;
 }
 
+.bp-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bp-log-item {
+  border: 1px solid #e7ecf7;
+  background: #f8faff;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.bp-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.bp-log-message {
+  margin: 0;
+  color: #1f2a44;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
 .bp-muted {
   color: var(--bp-muted);
   font-size: 14px;
@@ -974,14 +1002,6 @@ a {
 .bp-settings-actions {
   margin-top: 12px;
   justify-content: flex-end;
-}
-
-.bp-settings-log-toolbar {
-  margin-bottom: 12px;
-}
-
-.bp-settings-log-toolbar .ant-input {
-  min-height: 40px;
 }
 
 .bp-list-compact {

@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Input, Table, Tag } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
-import { useRuntimeStatus, useRuntimeTraffic, useRuntimeConnections } from "../hooks/useRuntime";
+import { useRuntimeStatus, useRuntimeTraffic, useRuntimeConnections, useRuntimeLogs } from "../hooks/useRuntime";
 import { useSubscriptions } from "../hooks/useSubscriptions";
 import { useNodes } from "../hooks/useNodes";
-import { useForwardingSummary } from "../hooks/useProxySettings";
+import { useForwardingSummary, useRoutingSummary } from "../hooks/useProxySettings";
 import { ErrorState } from "../components/common/ErrorState";
 import { formatDateTime } from "../utils/datetime";
 import type { ColumnsType } from "antd/es/table";
@@ -21,6 +21,8 @@ export default function Dashboard() {
   const { data: subs } = useSubscriptions();
   const { data: nodes } = useNodes({});
   const { data: forwardingSummary } = useForwardingSummary();
+  const { data: routingSummary } = useRoutingSummary();
+  const { data: logsData } = useRuntimeLogs({ level: "all", limit: 12 });
   const [connQuery, setConnQuery] = useState("");
   const { data: connectionsData, isLoading: connectionsLoading } = useRuntimeConnections(connQuery);
 
@@ -228,6 +230,81 @@ export default function Dashboard() {
           <p className="bp-muted">
             Forwarding selected: {forwardingSummary?.selected_nodes_count ?? 0}
           </p>
+        </div>
+
+        <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
+          <div className="bp-card-header">
+            <div>
+              <p className="bp-card-kicker">Routing</p>
+              <h2 className="bp-card-title">Routing / Geo</h2>
+            </div>
+            <Link to="/settings" className="bp-link-pill">
+              Edit Rules
+            </Link>
+          </div>
+          <div className="bp-runtime-grid">
+            <div className="bp-runtime-item">
+              <span className="bp-runtime-label">Bypass Private</span>
+              <span className="bp-runtime-value">
+                {routingSummary?.bypass_private_enabled ? "Enabled" : "Disabled"}
+              </span>
+            </div>
+            <div className="bp-runtime-item">
+              <span className="bp-runtime-label">Bypass Domains</span>
+              <span className="bp-runtime-value">{routingSummary?.bypass_domains_count ?? 0}</span>
+            </div>
+            <div className="bp-runtime-item">
+              <span className="bp-runtime-label">Bypass CIDRs</span>
+              <span className="bp-runtime-value">{routingSummary?.bypass_cidrs_count ?? 0}</span>
+            </div>
+            <div className="bp-runtime-item">
+              <span className="bp-runtime-label">GeoIP / GeoSite</span>
+              <span className="bp-runtime-value">
+                {routingSummary?.geoip_status || "unknown"} / {routingSummary?.geosite_status || "unknown"}
+              </span>
+            </div>
+          </div>
+          {routingSummary?.notes?.length ? (
+            <div className="bp-list-compact" style={{ marginTop: 12 }}>
+              {routingSummary.notes.slice(0, 2).map((note) => (
+                <p key={note} className="bp-muted">
+                  - {note}
+                </p>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
+          <div className="bp-card-header">
+            <div>
+              <p className="bp-card-kicker">Diagnostics</p>
+              <h2 className="bp-card-title">Runtime Logs</h2>
+            </div>
+            <span className="bp-muted">Recent {Math.min(logsData?.items?.length ?? 0, 12)}</span>
+          </div>
+          {logsData?.items?.length ? (
+            <div className="bp-log-list">
+              {logsData.items.slice(0, 8).map((item) => (
+                <div
+                  key={`${item.timestamp}-${item.level}-${item.source}-${item.message}`}
+                  className="bp-log-item"
+                >
+                  <div className="bp-log-head">
+                    <span className="bp-table-mono">{formatDateTime(item.timestamp)}</span>
+                    <Tag color={item.level === "error" ? "error" : item.level === "warn" ? "warning" : "processing"}>
+                      {item.level.toUpperCase()}
+                    </Tag>
+                  </div>
+                  <p className="bp-log-message">
+                    <span className="bp-table-mono">[{item.source}]</span> {item.message}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="bp-muted">No runtime logs yet.</p>
+          )}
         </div>
 
         <div className="bp-card bp-dashboard-card bp-dashboard-card--full">

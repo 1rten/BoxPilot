@@ -22,6 +22,8 @@ export function useUpdateNodeForwarding() {
     mutationFn: (body: UpdateNodeForwardingBody) => updateNodeForwarding(body),
     onSuccess: (_data, vars) => {
       q.invalidateQueries({ queryKey: ["node-forwarding", vars.node_id] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
       addToast("success", "Forwarding override saved");
     },
     onError: (error: unknown) => {
@@ -37,10 +39,15 @@ export function useUpdateNodeForwarding() {
 }
 
 export function useRestartNodeForwarding() {
+  const q = useQueryClient();
   const { addToast } = useToast();
   return useMutation({
     mutationFn: (nodeId: string) => restartNodeForwarding(nodeId),
     onSuccess: () => {
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
       addToast("success", "Node proxy restarted");
     },
     onError: (error: unknown) => {
