@@ -22,9 +22,13 @@ export default function Dashboard() {
   const { data: nodes } = useNodes({});
   const { data: forwardingSummary } = useForwardingSummary();
   const { data: routingSummary } = useRoutingSummary();
-  const { data: logsData } = useRuntimeLogs({ level: "all", limit: 12 });
+  const { data: logsData, isFetching: logsFetching } = useRuntimeLogs({ level: "all", limit: 12 });
   const [connQuery, setConnQuery] = useState("");
-  const { data: connectionsData, isLoading: connectionsLoading } = useRuntimeConnections(connQuery);
+  const {
+    data: connectionsData,
+    isLoading: connectionsLoading,
+    isFetching: connectionsFetching,
+  } = useRuntimeConnections(connQuery);
 
   const runtimeState = runtimeLoading
     ? "Loading"
@@ -50,6 +54,8 @@ export default function Dashboard() {
         : "muted";
 
   const connections = connectionsData?.items ?? [];
+  const recentLogs = logsData?.items?.slice(0, 8) ?? [];
+  const recentLogsTotal = logsData?.items?.length ?? 0;
   const connectionColumns: ColumnsType<RuntimeConnection> = useMemo(
     () => [
       {
@@ -281,11 +287,16 @@ export default function Dashboard() {
               <p className="bp-card-kicker">Diagnostics</p>
               <h2 className="bp-card-title">Runtime Logs</h2>
             </div>
-            <span className="bp-muted">Recent {Math.min(logsData?.items?.length ?? 0, 12)}</span>
+            <div className="bp-card-header-meta">
+              <span className="bp-metric-pill bp-metric-pill-neutral">
+                Showing {recentLogs.length} / {recentLogsTotal}
+              </span>
+              {logsFetching ? <span className="bp-metric-subtle">Updating...</span> : null}
+            </div>
           </div>
-          {logsData?.items?.length ? (
+          {recentLogs.length ? (
             <div className="bp-log-list">
-              {logsData.items.slice(0, 8).map((item) => (
+              {recentLogs.map((item) => (
                 <div
                   key={`${item.timestamp}-${item.level}-${item.source}-${item.message}`}
                   className="bp-log-item"
@@ -303,7 +314,7 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <p className="bp-muted">No runtime logs yet.</p>
+            <p className="bp-muted">{logsFetching ? "Loading runtime logs..." : "No runtime logs yet."}</p>
           )}
         </div>
 
@@ -313,7 +324,12 @@ export default function Dashboard() {
               <p className="bp-card-kicker">Diagnostics</p>
               <h2 className="bp-card-title">Connections</h2>
             </div>
-            <span className="bp-muted">Active {connectionsData?.active_count ?? 0}</span>
+            <div className="bp-card-header-meta">
+              <span className="bp-metric-pill bp-metric-pill-active">
+                Active {connectionsData?.active_count ?? 0}
+              </span>
+              {connectionsFetching ? <span className="bp-metric-subtle">Updating...</span> : null}
+            </div>
           </div>
           <div className="bp-dashboard-table-toolbar">
             <Input
@@ -328,7 +344,7 @@ export default function Dashboard() {
           <Table<RuntimeConnection>
             rowKey="id"
             size="small"
-            loading={connectionsLoading}
+            loading={connectionsLoading || connectionsFetching}
             dataSource={connections}
             columns={connectionColumns}
             pagination={{ pageSize: 5, showSizeChanger: false }}

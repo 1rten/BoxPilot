@@ -469,6 +469,43 @@ a {
   color: var(--bp-ink);
 }
 
+.bp-card-header-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bp-metric-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bp-metric-pill-active {
+  color: #067647;
+  background: #ecfdf3;
+  border-color: #baf0cc;
+}
+
+.bp-metric-pill-neutral {
+  color: #1e3a8a;
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.bp-metric-subtle {
+  font-size: 12px;
+  color: var(--bp-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .bp-dashboard-table-toolbar {
   margin-bottom: 12px;
   display: flex;
