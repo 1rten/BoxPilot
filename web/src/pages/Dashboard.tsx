@@ -488,6 +488,7 @@ type LatencyTone =
   | "slow"
   | "poor"
   | "error"
+  | "warn"
   | "unknown";
 
 function latencyTone(latencyMs?: number | null, testStatus?: string | null): LatencyTone {
