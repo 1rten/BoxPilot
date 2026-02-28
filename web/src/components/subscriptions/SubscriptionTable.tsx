@@ -1,7 +1,7 @@
 import type { Subscription } from "../../api/types";
 import { formatDateTime } from "../../utils/datetime";
 import { Button, Progress, Table, Tag, Tooltip } from "antd";
-import { DeleteOutlined, EditOutlined, LoadingOutlined, ReloadOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, ExclamationCircleOutlined, LoadingOutlined, ReloadOutlined } from "@ant-design/icons";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import { useI18n } from "../../i18n/context";
 
@@ -36,20 +36,16 @@ export function SubscriptionTable({
       title: tr("subs.table.name", "Name"),
       dataIndex: "name",
       key: "name",
-      width: 140,
-      ellipsis: true,
-      render: (_value, record) => record.name || record.url,
-    },
-    {
-      title: "URL",
-      dataIndex: "url",
-      key: "url",
-      width: 260,
-      ellipsis: true,
-      render: (value: string) => (
-        <span className="bp-table-mono" title={value}>
-          {truncate(value)}
-        </span>
+      width: 300,
+      render: (_value, record) => (
+        <div className="bp-subs-name-cell">
+          <div className="bp-subs-name-main" title={record.name || record.url}>
+            {record.name || record.url}
+          </div>
+          <div className="bp-subs-name-url bp-table-mono" title={record.url}>
+            {truncate(record.url, 56)}
+          </div>
+        </div>
       ),
     },
     {
@@ -73,7 +69,7 @@ export function SubscriptionTable({
     {
       title: tr("subs.table.plan", "Plan"),
       key: "plan",
-      width: 230,
+      width: 250,
       render: (_value, record) => renderPlanCell(record, tr),
     },
     {
@@ -97,19 +93,28 @@ export function SubscriptionTable({
       title: tr("subs.table.last_error", "Last error"),
       dataIndex: "last_error",
       key: "last_error",
-      width: 180,
-      ellipsis: true,
-      render: (value: string | null | undefined) => (
-        <span style={{ color: value ? "#DC2626" : "#64748B" }} title={value ?? undefined}>
-          {value || "-"}
-        </span>
-      ),
+      width: 110,
+      align: "center",
+      responsive: ["xl"],
+      render: (value: string | null | undefined) => {
+        if (!value) {
+          return <span style={{ color: "#94A3B8" }}>-</span>;
+        }
+        return (
+          <Tooltip title={value}>
+            <span className="bp-subs-error-pill">
+              <ExclamationCircleOutlined />
+              {tr("subs.status.error", "Error")}
+            </span>
+          </Tooltip>
+        );
+      },
     },
     {
       title: tr("subs.table.actions", "Actions"),
       key: "actions",
       align: "right",
-      width: 140,
+      width: 120,
       render: (_value, record) => {
         const refreshing = rowRefreshingId === record.id;
         return (
@@ -152,7 +157,7 @@ export function SubscriptionTable({
   return (
     <Table<Subscription>
       rowKey="id"
-      scroll={{ x: 1380 }}
+      scroll={{ x: 1160 }}
       dataSource={list}
       columns={columns}
       pagination={pagination}
@@ -178,30 +183,32 @@ function renderPlanCell(
   }
 
   return (
-    <div style={{ display: "grid", gap: 6 }}>
+    <div className="bp-subs-plan-cell">
       {hasQuota ? (
         <>
-          <div className="bp-table-mono" style={{ fontSize: 12 }}>
-            {tr("subs.plan.used_total", "Used / Total")}: {formatBytes(s.used_bytes || 0)} / {formatBytes(s.total_bytes || 0)}
+          <div className="bp-table-mono bp-subs-plan-usage">
+            {formatBytes(s.used_bytes || 0)} / {formatBytes(s.total_bytes || 0)}
+            <span className="bp-subs-plan-percent">{Math.round(percent)}%</span>
           </div>
           <Progress size="small" percent={percent} showInfo={false} />
         </>
       ) : null}
-      {s.expire_at ? (
-        <div style={{ color: "#64748B", fontSize: 12 }}>
-          {tr("subs.plan.expire", "Expire")}: <span className="bp-table-mono">{expireText}</span>
-        </div>
-      ) : null}
-      {s.profile_web_page ? (
-        <a
-          href={s.profile_web_page}
-          target="_blank"
-          rel="noreferrer"
-          style={{ color: "#2563eb", fontSize: 12, fontWeight: 600 }}
-        >
-          {tr("subs.plan.portal", "Portal")}
-        </a>
-      ) : null}
+      <div className="bp-subs-plan-meta">
+        {s.expire_at ? (
+          <span>
+            {tr("subs.plan.expire", "Expire")}: <span className="bp-table-mono">{expireText}</span>
+          </span>
+        ) : null}
+        {s.profile_web_page ? (
+          <a
+            href={s.profile_web_page}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {tr("subs.plan.portal", "Portal")}
+          </a>
+        ) : null}
+      </div>
     </div>
   );
 }
