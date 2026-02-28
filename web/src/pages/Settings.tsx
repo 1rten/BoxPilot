@@ -345,7 +345,7 @@ function RoutingSummaryCard({ data }: RoutingSummaryCardProps) {
       </div>
       {data?.notes?.length ? (
         <div className="bp-list-compact" style={{ marginTop: 14 }}>
-          {data.notes.map((note) => (
+          {data.notes.map((note: string) => (
             <p key={note} className="bp-muted">
               - {note}
             </p>
