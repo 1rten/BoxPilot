@@ -91,3 +91,36 @@ func TestBuildConfig_WithoutBypassRules(t *testing.T) {
 		t.Fatalf("did not expect route.rules when bypass is disabled")
 	}
 }
+
+func TestBuildConfigWithNodes_UsesProvidedTags(t *testing.T) {
+	cfg, err := BuildConfigWithNodes(
+		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		RoutingSettings{BypassPrivateEnabled: false},
+		[]NodeOutbound{
+			{
+				Tag:     "node-fast",
+				RawJSON: `{"type":"trojan","tag":"node-fast","server":"example.com","server_port":443,"password":"p"}`,
+			},
+			{
+				Tag:     "node-raw-only",
+				RawJSON: `{"type":"vmess","tag":"node-raw-only","server":"example.org","server_port":443,"uuid":"11111111-1111-1111-1111-111111111111"}`,
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("BuildConfigWithNodes returned error: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(cfg, &parsed); err != nil {
+		t.Fatalf("unmarshal config: %v", err)
+	}
+	outbounds, ok := parsed["outbounds"].([]any)
+	if !ok {
+		t.Fatalf("missing outbounds")
+	}
+	if len(outbounds) < 5 {
+		t.Fatalf("expected at least 5 outbounds, got %d", len(outbounds))
+	}
+}

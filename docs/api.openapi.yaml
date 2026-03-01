@@ -103,6 +103,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/RuntimeLogsResponse'
 
+  /api/v1/runtime/proxy/check:
+    post:
+      tags: [Runtime]
+      summary: Check HTTP/SOCKS proxy chain connectivity
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuntimeProxyCheckRequest'
+      responses:
+        '200':
+          description: Proxy check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeProxyCheckResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
   /api/v1/runtime/plan:
     post:
       tags: [Runtime]
@@ -166,6 +188,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ForwardingSummaryResponse'
+
+  /api/v1/settings/forwarding/policy:
+    get:
+      tags: [Settings]
+      summary: Get forwarding node eligibility policy
+      responses:
+        '200':
+          description: Forwarding policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForwardingPolicyResponse'
+
+  /api/v1/settings/forwarding/policy/update:
+    post:
+      tags: [Settings]
+      summary: Update forwarding node eligibility policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateForwardingPolicyRequest'
+      responses:
+        '200':
+          description: Forwarding policy updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForwardingPolicyResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
 
   /api/v1/settings/forwarding/start:
     post:
@@ -623,6 +679,9 @@ components:
             config_version: { type: integer }
             config_hash: { type: string }
             forwarding_running: { type: boolean }
+            nodes_included: { type: integer }
+            last_apply_duration_ms: { type: integer }
+            last_apply_success_at: { type: string, nullable: true }
             last_reload_at: { type: string }
             last_reload_error: { type: string }
             ports:
@@ -630,7 +689,7 @@ components:
               properties:
                 http: { type: integer }
                 socks: { type: integer }
-          required: [config_version, config_hash, forwarding_running, ports]
+          required: [config_version, config_hash, forwarding_running, nodes_included, last_apply_duration_ms, ports]
       required: [data]
 
     RuntimeTrafficResponse:
@@ -694,6 +753,46 @@ components:
           required: [items]
       required: [data]
 
+    RuntimeProxyCheckRequest:
+      type: object
+      properties:
+        target_url:
+          type: string
+          example: https://www.gstatic.com/generate_204
+        timeout_ms:
+          type: integer
+          minimum: 500
+          maximum: 30000
+          default: 5000
+
+    RuntimeProxyCheckResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            target_url: { type: string }
+            checked_at: { type: string }
+            http:
+              $ref: '#/components/schemas/RuntimeProxyCheckItem'
+            socks:
+              $ref: '#/components/schemas/RuntimeProxyCheckItem'
+          required: [target_url, checked_at, http, socks]
+      required: [data]
+
+    RuntimeProxyCheckItem:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        proxy_url: { type: string }
+        connected: { type: boolean }
+        tls_ok: { type: boolean }
+        status_code: { type: integer, nullable: true }
+        latency_ms: { type: integer, nullable: true }
+        error: { type: string, nullable: true }
+        egress_ip: { type: string, nullable: true }
+      required: [enabled, proxy_url, connected, tls_ok]
+
     ForwardingRuntimeStatusResponse:
       type: object
       properties:
@@ -734,6 +833,27 @@ components:
                 required: [id, name, tag, type]
           required: [running, status, selected_nodes_count, nodes]
       required: [data]
+
+    ForwardingPolicyResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            healthy_only_enabled: { type: boolean }
+            max_latency_ms: { type: integer }
+            allow_untested: { type: boolean }
+            updated_at: { type: string, nullable: true }
+          required: [healthy_only_enabled, max_latency_ms, allow_untested]
+      required: [data]
+
+    UpdateForwardingPolicyRequest:
+      type: object
+      properties:
+        healthy_only_enabled: { type: boolean }
+        max_latency_ms: { type: integer, minimum: 1, maximum: 10000 }
+        allow_untested: { type: boolean }
+      required: [healthy_only_enabled, max_latency_ms, allow_untested]
 
     RoutingSettingsResponse:
       type: object

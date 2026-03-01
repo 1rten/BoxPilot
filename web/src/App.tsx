@@ -4,14 +4,16 @@ import Dashboard from "./pages/Dashboard";
 import Subscriptions from "./pages/Subscriptions";
 import Nodes from "./pages/Nodes";
 import Settings from "./pages/Settings";
-import type { ForwardingSummaryNode } from "./api/types";
+import type { ForwardingSummaryNode, RuntimeProxyCheckItem } from "./api/types";
 import {
   useForwardingSummary,
   useStartForwardingRuntime,
   useStopForwardingRuntime,
 } from "./hooks/useProxySettings";
-import { Popover } from "antd";
+import { Button, Input, Popover, Tag } from "antd";
 import { useI18n } from "./i18n/context";
+import { useRuntimeProxyCheck } from "./hooks/useRuntime";
+import { formatDateTime } from "./utils/datetime";
 
 export default function App() {
   const { locale, setLocale, tr } = useI18n();
@@ -19,11 +21,14 @@ export default function App() {
   const { data: summary, refetch: refetchForwardingSummary } = useForwardingSummary();
   const startForwarding = useStartForwardingRuntime();
   const stopForwarding = useStopForwardingRuntime();
+  const proxyCheck = useRuntimeProxyCheck();
+  const [proxyCheckTarget, setProxyCheckTarget] = useState("https://www.gstatic.com/generate_204");
   const toggling = startForwarding.isPending || stopForwarding.isPending;
   const isRunning = !!summary?.running;
   const runtimeStatus = summary?.status ?? "stopped";
   const runtimeStatusLabel = tr(`app.proxy.runtime.${runtimeStatus}`, runtimeStatus.toUpperCase());
   const nodeList = summary?.nodes ?? [];
+  const proxyCheckResult = proxyCheck.data;
 
   return (
     <BrowserRouter>
@@ -113,7 +118,7 @@ export default function App() {
             </Popover>
             <Popover
               placement="bottomRight"
-              trigger={["hover"]}
+              trigger={["hover", "click"]}
               onOpenChange={(open) => {
                 if (open) {
                   void refetchForwardingSummary();
@@ -155,6 +160,60 @@ export default function App() {
                   ) : (
                     <p className="bp-forwarding-popover-empty">{tr("app.proxy.empty", "No forwarding nodes selected.")}</p>
                   )}
+                  <div className="bp-forwarding-popover-section">
+                    <div className="bp-forwarding-popover-head">
+                      <span className="bp-forwarding-popover-title">
+                        {tr("app.proxy.check.title", "Proxy Chain Check")}
+                      </span>
+                      {proxyCheckResult?.checked_at ? (
+                        <span className="bp-forwarding-popover-time">{formatDateTime(proxyCheckResult.checked_at)}</span>
+                      ) : null}
+                    </div>
+                    <div className="bp-forwarding-popover-toolbar">
+                      <Input
+                        value={proxyCheckTarget}
+                        onChange={(e) => setProxyCheckTarget(e.target.value)}
+                        placeholder={tr("app.proxy.check.target.placeholder", "https://www.gstatic.com/generate_204")}
+                        className="bp-input"
+                      />
+                      <Button
+                        type="primary"
+                        size="small"
+                        loading={proxyCheck.isPending}
+                        onClick={() =>
+                          proxyCheck.mutate({
+                            target_url: proxyCheckTarget.trim() || undefined,
+                          })
+                        }
+                      >
+                        {tr("app.proxy.check.run", "Check")}
+                      </Button>
+                    </div>
+                    <div className="bp-forwarding-popover-check-grid">
+                      <ProxyMiniResult
+                        label="HTTP"
+                        data={proxyCheckResult?.http}
+                        labels={{
+                          pass: tr("app.proxy.check.pass", "PASS"),
+                          fail: tr("app.proxy.check.fail", "FAIL"),
+                          disabled: tr("app.proxy.check.disabled", "DISABLED"),
+                          tls_ok: tr("app.proxy.check.tls_ok", "TLS OK"),
+                          tls_na: tr("app.proxy.check.tls_na", "TLS -"),
+                        }}
+                      />
+                      <ProxyMiniResult
+                        label="SOCKS5"
+                        data={proxyCheckResult?.socks}
+                        labels={{
+                          pass: tr("app.proxy.check.pass", "PASS"),
+                          fail: tr("app.proxy.check.fail", "FAIL"),
+                          disabled: tr("app.proxy.check.disabled", "DISABLED"),
+                          tls_ok: tr("app.proxy.check.tls_ok", "TLS OK"),
+                          tls_na: tr("app.proxy.check.tls_na", "TLS -"),
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               }
             >
@@ -205,5 +264,55 @@ export default function App() {
         </main>
       </div>
     </BrowserRouter>
+  );
+}
+
+function ProxyMiniResult({
+  label,
+  data,
+  labels,
+}: {
+  label: string;
+  data?: RuntimeProxyCheckItem;
+  labels: {
+    pass: string;
+    fail: string;
+    disabled: string;
+    tls_ok: string;
+    tls_na: string;
+  };
+}) {
+  if (!data) {
+    return (
+      <div className="bp-forwarding-popover-check-item">
+        <div className="bp-forwarding-popover-check-head">
+          <span className="bp-forwarding-popover-check-label">{label}</span>
+          <Tag bordered={false}>-</Tag>
+        </div>
+        <p className="bp-forwarding-popover-empty">-</p>
+      </div>
+    );
+  }
+
+  const tone = !data.enabled ? undefined : data.connected ? "success" : "error";
+  const statusText = data.enabled ? (data.connected ? labels.pass : labels.fail) : labels.disabled;
+  return (
+    <div className="bp-forwarding-popover-check-item">
+      <div className="bp-forwarding-popover-check-head">
+        <span className="bp-forwarding-popover-check-label">{label}</span>
+        <Tag color={tone}>{statusText}</Tag>
+      </div>
+      <div className="bp-forwarding-popover-check-meta">
+        <span className="bp-table-mono">{data.proxy_url}</span>
+        <span>{data.status_code ?? "-"}</span>
+        <span>{data.latency_ms != null ? `${data.latency_ms}ms` : "-"}</span>
+        <span>{data.tls_ok ? labels.tls_ok : labels.tls_na}</span>
+      </div>
+      {data.error ? (
+        <p className="bp-forwarding-popover-error" title={data.error}>
+          {data.error}
+        </p>
+      ) : null}
+    </div>
   );
 }

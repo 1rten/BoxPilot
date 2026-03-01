@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import type {
   RuntimeConnectionsData,
   RuntimeLogsData,
+  RuntimeProxyCheckData,
   RuntimeStatusData,
   RuntimeTrafficData,
 } from "../api/types";
@@ -66,6 +67,29 @@ export function useRuntimeTraffic() {
     refetchOnWindowFocus: true,
     refetchInterval: 4000,
     refetchIntervalInBackground: true,
+  });
+}
+
+export function useRuntimeProxyCheck() {
+  const { tr } = useI18n();
+  const { addToast } = useToast();
+  return useMutation({
+    mutationFn: async (body?: { target_url?: string; timeout_ms?: number }) => {
+      const { data } = await api.post<{ data: RuntimeProxyCheckData }>("/runtime/proxy/check", body ?? {});
+      return data.data;
+    },
+    onSuccess: () => {
+      addToast("success", tr("toast.runtime.proxy_check_ok", "Proxy chain check completed"));
+    },
+    onError: (error: unknown) => {
+      const anyErr = error as any;
+      const message =
+        anyErr?.appError?.message ||
+        anyErr?.response?.data?.error?.message ||
+        anyErr?.message ||
+        tr("toast.unknown", "Unknown error");
+      addToast("error", tr("toast.runtime.proxy_check_failed", "Proxy chain check failed: {message}", { message }));
+    },
   });
 }
 

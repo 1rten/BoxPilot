@@ -13,7 +13,7 @@ PREBUILT_GOARCH_DEFAULT := amd64
 endif
 PREBUILT_GOARCH ?= $(PREBUILT_GOARCH_DEFAULT)
 
-.PHONY: build build-prebuilt web server server-prebuilt run test migrate-gen image-prebuilt up-prebuilt
+.PHONY: build build-prebuilt web server server-prebuilt run test migrate-gen image-prebuilt up-prebuilt diagnose
 
 # Build web then server binary (embedding web/dist)
 build: web server
@@ -50,6 +50,10 @@ image-prebuilt: build-prebuilt
 # Run compose with prebuilt image flow
 up-prebuilt: build-prebuilt
 	docker compose -f docker-compose.yml -f docker-compose.prebuilt.yml up --build
+
+# Runtime diagnostics (API + proxy smoke)
+diagnose:
+	./scripts/diagnose-forwarding.sh
 
 # Generate OpenAPI types for frontend
 migrate-gen:

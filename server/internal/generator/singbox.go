@@ -24,6 +24,11 @@ type RoutingSettings struct {
 	BypassCIDRs          []string
 }
 
+type NodeOutbound struct {
+	Tag     string
+	RawJSON string
+}
+
 func DefaultRoutingSettings() RoutingSettings {
 	return RoutingSettings{
 		BypassPrivateEnabled: true,
@@ -42,6 +47,14 @@ func DefaultRoutingSettings() RoutingSettings {
 }
 
 func BuildConfig(httpProxy ProxyInbound, socksProxy ProxyInbound, routing RoutingSettings, nodeOutboundJSONs []string) ([]byte, error) {
+	nodes := make([]NodeOutbound, 0, len(nodeOutboundJSONs))
+	for _, raw := range nodeOutboundJSONs {
+		nodes = append(nodes, NodeOutbound{RawJSON: raw})
+	}
+	return BuildConfigWithNodes(httpProxy, socksProxy, routing, nodes)
+}
+
+func BuildConfigWithNodes(httpProxy ProxyInbound, socksProxy ProxyInbound, routing RoutingSettings, nodes []NodeOutbound) ([]byte, error) {
 	inbounds := []map[string]any{}
 	if httpProxy.Enabled {
 		inbounds = append(inbounds, buildInbound("http", "http-in", httpProxy))
@@ -49,18 +62,22 @@ func BuildConfig(httpProxy ProxyInbound, socksProxy ProxyInbound, routing Routin
 	if socksProxy.Enabled {
 		inbounds = append(inbounds, buildInbound("socks", "socks-in", socksProxy))
 	}
-	outbounds := []map[string]any{
-		{"type": "direct", "tag": "direct"},
-		{"type": "block", "tag": "block"},
+	outbounds := []any{
+		map[string]any{"type": "direct", "tag": "direct"},
+		map[string]any{"type": "block", "tag": "block"},
 	}
 	var tags []string
-	for _, raw := range nodeOutboundJSONs {
-		var m map[string]any
-		if json.Unmarshal([]byte(raw), &m) != nil {
+	for _, node := range nodes {
+		raw := strings.TrimSpace(node.RawJSON)
+		if !json.Valid([]byte(raw)) {
 			continue
 		}
-		outbounds = append(outbounds, m)
-		if tag, ok := m["tag"].(string); ok {
+		outbounds = append(outbounds, json.RawMessage(raw))
+		tag := strings.TrimSpace(node.Tag)
+		if tag == "" {
+			tag = parseTagFromOutbound(raw)
+		}
+		if tag != "" {
 			tags = append(tags, tag)
 		}
 	}
@@ -131,6 +148,17 @@ func BuildConfig(httpProxy ProxyInbound, socksProxy ProxyInbound, routing Routin
 		return nil, errorx.New(errorx.CFGJSONInvalid, "marshal config")
 	}
 	return b, nil
+}
+
+func parseTagFromOutbound(raw string) string {
+	var m map[string]any
+	if json.Unmarshal([]byte(raw), &m) != nil {
+		return ""
+	}
+	if tag, ok := m["tag"].(string); ok {
+		return strings.TrimSpace(tag)
+	}
+	return ""
 }
 
 func applyClashAPI(cfg map[string]any) {

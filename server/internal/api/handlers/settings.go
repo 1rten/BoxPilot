@@ -111,6 +111,10 @@ func (h *Settings) ApplyProxySettings(c *gin.Context) {
 	configPath := service.ResolveConfigPath()
 	v, hsh, out, err := service.Reload(c.Request.Context(), h.DB, configPath)
 	if err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
 		writeError(c, errorx.New(errorx.RTRestartFailed, err.Error()))
 		return
 	}
@@ -263,6 +267,53 @@ func (h *Settings) ForwardingSummary(c *gin.Context) {
 	})
 }
 
+func (h *Settings) GetForwardingPolicy(c *gin.Context) {
+	policy, err := service.LoadForwardingPolicy(h.DB)
+	if err != nil {
+		writeError(c, errorx.New(errorx.DBError, "get forwarding policy"))
+		return
+	}
+	c.JSON(http.StatusOK, dto.ForwardingPolicyResponse{
+		Data: forwardingPolicyToDTO(policy),
+	})
+}
+
+func (h *Settings) UpdateForwardingPolicy(c *gin.Context) {
+	var req dto.UpdateForwardingPolicyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, errorx.New(errorx.REQValidationFailed, "invalid body"))
+		return
+	}
+	if req.HealthyOnlyEnabled == nil {
+		writeError(c, errorx.New(errorx.REQMissingField, "healthy_only_enabled required"))
+		return
+	}
+	if req.AllowUntested == nil {
+		writeError(c, errorx.New(errorx.REQMissingField, "allow_untested required"))
+		return
+	}
+	if req.MaxLatencyMs < 1 || req.MaxLatencyMs > 10000 {
+		writeError(c, errorx.New(errorx.REQInvalidField, "max_latency_ms must be between 1 and 10000"))
+		return
+	}
+	policy, err := service.SaveForwardingPolicy(h.DB, service.ForwardingPolicy{
+		HealthyOnlyEnabled: *req.HealthyOnlyEnabled,
+		MaxLatencyMs:       req.MaxLatencyMs,
+		AllowUntested:      *req.AllowUntested,
+	})
+	if err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.DBError, "update forwarding policy"))
+		return
+	}
+	c.JSON(http.StatusOK, dto.ForwardingPolicyResponse{
+		Data: forwardingPolicyToDTO(policy),
+	})
+}
+
 func (h *Settings) StartForwarding(c *gin.Context) {
 	nodes, err := repo.ListEnabledForwardingNodes(h.DB)
 	if err != nil {
@@ -326,7 +377,7 @@ func (h *Settings) setForwardingRunningAndReload(c *gin.Context, running bool) e
 	configPath := service.ResolveConfigPath()
 	if _, _, _, err := service.Reload(c.Request.Context(), h.DB, configPath); err != nil {
 		_ = repo.SetForwardingRunning(h.DB, prev)
-		return errorx.New(errorx.RTRestartFailed, err.Error())
+		return err
 	}
 	return nil
 }
@@ -366,6 +417,15 @@ func runtimeStatus(db *sql.DB) (bool, string, *string) {
 		return false, "stopped", nil
 	}
 	return true, "running", nil
+}
+
+func forwardingPolicyToDTO(p service.ForwardingPolicy) dto.ForwardingPolicyData {
+	return dto.ForwardingPolicyData{
+		HealthyOnlyEnabled: p.HealthyOnlyEnabled,
+		MaxLatencyMs:       p.MaxLatencyMs,
+		AllowUntested:      p.AllowUntested,
+		UpdatedAt:          p.UpdatedAt,
+	}
 }
 
 func mustGetProxy(db *sql.DB, proxyType string) repo.ProxySettingsRow {

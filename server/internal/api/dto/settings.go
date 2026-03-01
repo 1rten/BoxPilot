@@ -94,6 +94,23 @@ type ForwardingSummaryData struct {
 	Nodes              []ForwardingSummaryNode `json:"nodes"`
 }
 
+type ForwardingPolicyResponse struct {
+	Data ForwardingPolicyData `json:"data"`
+}
+
+type ForwardingPolicyData struct {
+	HealthyOnlyEnabled bool   `json:"healthy_only_enabled"`
+	MaxLatencyMs       int    `json:"max_latency_ms"`
+	AllowUntested      bool   `json:"allow_untested"`
+	UpdatedAt          string `json:"updated_at,omitempty"`
+}
+
+type UpdateForwardingPolicyRequest struct {
+	HealthyOnlyEnabled *bool `json:"healthy_only_enabled"`
+	MaxLatencyMs       int   `json:"max_latency_ms"`
+	AllowUntested      *bool `json:"allow_untested"`
+}
+
 type ForwardingSummaryNode struct {
 	ID            string  `json:"id"`
 	Name          string  `json:"name"`

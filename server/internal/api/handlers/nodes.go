@@ -309,6 +309,10 @@ func (h *Nodes) RestartForwarding(c *gin.Context) {
 	}
 	configPath := service.ResolveConfigPath()
 	if _, _, _, err := service.Reload(c.Request.Context(), h.DB, configPath); err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
 		writeError(c, errorx.New(errorx.RTRestartFailed, err.Error()))
 		return
 	}

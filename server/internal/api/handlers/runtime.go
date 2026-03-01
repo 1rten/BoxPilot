@@ -5,8 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -22,6 +25,7 @@ import (
 	"boxpilot/server/internal/util/errorx"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/net/proxy"
 )
 
 type Runtime struct {
@@ -56,13 +60,20 @@ func (h *Runtime) Status(c *gin.Context) {
 	cfgVersion := 0
 	cfgHash := ""
 	forwardingRunning := false
-	var lastReloadAt, lastReloadError *string
+	nodesIncluded := 0
+	lastApplyDuration := 0
+	var lastReloadAt, lastReloadError, lastApplySuccess *string
 	if row != nil {
 		cfgVersion = row.ConfigVersion
 		cfgHash = row.ConfigHash
 		forwardingRunning = row.ForwardingRunning == 1
+		nodesIncluded = row.LastNodesIncluded
+		lastApplyDuration = row.LastApplyDuration
 		if row.LastReloadAt.Valid {
 			lastReloadAt = &row.LastReloadAt.String
+		}
+		if row.LastApplySuccess.Valid {
+			lastApplySuccess = &row.LastApplySuccess.String
 		}
 		if row.LastReloadError.Valid {
 			lastReloadError = &row.LastReloadError.String
@@ -83,6 +94,9 @@ func (h *Runtime) Status(c *gin.Context) {
 			ConfigVersion:     cfgVersion,
 			ConfigHash:        cfgHash,
 			ForwardingRunning: forwardingRunning,
+			NodesIncluded:     nodesIncluded,
+			LastApplyDuration: lastApplyDuration,
+			LastApplySuccess:  lastApplySuccess,
 			LastReloadAt:      lastReloadAt,
 			LastReloadError:   lastReloadError,
 			Ports:             dto.RuntimePorts{HTTP: httpPort, Socks: socksPort},
@@ -369,6 +383,14 @@ func (h *Runtime) Plan(c *gin.Context) {
 		writeError(c, errorx.New(errorx.DBError, "list nodes for plan"))
 		return
 	}
+	if !req.IncludeDisabledNodes {
+		policy, policyErr := service.LoadForwardingPolicy(h.DB)
+		if policyErr != nil {
+			writeError(c, errorx.New(errorx.DBError, "get forwarding policy"))
+			return
+		}
+		nodes = service.FilterForwardingNodes(nodes, policy)
+	}
 
 	if forwardingRunning && (httpProxy.Enabled || socksProxy.Enabled) && len(nodes) == 0 {
 		writeError(c, errorx.New(errorx.CFGNoEnabledNodes, "no forwarding nodes enabled"))
@@ -406,6 +428,10 @@ func (h *Runtime) Reload(c *gin.Context) {
 	configPath := service.ResolveConfigPath()
 	v, hsh, out, err := service.Reload(c.Request.Context(), h.DB, configPath)
 	if err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
 		writeError(c, errorx.New(errorx.RTRestartFailed, err.Error()))
 		return
 	}
@@ -420,6 +446,56 @@ func (h *Runtime) Reload(c *gin.Context) {
 			NodesIncluded: nodesIncluded,
 			RestartOutput: out,
 			ReloadedAt:    util.NowRFC3339(),
+		},
+	})
+}
+
+func (h *Runtime) ProxyCheck(c *gin.Context) {
+	var req dto.RuntimeProxyCheckRequest
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			writeError(c, errorx.New(errorx.REQValidationFailed, "invalid body"))
+			return
+		}
+	}
+
+	targetURL := strings.TrimSpace(req.TargetURL)
+	if targetURL == "" {
+		targetURL = "https://www.gstatic.com/generate_204"
+	}
+	parsedTarget, err := url.Parse(targetURL)
+	if err != nil || parsedTarget.Scheme == "" || parsedTarget.Host == "" {
+		writeError(c, errorx.New(errorx.REQInvalidField, "invalid target_url"))
+		return
+	}
+
+	timeoutMS := req.TimeoutMS
+	if timeoutMS == 0 {
+		timeoutMS = 5000
+	}
+	if timeoutMS < 500 || timeoutMS > 30000 {
+		writeError(c, errorx.New(errorx.REQInvalidField, "timeout_ms must be between 500 and 30000"))
+		return
+	}
+
+	settings, err := repo.GetProxySettings(h.DB)
+	if err != nil {
+		writeError(c, errorx.New(errorx.DBError, "get proxy settings"))
+		return
+	}
+
+	timeout := time.Duration(timeoutMS) * time.Millisecond
+	httpRow := settings["http"]
+	socksRow := settings["socks"]
+	httpResult := probeProxyEndpoint(parsedTarget, "http", httpRow, timeout)
+	socksResult := probeProxyEndpoint(parsedTarget, "socks", socksRow, timeout)
+
+	c.JSON(http.StatusOK, dto.RuntimeProxyCheckResponse{
+		Data: dto.RuntimeProxyCheckData{
+			TargetURL: targetURL,
+			CheckedAt: util.NowRFC3339(),
+			HTTP:      httpResult,
+			Socks:     socksResult,
 		},
 	})
 }
@@ -456,6 +532,96 @@ func runtimeProxyRowsToInbounds(httpRow, socksRow repo.ProxySettingsRow) (genera
 		socksProxy.Port = 7891
 	}
 	return httpProxy, socksProxy
+}
+
+func probeProxyEndpoint(target *url.URL, proxyType string, row repo.ProxySettingsRow, timeout time.Duration) dto.RuntimeProxyCheckItem {
+	result := dto.RuntimeProxyCheckItem{
+		Enabled:  row.Enabled == 1,
+		ProxyURL: proxyURL(proxyType, row.Port),
+	}
+	if !result.Enabled {
+		return result
+	}
+
+	start := time.Now()
+	client, closeFn, err := buildProxyHTTPClient(proxyType, row.Port, timeout)
+	if err != nil {
+		msg := err.Error()
+		result.Error = &msg
+		return result
+	}
+	defer closeFn()
+
+	req, err := http.NewRequest(http.MethodGet, target.String(), nil)
+	if err != nil {
+		msg := err.Error()
+		result.Error = &msg
+		return result
+	}
+	resp, err := client.Do(req)
+	latency := time.Since(start).Milliseconds()
+	result.LatencyMS = &latency
+	if err != nil {
+		msg := err.Error()
+		result.Error = &msg
+		return result
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1024))
+
+	code := resp.StatusCode
+	result.StatusCode = &code
+	result.Connected = true
+	if target.Scheme == "https" {
+		result.TLSOK = resp.TLS != nil
+	} else {
+		result.TLSOK = true
+	}
+	return result
+}
+
+func buildProxyHTTPClient(proxyType string, port int, timeout time.Duration) (*http.Client, func(), error) {
+	address := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+	transport := &http.Transport{
+		ForceAttemptHTTP2: true,
+	}
+
+	switch proxyType {
+	case "http":
+		u, err := url.Parse("http://" + address)
+		if err != nil {
+			return nil, func() {}, err
+		}
+		transport.Proxy = http.ProxyURL(u)
+	case "socks":
+		dialer, err := proxy.SOCKS5("tcp", address, nil, &net.Dialer{Timeout: timeout})
+		if err != nil {
+			return nil, func() {}, err
+		}
+		if contextDialer, ok := dialer.(proxy.ContextDialer); ok {
+			transport.DialContext = contextDialer.DialContext
+		} else {
+			transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return dialer.Dial(network, addr)
+			}
+		}
+	default:
+		return nil, func() {}, fmt.Errorf("unsupported proxy type: %s", proxyType)
+	}
+
+	client := &http.Client{
+		Timeout:   timeout,
+		Transport: transport,
+	}
+	return client, transport.CloseIdleConnections, nil
+}
+
+func proxyURL(proxyType string, port int) string {
+	scheme := "http"
+	if proxyType == "socks" {
+		scheme = "socks5"
+	}
+	return scheme + "://127.0.0.1:" + strconv.Itoa(port)
 }
 
 func fetchProxyTraffic(parent context.Context) (proxyTrafficSample, error) {

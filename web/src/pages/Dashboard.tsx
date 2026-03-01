@@ -2,14 +2,14 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button, Input, Modal, Select, Table, Tag } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
-import { useRuntimeStatus, useRuntimeTraffic, useRuntimeConnections, useRuntimeLogs } from "../hooks/useRuntime";
+import { useRuntimeStatus, useRuntimeTraffic, useRuntimeConnections, useRuntimeLogs, useRuntimeProxyCheck } from "../hooks/useRuntime";
 import { useSubscriptions } from "../hooks/useSubscriptions";
 import { useNodes } from "../hooks/useNodes";
 import { useForwardingSummary, useRoutingSummary } from "../hooks/useProxySettings";
 import { ErrorState } from "../components/common/ErrorState";
 import { formatDateTime } from "../utils/datetime";
 import type { ColumnsType } from "antd/es/table";
-import type { RuntimeConnection, RuntimeLogItem } from "../api/types";
+import type { RuntimeConnection, RuntimeLogItem, RuntimeProxyCheckItem } from "../api/types";
 import { useI18n } from "../i18n/context";
 
 export default function Dashboard() {
@@ -45,6 +45,9 @@ export default function Dashboard() {
     isLoading: connectionsLoading,
     isFetching: connectionsFetching,
   } = useRuntimeConnections(connQuery);
+  const [proxyCheckTarget, setProxyCheckTarget] = useState("https://www.gstatic.com/generate_204");
+  const proxyCheck = useRuntimeProxyCheck();
+  const proxyCheckResult = proxyCheck.data;
 
   const runtimeStateKey = runtimeLoading
     ? "loading"
@@ -179,6 +182,16 @@ export default function Dashboard() {
                 <span className="bp-runtime-value bp-mono">{configHash}</span>
               </div>
               <div className="bp-runtime-item">
+                <span className="bp-runtime-label">{tr("dashboard.runtime.nodes_included", "Nodes Included")}</span>
+                <span className="bp-runtime-value">{runtime.nodes_included}</span>
+              </div>
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">{tr("dashboard.runtime.apply_duration", "Last Apply Duration")}</span>
+                <span className="bp-runtime-value">
+                  {runtime.last_apply_duration_ms ? `${runtime.last_apply_duration_ms} ms` : "-"}
+                </span>
+              </div>
+              <div className="bp-runtime-item">
                 <span className="bp-runtime-label">{tr("dashboard.runtime.http_port", "HTTP Port")}</span>
                 <span className="bp-runtime-value">{runtime.ports.http}</span>
               </div>
@@ -190,6 +203,12 @@ export default function Dashboard() {
                 <span className="bp-runtime-label">{tr("dashboard.runtime.last_reload", "Last Reload")}</span>
                 <span className="bp-runtime-value bp-mono">
                   {runtime.last_reload_at ? formatDateTime(runtime.last_reload_at) : "-"}
+                </span>
+              </div>
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">{tr("dashboard.runtime.last_success", "Last Successful Apply")}</span>
+                <span className="bp-runtime-value bp-mono">
+                  {runtime.last_apply_success_at ? formatDateTime(runtime.last_apply_success_at) : "-"}
                 </span>
               </div>
               <div className="bp-runtime-item">
@@ -231,6 +250,68 @@ export default function Dashboard() {
               <span className="bp-runtime-label">{tr("dashboard.traffic.tx_total", "TX Total")}</span>
               <span className="bp-runtime-value">{formatBytes(traffic?.tx_total_bytes ?? 0)}</span>
             </div>
+          </div>
+        </div>
+
+        <div className="bp-card bp-dashboard-card">
+          <div className="bp-card-header">
+            <div>
+              <p className="bp-card-kicker">{tr("dashboard.kicker.diagnostics", "Diagnostics")}</p>
+              <h2 className="bp-card-title">{tr("dashboard.proxy_check.title", "Proxy Chain Check")}</h2>
+            </div>
+            {proxyCheckResult?.checked_at ? (
+              <span className="bp-metric-subtle">{formatDateTime(proxyCheckResult.checked_at)}</span>
+            ) : (
+              <span className="bp-metric-subtle bp-metric-subtle-hidden">--</span>
+            )}
+          </div>
+          <div className="bp-proxy-check-toolbar">
+            <Input
+              className="bp-input"
+              value={proxyCheckTarget}
+              onChange={(e) => setProxyCheckTarget(e.target.value)}
+              placeholder={tr("dashboard.proxy_check.target.placeholder", "https://www.gstatic.com/generate_204")}
+            />
+            <Button
+              type="primary"
+              className="bp-btn-fixed"
+              loading={proxyCheck.isPending}
+              onClick={() =>
+                proxyCheck.mutate({
+                  target_url: proxyCheckTarget.trim() || undefined,
+                })
+              }
+            >
+              {tr("dashboard.proxy_check.run", "Run Check")}
+            </Button>
+          </div>
+          <div className="bp-proxy-check-grid">
+            <ProxyCheckRow
+              label="HTTP"
+              result={proxyCheckResult?.http}
+              emptyText={tr("dashboard.proxy_check.empty", "Run a check to see proxy chain status.")}
+              labels={{
+                pass: tr("dashboard.proxy_check.pass", "PASS"),
+                fail: tr("dashboard.proxy_check.fail", "FAIL"),
+                disabled: tr("dashboard.proxy_check.disabled", "DISABLED"),
+                tls_ok: tr("dashboard.proxy_check.tls_ok", "TLS OK"),
+                tls_na: tr("dashboard.proxy_check.tls_na", "TLS -"),
+                egress: tr("dashboard.proxy_check.egress", "Egress"),
+              }}
+            />
+            <ProxyCheckRow
+              label="SOCKS5"
+              result={proxyCheckResult?.socks}
+              emptyText={tr("dashboard.proxy_check.empty", "Run a check to see proxy chain status.")}
+              labels={{
+                pass: tr("dashboard.proxy_check.pass", "PASS"),
+                fail: tr("dashboard.proxy_check.fail", "FAIL"),
+                disabled: tr("dashboard.proxy_check.disabled", "DISABLED"),
+                tls_ok: tr("dashboard.proxy_check.tls_ok", "TLS OK"),
+                tls_na: tr("dashboard.proxy_check.tls_na", "TLS -"),
+                egress: tr("dashboard.proxy_check.egress", "Egress"),
+              }}
+            />
           </div>
         </div>
 
@@ -465,6 +546,64 @@ export default function Dashboard() {
   );
 }
 
+function ProxyCheckRow({
+  label,
+  result,
+  emptyText,
+  labels,
+}: {
+  label: string;
+  result?: RuntimeProxyCheckItem;
+  emptyText: string;
+  labels: {
+    pass: string;
+    fail: string;
+    disabled: string;
+    tls_ok: string;
+    tls_na: string;
+    egress: string;
+  };
+}) {
+  if (!result) {
+    return (
+      <div className="bp-proxy-check-item bp-proxy-check-item-empty">
+        <div className="bp-proxy-check-head">
+          <span className="bp-proxy-check-label">{label}</span>
+          <Tag bordered={false}>-</Tag>
+        </div>
+        <p className="bp-muted">{emptyText}</p>
+      </div>
+    );
+  }
+
+  const tone = proxyCheckTone(result);
+  const statusText = result.enabled ? (result.connected ? labels.pass : labels.fail) : labels.disabled;
+  return (
+    <div className="bp-proxy-check-item">
+      <div className="bp-proxy-check-head">
+        <span className="bp-proxy-check-label">{label}</span>
+        <Tag color={tone}>{statusText}</Tag>
+      </div>
+      <div className="bp-proxy-check-meta">
+        <span className="bp-table-mono">{result.proxy_url}</span>
+        <span>{result.status_code ?? "-"}</span>
+        <span>{result.latency_ms != null ? `${result.latency_ms} ms` : "-"}</span>
+        <span>{result.tls_ok ? labels.tls_ok : labels.tls_na}</span>
+      </div>
+      {result.egress_ip ? (
+        <p className="bp-proxy-check-egress">
+          {labels.egress}: <span className="bp-table-mono">{result.egress_ip}</span>
+        </p>
+      ) : null}
+      {result.error ? (
+        <p className="bp-proxy-check-error" title={result.error}>
+          {result.error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function formatRate(value: number): string {
   return `${formatBytes(value)}/s`;
 }
@@ -519,6 +658,13 @@ function formatLatency(latencyMs?: number | null): string {
     return "-";
   }
   return `${latencyMs} ms`;
+}
+
+function proxyCheckTone(result: RuntimeProxyCheckItem): "success" | "error" | undefined {
+  if (!result.enabled) {
+    return undefined;
+  }
+  return result.connected ? "success" : "error";
 }
 
 type TrafficSourceTone = "success" | "warning" | "danger" | "muted";

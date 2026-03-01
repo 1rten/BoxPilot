@@ -8,6 +8,9 @@ type RuntimeStatusData struct {
 	ConfigVersion     int          `json:"config_version"`
 	ConfigHash        string       `json:"config_hash"`
 	ForwardingRunning bool         `json:"forwarding_running"`
+	NodesIncluded     int          `json:"nodes_included"`
+	LastApplyDuration int          `json:"last_apply_duration_ms"`
+	LastApplySuccess  *string      `json:"last_apply_success_at,omitempty"`
 	LastReloadAt      *string      `json:"last_reload_at,omitempty"`
 	LastReloadError   *string      `json:"last_reload_error,omitempty"`
 	Ports             RuntimePorts `json:"ports"`
@@ -46,6 +49,33 @@ type RuntimeReloadData struct {
 	NodesIncluded int    `json:"nodes_included"`
 	RestartOutput string `json:"restart_output"`
 	ReloadedAt    string `json:"reloaded_at"`
+}
+
+type RuntimeProxyCheckRequest struct {
+	TargetURL string `json:"target_url"`
+	TimeoutMS int    `json:"timeout_ms"`
+}
+
+type RuntimeProxyCheckResponse struct {
+	Data RuntimeProxyCheckData `json:"data"`
+}
+
+type RuntimeProxyCheckData struct {
+	TargetURL string                `json:"target_url"`
+	CheckedAt string                `json:"checked_at"`
+	HTTP      RuntimeProxyCheckItem `json:"http"`
+	Socks     RuntimeProxyCheckItem `json:"socks"`
+}
+
+type RuntimeProxyCheckItem struct {
+	Enabled    bool    `json:"enabled"`
+	ProxyURL   string  `json:"proxy_url"`
+	Connected  bool    `json:"connected"`
+	TLSOK      bool    `json:"tls_ok"`
+	StatusCode *int    `json:"status_code,omitempty"`
+	LatencyMS  *int64  `json:"latency_ms,omitempty"`
+	Error      *string `json:"error,omitempty"`
+	EgressIP   *string `json:"egress_ip,omitempty"`
 }
 
 type RuntimeTrafficResponse struct {

@@ -2,6 +2,7 @@ import { api } from "./client";
 import type {
   ForwardingRuntimeStatus,
   ForwardingSummaryData,
+  ForwardingPolicyData,
   ProxySettingsData,
   ProxyType,
   ProxyConfig,
@@ -50,6 +51,24 @@ export async function getForwardingRuntimeStatus(): Promise<ForwardingRuntimeSta
 
 export async function getForwardingSummary(): Promise<ForwardingSummaryData> {
   const { data } = await api.get<{ data: ForwardingSummaryData }>("/settings/forwarding/summary");
+  return data.data;
+}
+
+export async function getForwardingPolicy(): Promise<ForwardingPolicyData> {
+  const { data } = await api.get<{ data: ForwardingPolicyData }>("/settings/forwarding/policy");
+  return data.data;
+}
+
+export interface UpdateForwardingPolicyBody {
+  healthy_only_enabled: boolean;
+  max_latency_ms: number;
+  allow_untested: boolean;
+}
+
+export async function updateForwardingPolicy(
+  body: UpdateForwardingPolicyBody
+): Promise<ForwardingPolicyData> {
+  const { data } = await api.post<{ data: ForwardingPolicyData }>("/settings/forwarding/policy/update", body);
   return data.data;
 }
 

@@ -3,15 +3,14 @@ package service
 import (
 	"context"
 	"database/sql"
-	"path/filepath"
+	"time"
 
 	"boxpilot/server/internal/generator"
-	"boxpilot/server/internal/runtime"
 	"boxpilot/server/internal/store/repo"
-	"boxpilot/server/internal/util"
 )
 
 func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, hash string, output string, err error) {
+	startedAt := time.Now()
 	httpProxy, socksProxy, err := loadProxySettings(db)
 	if err != nil {
 		return 0, "", "", err
@@ -24,24 +23,30 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 	if err != nil {
 		return 0, "", "", err
 	}
-	cfg, _, h, err := BuildConfigFromDB(db, httpProxy, socksProxy, routing, forwardingRunning)
+	cfg, tags, h, err := BuildConfigFromDB(db, httpProxy, socksProxy, routing, forwardingRunning)
 	if err != nil {
 		return 0, "", "", err
 	}
-	if err := util.AtomicWrite(filepath.Dir(configPath), filepath.Base(configPath), cfg); err != nil {
-		return 0, "", "", err
+
+	prevRow, _ := repo.GetRuntimeState(db)
+	prevVersion := 0
+	prevHash := ""
+	if prevRow != nil {
+		prevVersion = prevRow.ConfigVersion
+		prevHash = prevRow.ConfigHash
 	}
-	out, err := runtime.Restart(ctx, configPath)
+
+	out, err := applyConfigWithPreflight(ctx, configPath, cfg)
+	durationMs := int(time.Since(startedAt).Milliseconds())
+	if durationMs < 0 {
+		durationMs = 0
+	}
 	if err != nil {
-		repo.UpdateRuntimeState(db, 0, h, err.Error())
-		return 0, h, string(out), err
+		_ = repo.UpdateRuntimeState(db, prevVersion, prevHash, err.Error(), len(tags), durationMs, false)
+		return prevVersion, prevHash, string(out), err
 	}
-	row, _ := repo.GetRuntimeState(db)
-	v := 0
-	if row != nil {
-		v = row.ConfigVersion + 1
-	}
-	repo.UpdateRuntimeState(db, v, h, "")
+	v := prevVersion + 1
+	_ = repo.UpdateRuntimeState(db, v, h, "", len(tags), durationMs, true)
 	return v, h, string(out), nil
 }
 

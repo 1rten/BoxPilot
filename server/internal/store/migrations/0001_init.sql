@@ -54,12 +54,17 @@ CREATE TABLE IF NOT EXISTS runtime_state (
   config_version INTEGER NOT NULL DEFAULT 0,
   config_hash TEXT NOT NULL DEFAULT '',
   forwarding_running INTEGER NOT NULL DEFAULT 0,
+  last_nodes_included INTEGER NOT NULL DEFAULT 0,
+  last_apply_duration_ms INTEGER NOT NULL DEFAULT 0,
   last_reload_at TEXT,
+  last_apply_success_at TEXT,
   last_reload_error TEXT
 );
 
-INSERT OR IGNORE INTO runtime_state (id, config_version, config_hash, forwarding_running)
-VALUES ('runtime', 0, '', 0);
+INSERT OR IGNORE INTO runtime_state (
+  id, config_version, config_hash, forwarding_running, last_nodes_included, last_apply_duration_ms
+)
+VALUES ('runtime', 0, '', 0, 0, 0);
 
 CREATE TABLE IF NOT EXISTS proxy_settings (
   proxy_type TEXT PRIMARY KEY,
@@ -110,3 +115,16 @@ VALUES (
   '["127.0.0.0/8","10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","169.254.0.0/16","::1/128","fc00::/7","fe80::/10"]',
   ''
 );
+
+CREATE TABLE IF NOT EXISTS forwarding_policy (
+  id TEXT PRIMARY KEY,
+  healthy_only_enabled INTEGER NOT NULL DEFAULT 1,
+  max_latency_ms INTEGER NOT NULL DEFAULT 1200,
+  allow_untested INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT ''
+);
+
+INSERT OR IGNORE INTO forwarding_policy (
+  id, healthy_only_enabled, max_latency_ms, allow_untested, updated_at
+)
+VALUES ('global', 1, 1200, 0, '');

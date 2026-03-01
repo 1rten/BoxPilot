@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Form, Input, InputNumber, Select, Switch, Tag } from "antd";
+import { Alert, Button, Card, Form, Input, InputNumber, Modal, Select, Switch, Tag } from "antd";
 import type { ProxyConfig, ProxyType, RoutingSettingsData } from "../api/types";
 import { buildProxyUrl, resolveProxyClientHost } from "../api/settings";
 import {
@@ -8,6 +8,8 @@ import {
   useApplyProxySettings,
   useRoutingSettings,
   useUpdateRoutingSettings,
+  useForwardingPolicy,
+  useUpdateForwardingPolicy,
 } from "../hooks/useProxySettings";
 import { useToast } from "../components/common/ToastContext";
 import { useI18n } from "../i18n/context";
@@ -22,6 +24,7 @@ export default function Settings() {
   const { tr } = useI18n();
   const { data, isLoading } = useProxySettings();
   const { data: routingData, isLoading: routingLoading } = useRoutingSettings();
+  const { data: forwardingPolicy, isLoading: forwardingPolicyLoading } = useForwardingPolicy();
   return (
     <div className="bp-page">
       <div className="bp-page-header">
@@ -37,9 +40,12 @@ export default function Settings() {
         <ProxySettingsCard title={tr("settings.socks.title", "SOCKS5 Proxy")} proxyType="socks" data={data?.socks} />
       </div>
       <div style={{ marginTop: 16 }}>
+        <ForwardingPolicyCard data={forwardingPolicy} />
+      </div>
+      <div style={{ marginTop: 16 }}>
         <RoutingSettingsCard data={routingData} />
       </div>
-      {(isLoading || routingLoading) && (
+      {(isLoading || routingLoading || forwardingPolicyLoading) && (
         <p className="bp-muted" style={{ marginTop: 12 }}>
           {tr("common.loading", "Loading...")}
         </p>
@@ -55,6 +61,8 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
   const update = useUpdateProxySettings();
   const apply = useApplyProxySettings();
   const authMode = Form.useWatch("auth_mode", form);
+  const enabledWatch = Form.useWatch("enabled", form);
+  const listenAddressWatch = Form.useWatch("listen_address", form);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -71,6 +79,12 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
 
   const onSave = async () => {
     const values = await form.validateFields();
+    if (isPublicNoAuth(values.enabled, values.listen_address, values.auth_mode)) {
+      const ok = await confirmPublicNoAuth(tr);
+      if (!ok) {
+        return;
+      }
+    }
     update.mutate({
       proxy_type: proxyType,
       enabled: values.enabled,
@@ -135,6 +149,22 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
         <p className="bp-text-danger" style={{ marginBottom: 12 }}>
           {data.error_message}
         </p>
+      )}
+      {isPublicNoAuth(
+        enabledWatch ?? data?.enabled ?? true,
+        listenAddressWatch ?? data?.listen_address ?? "0.0.0.0",
+        authMode ?? data?.auth_mode ?? "none"
+      ) && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={tr("settings.security.warning_title", "Public exposure without authentication")}
+          description={tr(
+            "settings.security.warning_desc",
+            "Current config listens on 0.0.0.0 with auth_mode=none. Anyone who can access this port may use your proxy."
+          )}
+        />
       )}
       <Form
         form={form}
@@ -298,4 +328,129 @@ function splitLines(raw: string): string[] {
     .split(/\r?\n|,/)
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
+}
+
+interface ForwardingPolicyCardProps {
+  data?: {
+    healthy_only_enabled: boolean;
+    max_latency_ms: number;
+    allow_untested: boolean;
+    updated_at?: string;
+  };
+}
+
+function ForwardingPolicyCard({ data }: ForwardingPolicyCardProps) {
+  const { tr } = useI18n();
+  const [form] = Form.useForm();
+  const update = useUpdateForwardingPolicy();
+  const apply = useApplyProxySettings();
+
+  useEffect(() => {
+    if (!data) {
+      return;
+    }
+    form.setFieldsValue({
+      healthy_only_enabled: data.healthy_only_enabled,
+      max_latency_ms: data.max_latency_ms,
+      allow_untested: data.allow_untested,
+    });
+  }, [data, form]);
+
+  const onSave = async () => {
+    const values = await form.validateFields();
+    update.mutate({
+      healthy_only_enabled: values.healthy_only_enabled,
+      max_latency_ms: values.max_latency_ms,
+      allow_untested: values.allow_untested,
+    });
+  };
+
+  return (
+    <Card className="bp-settings-card">
+      <div className="bp-card-header">
+        <div>
+          <p className="bp-card-kicker">{tr("settings.forwarding.kicker", "Forwarding Policy")}</p>
+          <h2 className="bp-card-title">{tr("settings.forwarding.title", "Node Eligibility Gate")}</h2>
+        </div>
+        {data?.updated_at ? (
+          <span className="bp-muted">{tr("settings.forwarding.updated", "Updated {time}", { time: data.updated_at })}</span>
+        ) : null}
+      </div>
+      <p className="bp-muted" style={{ marginTop: 0, marginBottom: 12 }}>
+        {tr(
+          "settings.forwarding.desc",
+          "When enabled, only healthy nodes are included in runtime forwarding config."
+        )}
+      </p>
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={{
+          healthy_only_enabled: true,
+          max_latency_ms: 1200,
+          allow_untested: false,
+        }}
+      >
+        <Form.Item
+          name="healthy_only_enabled"
+          label={tr("settings.forwarding.healthy_only", "Healthy nodes only")}
+          valuePropName="checked"
+        >
+          <Switch />
+        </Form.Item>
+        <Form.Item
+          name="max_latency_ms"
+          label={tr("settings.forwarding.max_latency", "Max latency (ms)")}
+          rules={[
+            { required: true, message: tr("settings.forwarding.max_latency.required", "Please enter max latency") },
+            {
+              type: "number",
+              min: 1,
+              max: 10000,
+              message: tr("settings.forwarding.max_latency.range", "Max latency must be between 1 and 10000"),
+            },
+          ]}
+        >
+          <InputNumber min={1} max={10000} style={{ width: "100%" }} />
+        </Form.Item>
+        <Form.Item
+          name="allow_untested"
+          label={tr("settings.forwarding.allow_untested", "Allow untested nodes")}
+          valuePropName="checked"
+        >
+          <Switch />
+        </Form.Item>
+      </Form>
+      <div className="bp-page-actions bp-settings-actions">
+        <Button onClick={onSave} type="primary" loading={update.isPending}>
+          {tr("common.save", "Save")}
+        </Button>
+        <Button onClick={() => apply.mutate()} loading={apply.isPending}>
+          {tr("settings.proxy.apply", "Apply / Restart")}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function isPublicNoAuth(enabled: boolean, listenAddress: string, authMode: string): boolean {
+  return enabled && listenAddress === "0.0.0.0" && authMode === "none";
+}
+
+function confirmPublicNoAuth(
+  tr: (key: string, fallback?: string, params?: Record<string, string | number | boolean | null | undefined>) => string
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    Modal.confirm({
+      title: tr("settings.security.confirm_title", "Confirm public unauthenticated proxy"),
+      content: tr(
+        "settings.security.confirm_desc",
+        "This setting exposes proxy service on all interfaces without authentication. Continue only if this is intended."
+      ),
+      okText: tr("common.save", "Save"),
+      cancelText: tr("common.cancel", "Cancel"),
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false),
+    });
+  });
 }

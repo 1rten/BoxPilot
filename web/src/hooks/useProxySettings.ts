@@ -5,13 +5,16 @@ import {
   applyProxySettings,
   getForwardingRuntimeStatus,
   getForwardingSummary,
+  getForwardingPolicy,
   startForwardingRuntime,
   stopForwardingRuntime,
   getRoutingSettings,
   getRoutingSummary,
   updateRoutingSettings,
+  updateForwardingPolicy,
   type UpdateProxySettingsBody,
   type UpdateRoutingSettingsBody,
+  type UpdateForwardingPolicyBody,
 } from "../api/settings";
 import { useToast } from "../components/common/ToastContext";
 import { useI18n } from "../i18n/context";
@@ -203,5 +206,40 @@ export function useRoutingSummary() {
     refetchOnWindowFocus: true,
     refetchInterval: 10_000,
     refetchIntervalInBackground: true,
+  });
+}
+
+export function useForwardingPolicy() {
+  return useQuery({
+    queryKey: ["forwarding-policy"],
+    queryFn: getForwardingPolicy,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useUpdateForwardingPolicy() {
+  const { tr } = useI18n();
+  const q = useQueryClient();
+  const { addToast } = useToast();
+  return useMutation({
+    mutationFn: (body: UpdateForwardingPolicyBody) => updateForwardingPolicy(body),
+    onSuccess: () => {
+      q.invalidateQueries({ queryKey: ["forwarding-policy"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      addToast("success", tr("toast.forwarding.policy_saved", "Forwarding policy saved"));
+    },
+    onError: (error: unknown) => {
+      const anyErr = error as any;
+      const message =
+        anyErr?.appError?.message ||
+        anyErr?.response?.data?.error?.message ||
+        anyErr?.message ||
+        tr("toast.unknown", "Unknown error");
+      addToast("error", message);
+    },
   });
 }
