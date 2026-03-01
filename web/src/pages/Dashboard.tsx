@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Button, Input, Modal, Select, Table, Tag } from "antd";
+import { Button, Input, Modal, Select, Table, Tag, Tooltip } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { useRuntimeStatus, useRuntimeTraffic, useRuntimeConnections, useRuntimeLogs, useRuntimeProxyCheck } from "../hooks/useRuntime";
 import { useSubscriptions } from "../hooks/useSubscriptions";
@@ -585,7 +585,9 @@ function ProxyCheckRow({
         <Tag color={tone}>{statusText}</Tag>
       </div>
       <div className="bp-proxy-check-meta">
-        <span className="bp-table-mono">{result.proxy_url}</span>
+        <Tooltip title={result.proxy_url} placement="topLeft">
+          <span className="bp-table-mono bp-proxy-check-url">{result.proxy_url}</span>
+        </Tooltip>
         <span>{result.status_code ?? "-"}</span>
         <span>{result.latency_ms != null ? `${result.latency_ms} ms` : "-"}</span>
         <span>{result.tls_ok ? labels.tls_ok : labels.tls_na}</span>

@@ -211,7 +211,7 @@ func (h *Nodes) Test(c *gin.Context) {
 			go func() {
 				defer wg.Done()
 				for task := range taskCh {
-					latency, status, errMsg := probeNode(task.row.OutboundJSON, req.Mode, time.Duration(policy.NodeTestTimeoutMs)*time.Millisecond)
+					latency, status, errMsg := probeNode(task.row.OutboundJSON, task.row.Type, req.Mode, time.Duration(policy.NodeTestTimeoutMs)*time.Millisecond)
 					var latencyPtr *int
 					if latency >= 0 {
 						latencyPtr = &latency
@@ -500,13 +500,15 @@ func probeNodeHTTP(rawOutbound string, timeout time.Duration) (latencyMs int, st
 		scheme = "https"
 	}
 	target := scheme + "://" + net.JoinHostPort(meta.Server, strconv.Itoa(meta.ServerPort)) + "/"
-	client := &http.Client{
-		Timeout: timeout,
+	transport := &http.Transport{
+		DisableKeepAlives: true,
 	}
+	client := &http.Client{Timeout: timeout, Transport: transport}
 	req, err := http.NewRequest(http.MethodHead, target, nil)
 	if err != nil {
 		return -1, "error", err.Error()
 	}
+	req.Close = true
 	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
@@ -523,8 +525,10 @@ func nullIfEmpty(s string) any {
 	return s
 }
 
-func probeNode(rawOutbound, mode string, timeout time.Duration) (latencyMs int, status string, errMsg string) {
-	if mode == "http" {
+func probeNode(rawOutbound, nodeType, mode string, timeout time.Duration) (latencyMs int, status string, errMsg string) {
+	// HTTP probe is meaningful only for native HTTP nodes.
+	// For vmess/trojan/etc, fallback to TCP probe to avoid false negatives and noisy logs.
+	if mode == "http" && nodeType == "http" {
 		return probeNodeHTTP(rawOutbound, timeout)
 	}
 	return probeNodePing(rawOutbound, timeout)

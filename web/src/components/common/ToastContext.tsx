@@ -7,6 +7,7 @@ interface Toast {
   id: number;
   type: ToastType;
   message: string;
+  createdAt: number;
 }
 
 interface ToastContextValue {
@@ -15,18 +16,32 @@ interface ToastContextValue {
 }
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
+const TOAST_TTL_MS = 3000;
+const TOAST_DUP_WINDOW_MS = 1200;
+const TOAST_MAX_STACK = 4;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const addToast = useCallback((type: ToastType, message: string) => {
     setToasts((prev) => {
+      const now = Date.now();
+      const duplicated = prev.some(
+        (item) =>
+          item.type === type &&
+          item.message === message &&
+          now - item.createdAt <= TOAST_DUP_WINDOW_MS
+      );
+      if (duplicated) {
+        return prev;
+      }
+
       const id = (prev[prev.length - 1]?.id ?? 0) + 1;
-      const next = [...prev, { id, type, message }];
+      const next = [...prev, { id, type, message, createdAt: now }].slice(-TOAST_MAX_STACK);
       // 自动移除
       setTimeout(() => {
         setToasts((current) => current.filter((t) => t.id !== id));
-      }, 3000);
+      }, TOAST_TTL_MS);
       return next;
     });
   }, []);
@@ -55,12 +70,15 @@ function ToastList() {
     <div
       style={{
         position: "fixed",
-        top: 16,
+        bottom: "max(16px, env(safe-area-inset-bottom))",
         right: 16,
         display: "flex",
         flexDirection: "column",
         gap: 8,
-        zIndex: 100,
+        zIndex: 110,
+        maxHeight: "40vh",
+        overflowY: "auto",
+        pointerEvents: "none",
       }}
     >
       {ctx.toasts.map((t) => (
@@ -69,8 +87,10 @@ function ToastList() {
           className="bp-card"
           style={{
             minWidth: 240,
+            maxWidth: "min(420px, calc(100vw - 24px))",
             borderLeft:
               t.type === "success" ? "4px solid #16A34A" : "4px solid #DC2626",
+            pointerEvents: "auto",
           }}
         >
           <p
@@ -87,4 +107,3 @@ function ToastList() {
     </div>
   );
 }
-

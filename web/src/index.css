@@ -735,9 +735,23 @@ a {
   align-items: center;
   font-size: 12px;
   color: #475569;
+  min-width: 0;
+}
+
+.bp-proxy-check-meta > span {
+  min-width: 0;
+  display: block;
 }
 
 .bp-proxy-check-meta > span:first-child {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bp-proxy-check-url {
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -747,15 +761,17 @@ a {
   margin: 8px 0 0 0;
   color: #b91c1c;
   font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .bp-proxy-check-egress {
   margin: 8px 0 0 0;
   color: #334155;
   font-size: 12px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .bp-log-list {
