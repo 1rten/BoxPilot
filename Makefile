@@ -57,4 +57,4 @@ diagnose:
 
 # Generate OpenAPI types for frontend
 migrate-gen:
-	cd web && npx openapi-typescript ../docs/api.openapi.yaml -o src/api/types.ts
+	cd web && npm run gen:types
