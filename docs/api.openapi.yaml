@@ -843,8 +843,10 @@ components:
             healthy_only_enabled: { type: boolean }
             max_latency_ms: { type: integer }
             allow_untested: { type: boolean }
+            node_test_timeout_ms: { type: integer, minimum: 500, maximum: 10000 }
+            node_test_concurrency: { type: integer, minimum: 1, maximum: 64 }
             updated_at: { type: string, nullable: true }
-          required: [healthy_only_enabled, max_latency_ms, allow_untested]
+          required: [healthy_only_enabled, max_latency_ms, allow_untested, node_test_timeout_ms, node_test_concurrency]
       required: [data]
 
     UpdateForwardingPolicyRequest:
@@ -853,7 +855,9 @@ components:
         healthy_only_enabled: { type: boolean }
         max_latency_ms: { type: integer, minimum: 1, maximum: 10000 }
         allow_untested: { type: boolean }
-      required: [healthy_only_enabled, max_latency_ms, allow_untested]
+        node_test_timeout_ms: { type: integer, minimum: 500, maximum: 10000 }
+        node_test_concurrency: { type: integer, minimum: 1, maximum: 64 }
+      required: [healthy_only_enabled, max_latency_ms, allow_untested, node_test_timeout_ms, node_test_concurrency]
 
     RoutingSettingsResponse:
       type: object

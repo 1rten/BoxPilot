@@ -121,10 +121,12 @@ CREATE TABLE IF NOT EXISTS forwarding_policy (
   healthy_only_enabled INTEGER NOT NULL DEFAULT 1,
   max_latency_ms INTEGER NOT NULL DEFAULT 1200,
   allow_untested INTEGER NOT NULL DEFAULT 0,
+  node_test_timeout_ms INTEGER NOT NULL DEFAULT 3000,
+  node_test_concurrency INTEGER NOT NULL DEFAULT 8,
   updated_at TEXT NOT NULL DEFAULT ''
 );
 
 INSERT OR IGNORE INTO forwarding_policy (
-  id, healthy_only_enabled, max_latency_ms, allow_untested, updated_at
+  id, healthy_only_enabled, max_latency_ms, allow_untested, node_test_timeout_ms, node_test_concurrency, updated_at
 )
-VALUES ('global', 1, 1200, 0, '');
+VALUES ('global', 1, 1200, 0, 3000, 8, '');

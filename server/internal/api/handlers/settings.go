@@ -296,10 +296,20 @@ func (h *Settings) UpdateForwardingPolicy(c *gin.Context) {
 		writeError(c, errorx.New(errorx.REQInvalidField, "max_latency_ms must be between 1 and 10000"))
 		return
 	}
+	if req.NodeTestTimeoutMs < 500 || req.NodeTestTimeoutMs > 10000 {
+		writeError(c, errorx.New(errorx.REQInvalidField, "node_test_timeout_ms must be between 500 and 10000"))
+		return
+	}
+	if req.NodeTestConcurrency < 1 || req.NodeTestConcurrency > 64 {
+		writeError(c, errorx.New(errorx.REQInvalidField, "node_test_concurrency must be between 1 and 64"))
+		return
+	}
 	policy, err := service.SaveForwardingPolicy(h.DB, service.ForwardingPolicy{
-		HealthyOnlyEnabled: *req.HealthyOnlyEnabled,
-		MaxLatencyMs:       req.MaxLatencyMs,
-		AllowUntested:      *req.AllowUntested,
+		HealthyOnlyEnabled:  *req.HealthyOnlyEnabled,
+		MaxLatencyMs:        req.MaxLatencyMs,
+		AllowUntested:       *req.AllowUntested,
+		NodeTestTimeoutMs:   req.NodeTestTimeoutMs,
+		NodeTestConcurrency: req.NodeTestConcurrency,
 	})
 	if err != nil {
 		if appErr, ok := err.(*errorx.AppError); ok {
@@ -421,10 +431,12 @@ func runtimeStatus(db *sql.DB) (bool, string, *string) {
 
 func forwardingPolicyToDTO(p service.ForwardingPolicy) dto.ForwardingPolicyData {
 	return dto.ForwardingPolicyData{
-		HealthyOnlyEnabled: p.HealthyOnlyEnabled,
-		MaxLatencyMs:       p.MaxLatencyMs,
-		AllowUntested:      p.AllowUntested,
-		UpdatedAt:          p.UpdatedAt,
+		HealthyOnlyEnabled:  p.HealthyOnlyEnabled,
+		MaxLatencyMs:        p.MaxLatencyMs,
+		AllowUntested:       p.AllowUntested,
+		NodeTestTimeoutMs:   p.NodeTestTimeoutMs,
+		NodeTestConcurrency: p.NodeTestConcurrency,
+		UpdatedAt:           p.UpdatedAt,
 	}
 }
 

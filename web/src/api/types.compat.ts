@@ -73,6 +73,8 @@ export type ForwardingPolicyData = {
   healthy_only_enabled: boolean;
   max_latency_ms: number;
   allow_untested: boolean;
+  node_test_timeout_ms: number;
+  node_test_concurrency: number;
   updated_at?: string;
 };
 

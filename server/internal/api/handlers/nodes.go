@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"boxpilot/server/internal/api/dto"
@@ -153,54 +154,118 @@ func (h *Nodes) Test(c *gin.Context) {
 		writeError(c, errorx.New(errorx.REQInvalidField, "mode must be ping/http"))
 		return
 	}
+	policy, err := service.LoadForwardingPolicy(h.DB)
+	if err != nil {
+		writeError(c, errorx.New(errorx.DBError, "get forwarding policy"))
+		return
+	}
 
-	results := make([]map[string]any, 0, len(req.NodeIDs))
-	for _, nodeID := range req.NodeIDs {
+	type probeTask struct {
+		index  int
+		nodeID string
+		row    *repo.NodeRow
+	}
+	type probeResult struct {
+		index      int
+		nodeID     string
+		status     string
+		latency    *int
+		errMessage string
+	}
+
+	results := make([]map[string]any, len(req.NodeIDs))
+	tasks := make([]probeTask, 0, len(req.NodeIDs))
+	for idx, nodeID := range req.NodeIDs {
 		row, err := repo.GetNode(h.DB, nodeID)
 		if err != nil {
-			results = append(results, map[string]any{
+			results[idx] = map[string]any{
 				"node_id": nodeID,
 				"status":  "error",
 				"error":   err.Error(),
-			})
+			}
 			continue
 		}
 		if row == nil {
-			results = append(results, map[string]any{
+			results[idx] = map[string]any{
 				"node_id": nodeID,
 				"status":  "error",
 				"error":   "node not found",
-			})
+			}
 			continue
 		}
-		var latency int
-		var status string
-		var errMsg string
-		if req.Mode == "http" {
-			latency, status, errMsg = probeNodeHTTP(row.OutboundJSON)
-		} else {
-			latency, status, errMsg = probeNodePing(row.OutboundJSON)
+		tasks = append(tasks, probeTask{index: idx, nodeID: nodeID, row: row})
+	}
+
+	// Probe network concurrently to speed up "test all" while keeping DB writes serialized.
+	probeOut := make([]probeResult, len(tasks))
+	if len(tasks) > 0 {
+		workers := minInt(policy.NodeTestConcurrency, len(tasks))
+		if workers < 1 {
+			workers = 1
 		}
-		var latencyPtr *int
-		if latency >= 0 {
-			latencyPtr = &latency
+		var wg sync.WaitGroup
+		taskCh := make(chan probeTask)
+		resultCh := make(chan probeResult, len(tasks))
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for task := range taskCh {
+					latency, status, errMsg := probeNode(task.row.OutboundJSON, req.Mode, time.Duration(policy.NodeTestTimeoutMs)*time.Millisecond)
+					var latencyPtr *int
+					if latency >= 0 {
+						latencyPtr = &latency
+					}
+					resultCh <- probeResult{
+						index:      task.index,
+						nodeID:     task.nodeID,
+						status:     status,
+						latency:    latencyPtr,
+						errMessage: errMsg,
+					}
+				}
+			}()
 		}
-		if err := repo.SetNodeProbeResult(h.DB, nodeID, latencyPtr, status, errMsg); err != nil {
-			results = append(results, map[string]any{
-				"node_id": nodeID,
+		for _, task := range tasks {
+			taskCh <- task
+		}
+		close(taskCh)
+		wg.Wait()
+		close(resultCh)
+		i := 0
+		for r := range resultCh {
+			probeOut[i] = r
+			i++
+		}
+	}
+
+	for _, r := range probeOut {
+		if r.nodeID == "" {
+			continue
+		}
+		if err := repo.SetNodeProbeResult(h.DB, r.nodeID, r.latency, r.status, r.errMessage); err != nil {
+			results[r.index] = map[string]any{
+				"node_id": r.nodeID,
 				"status":  "error",
 				"error":   err.Error(),
-			})
+			}
 			continue
 		}
-		results = append(results, map[string]any{
-			"node_id":    nodeID,
-			"status":     status,
-			"latency_ms": latencyPtr,
-			"error":      nullIfEmpty(errMsg),
-		})
+		results[r.index] = map[string]any{
+			"node_id":    r.nodeID,
+			"status":     r.status,
+			"latency_ms": r.latency,
+			"error":      nullIfEmpty(r.errMessage),
+		}
 	}
-	c.JSON(http.StatusOK, gin.H{"data": results})
+
+	final := make([]map[string]any, 0, len(results))
+	for _, item := range results {
+		if item != nil {
+			final = append(final, item)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"data": final})
 }
 
 func (h *Nodes) Forwarding(c *gin.Context) {
@@ -410,14 +475,14 @@ func parseNodeMeta(raw string) nodeMeta {
 	return out
 }
 
-func probeNodePing(rawOutbound string) (latencyMs int, status string, errMsg string) {
+func probeNodePing(rawOutbound string, timeout time.Duration) (latencyMs int, status string, errMsg string) {
 	meta := parseNodeMeta(rawOutbound)
 	if meta.Server == "" || meta.ServerPort <= 0 {
 		return -1, "error", "node has no server/server_port"
 	}
 	addr := net.JoinHostPort(meta.Server, strconv.Itoa(meta.ServerPort))
 	start := time.Now()
-	conn, err := net.DialTimeout("tcp", addr, 4*time.Second)
+	conn, err := net.DialTimeout("tcp", addr, timeout)
 	if err != nil {
 		return -1, "error", err.Error()
 	}
@@ -425,7 +490,7 @@ func probeNodePing(rawOutbound string) (latencyMs int, status string, errMsg str
 	return int(time.Since(start).Milliseconds()), "ok", ""
 }
 
-func probeNodeHTTP(rawOutbound string) (latencyMs int, status string, errMsg string) {
+func probeNodeHTTP(rawOutbound string, timeout time.Duration) (latencyMs int, status string, errMsg string) {
 	meta := parseNodeMeta(rawOutbound)
 	if meta.Server == "" || meta.ServerPort <= 0 {
 		return -1, "error", "node has no server/server_port"
@@ -436,7 +501,7 @@ func probeNodeHTTP(rawOutbound string) (latencyMs int, status string, errMsg str
 	}
 	target := scheme + "://" + net.JoinHostPort(meta.Server, strconv.Itoa(meta.ServerPort)) + "/"
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: timeout,
 	}
 	req, err := http.NewRequest(http.MethodHead, target, nil)
 	if err != nil {
@@ -456,4 +521,18 @@ func nullIfEmpty(s string) any {
 		return nil
 	}
 	return s
+}
+
+func probeNode(rawOutbound, mode string, timeout time.Duration) (latencyMs int, status string, errMsg string) {
+	if mode == "http" {
+		return probeNodeHTTP(rawOutbound, timeout)
+	}
+	return probeNodePing(rawOutbound, timeout)
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

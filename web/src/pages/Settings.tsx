@@ -371,6 +371,8 @@ interface ForwardingPolicyCardProps {
     healthy_only_enabled: boolean;
     max_latency_ms: number;
     allow_untested: boolean;
+    node_test_timeout_ms: number;
+    node_test_concurrency: number;
     updated_at?: string;
   };
 }
@@ -389,6 +391,8 @@ function ForwardingPolicyCard({ data }: ForwardingPolicyCardProps) {
       healthy_only_enabled: data.healthy_only_enabled,
       max_latency_ms: data.max_latency_ms,
       allow_untested: data.allow_untested,
+      node_test_timeout_ms: data.node_test_timeout_ms,
+      node_test_concurrency: data.node_test_concurrency,
     });
   }, [data, form]);
 
@@ -398,6 +402,8 @@ function ForwardingPolicyCard({ data }: ForwardingPolicyCardProps) {
       healthy_only_enabled: values.healthy_only_enabled,
       max_latency_ms: values.max_latency_ms,
       allow_untested: values.allow_untested,
+      node_test_timeout_ms: values.node_test_timeout_ms,
+      node_test_concurrency: values.node_test_concurrency,
     });
   };
 
@@ -425,6 +431,8 @@ function ForwardingPolicyCard({ data }: ForwardingPolicyCardProps) {
           healthy_only_enabled: true,
           max_latency_ms: 1200,
           allow_untested: false,
+          node_test_timeout_ms: 3000,
+          node_test_concurrency: 8,
         }}
       >
         <Form.Item
@@ -455,6 +463,36 @@ function ForwardingPolicyCard({ data }: ForwardingPolicyCardProps) {
           valuePropName="checked"
         >
           <Switch />
+        </Form.Item>
+        <Form.Item
+          name="node_test_timeout_ms"
+          label={tr("settings.forwarding.test_timeout", "Node test timeout (ms)")}
+          rules={[
+            { required: true, message: tr("settings.forwarding.test_timeout.required", "Please enter node test timeout") },
+            {
+              type: "number",
+              min: 500,
+              max: 10000,
+              message: tr("settings.forwarding.test_timeout.range", "Timeout must be between 500 and 10000 ms"),
+            },
+          ]}
+        >
+          <InputNumber min={500} max={10000} step={100} style={{ width: "100%" }} />
+        </Form.Item>
+        <Form.Item
+          name="node_test_concurrency"
+          label={tr("settings.forwarding.test_concurrency", "Node test concurrency")}
+          rules={[
+            { required: true, message: tr("settings.forwarding.test_concurrency.required", "Please enter node test concurrency") },
+            {
+              type: "number",
+              min: 1,
+              max: 64,
+              message: tr("settings.forwarding.test_concurrency.range", "Concurrency must be between 1 and 64"),
+            },
+          ]}
+        >
+          <InputNumber min={1} max={64} step={1} style={{ width: "100%" }} />
         </Form.Item>
       </Form>
       <div className="bp-page-actions bp-settings-actions">

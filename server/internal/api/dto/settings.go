@@ -99,16 +99,20 @@ type ForwardingPolicyResponse struct {
 }
 
 type ForwardingPolicyData struct {
-	HealthyOnlyEnabled bool   `json:"healthy_only_enabled"`
-	MaxLatencyMs       int    `json:"max_latency_ms"`
-	AllowUntested      bool   `json:"allow_untested"`
-	UpdatedAt          string `json:"updated_at,omitempty"`
+	HealthyOnlyEnabled  bool   `json:"healthy_only_enabled"`
+	MaxLatencyMs        int    `json:"max_latency_ms"`
+	AllowUntested       bool   `json:"allow_untested"`
+	NodeTestTimeoutMs   int    `json:"node_test_timeout_ms"`
+	NodeTestConcurrency int    `json:"node_test_concurrency"`
+	UpdatedAt           string `json:"updated_at,omitempty"`
 }
 
 type UpdateForwardingPolicyRequest struct {
-	HealthyOnlyEnabled *bool `json:"healthy_only_enabled"`
-	MaxLatencyMs       int   `json:"max_latency_ms"`
-	AllowUntested      *bool `json:"allow_untested"`
+	HealthyOnlyEnabled  *bool `json:"healthy_only_enabled"`
+	MaxLatencyMs        int   `json:"max_latency_ms"`
+	AllowUntested       *bool `json:"allow_untested"`
+	NodeTestTimeoutMs   int   `json:"node_test_timeout_ms"`
+	NodeTestConcurrency int   `json:"node_test_concurrency"`
 }
 
 type ForwardingSummaryNode struct {
