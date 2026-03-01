@@ -995,6 +995,33 @@ a {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  min-height: 36px;
+}
+
+.bp-page-actions--header {
+  gap: 10px;
+}
+
+.bp-page-actions--header .ant-btn {
+  height: 36px;
+  padding-inline: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bp-page-actions--header .bp-btn-fixed {
+  min-width: 124px;
+}
+
+.bp-page-actions--header .bp-btn-test-mode {
+  min-width: 132px;
+}
+
+.bp-page-actions--header .bp-badge {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .bp-toolbar-inline {
@@ -1120,7 +1147,7 @@ a {
 }
 
 .bp-nodes-toolbar-actions {
-  min-width: 640px;
+  min-width: 420px;
 }
 
 @media (max-width: 1280px) {
@@ -1893,6 +1920,15 @@ a {
   .bp-page-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .bp-page-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .bp-page-actions--header .ant-btn {
+    min-width: 0;
   }
 
   .bp-toolbar-inline,

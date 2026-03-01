@@ -89,11 +89,11 @@ export default function Subscriptions() {
             {tr("subs.subtitle", "Manage source feeds, refresh cadence, and sync health.")}
           </p>
         </div>
-        <div className="bp-page-actions">
-          <Button type="primary" onClick={handleCreate} loading={create.isPending}>
+        <div className="bp-page-actions bp-page-actions--header">
+          <Button className="bp-btn-fixed" type="primary" onClick={handleCreate} loading={create.isPending}>
             {tr("subs.new", "New Subscription")}
           </Button>
-          <Button onClick={() => refetch()} loading={isFetching}>
+          <Button className="bp-btn-fixed" onClick={() => refetch()} loading={isFetching}>
             {tr("common.refresh", "Refresh")}
           </Button>
         </div>

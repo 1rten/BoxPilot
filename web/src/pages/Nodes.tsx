@@ -30,10 +30,11 @@ export default function Nodes() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
-  const [testMode, setTestMode] = useState<"ping" | "http">("ping");
+  const [testMode, setTestMode] = useState<"ping" | "http">("http");
   const [rowTestingId, setRowTestingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const allNodeIDs = useMemo(() => (list ?? []).map((n) => n.id), [list]);
 
   const filtered = useMemo(() => {
     if (!list) return list;
@@ -106,6 +107,33 @@ export default function Nodes() {
             {tr("nodes.subtitle", "Select forwarding nodes and run connectivity tests.")}
           </p>
         </div>
+        <div className="bp-page-actions bp-page-actions--header">
+          <Button
+            type="primary"
+            className="bp-btn-fixed bp-btn-test-selected"
+            disabled={selectedCount === 0}
+            loading={testNodes.isPending}
+            onClick={() => void runSelectedTest(testMode)}
+          >
+            {tr("nodes.test.selected", "Test Selected")}
+          </Button>
+          <Dropdown menu={testMenu} trigger={["click"]}>
+            <Button className="bp-btn-fixed bp-btn-test-mode">
+              {tr("nodes.test.mode", "Mode")}: {testModeLabel}
+            </Button>
+          </Dropdown>
+          <Button
+            className="bp-btn-fixed"
+            disabled={allNodeIDs.length === 0}
+            loading={testNodes.isPending}
+            onClick={() => void runAllTest(testMode)}
+          >
+            {tr("nodes.test.all", "Test All Nodes")}
+          </Button>
+          <Button className="bp-btn-fixed" onClick={() => refetch()} loading={isLoading}>
+            {tr("common.refresh", "Refresh")}
+          </Button>
+        </div>
       </div>
 
       <Card className="bp-data-card">
@@ -119,19 +147,6 @@ export default function Nodes() {
             placeholder={tr("nodes.search.placeholder", "Search by name or address")}
           />
           <div className="bp-toolbar-actions-fixed bp-list-toolbar-actions bp-nodes-toolbar-actions">
-            <Dropdown menu={testMenu} trigger={["click"]}>
-              <Button className="bp-btn-fixed bp-btn-test-mode">
-                {tr("nodes.test.mode", "Mode")}: {testModeLabel}
-              </Button>
-            </Dropdown>
-            <Button
-              className="bp-btn-fixed bp-btn-test-selected"
-              disabled={selectedCount === 0}
-              loading={testNodes.isPending}
-              onClick={() => void runSelectedTest(testMode)}
-            >
-              {tr("nodes.test.selected", "Test Selected")}
-            </Button>
             <span className="bp-selection-pill bp-selection-pill-static">
               {tr("nodes.selected", "Selected {count}", { count: selectedCount })}
             </span>
@@ -145,9 +160,6 @@ export default function Nodes() {
                 {tr("nodes.forwarding.batch", "Batch Forwarding")}
               </Button>
             </Dropdown>
-            <Button className="bp-btn-fixed" onClick={() => refetch()} loading={isLoading}>
-              {tr("common.refresh", "Refresh")}
-            </Button>
           </div>
         </div>
 
@@ -363,6 +375,15 @@ export default function Nodes() {
     setRowTestingId(null);
     await testNodes.mutateAsync({
       node_ids: selectedRowKeys,
+      mode,
+    });
+  }
+
+  async function runAllTest(mode: "ping" | "http" = testMode) {
+    if (allNodeIDs.length === 0) return;
+    setRowTestingId(null);
+    await testNodes.mutateAsync({
+      node_ids: allNodeIDs,
       mode,
     });
   }

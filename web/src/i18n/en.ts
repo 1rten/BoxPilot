@@ -125,6 +125,7 @@ const en = {
   "nodes.subtitle": "Select forwarding nodes and run connectivity tests.",
   "nodes.test.mode": "Mode",
   "nodes.test.selected": "Test Selected",
+  "nodes.test.all": "Test All Nodes",
   "nodes.search.placeholder": "Search by name or address",
   "nodes.selected": "Selected {count}",
   "nodes.forwarding.batch": "Batch Forwarding",

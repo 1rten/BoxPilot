@@ -143,7 +143,7 @@ export default function Dashboard() {
           <h1 className="bp-page-title">{tr("nav.dashboard", "Dashboard")}</h1>
           <p className="bp-subtitle">{tr("dashboard.subtitle", "Runtime overview, forwarding status, and live diagnostics.")}</p>
         </div>
-        <div className="bp-hero-actions">
+        <div className="bp-hero-actions bp-page-actions bp-page-actions--header">
           <span className={`bp-badge bp-badge--${runtimeTone}`}>{tr("dashboard.runtime", "Runtime")}: {runtimeState}</span>
           <span className={`bp-badge bp-badge--${forwardingTone}`}>
             {tr("dashboard.forwarding", "Forwarding")}: {forwardingStatusLabel}

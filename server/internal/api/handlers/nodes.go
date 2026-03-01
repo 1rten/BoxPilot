@@ -147,7 +147,7 @@ func (h *Nodes) Test(c *gin.Context) {
 		return
 	}
 	if req.Mode == "" {
-		req.Mode = "ping"
+		req.Mode = "http"
 	}
 	if req.Mode != "ping" && req.Mode != "http" {
 		writeError(c, errorx.New(errorx.REQInvalidField, "mode must be ping/http"))

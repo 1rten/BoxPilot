@@ -473,7 +473,7 @@ paths:
                 mode:
                   type: string
                   enum: [http, ping]
-                  default: ping
+                  default: http
               required: [node_ids]
       responses:
         '200':

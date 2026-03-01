@@ -125,6 +125,7 @@ const zh = {
   "nodes.subtitle": "选择用于转发的节点并执行连通性测试。",
   "nodes.test.mode": "模式",
   "nodes.test.selected": "测试已选节点",
+  "nodes.test.all": "测速全部节点",
   "nodes.search.placeholder": "按名称或地址搜索",
   "nodes.selected": "已选 {count}",
   "nodes.forwarding.batch": "批量转发",

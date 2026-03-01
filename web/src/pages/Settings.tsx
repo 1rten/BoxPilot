@@ -22,9 +22,32 @@ interface ProxyCardProps {
 
 export default function Settings() {
   const { tr } = useI18n();
-  const { data, isLoading } = useProxySettings();
-  const { data: routingData, isLoading: routingLoading } = useRoutingSettings();
-  const { data: forwardingPolicy, isLoading: forwardingPolicyLoading } = useForwardingPolicy();
+  const {
+    data,
+    isLoading,
+    isFetching: proxyFetching,
+    refetch: refetchProxySettings,
+  } = useProxySettings();
+  const {
+    data: routingData,
+    isLoading: routingLoading,
+    isFetching: routingFetching,
+    refetch: refetchRoutingSettings,
+  } = useRoutingSettings();
+  const {
+    data: forwardingPolicy,
+    isLoading: forwardingPolicyLoading,
+    isFetching: forwardingPolicyFetching,
+    refetch: refetchForwardingPolicy,
+  } = useForwardingPolicy();
+  const applyAll = useApplyProxySettings();
+
+  const refreshing = proxyFetching || routingFetching || forwardingPolicyFetching;
+
+  const onRefreshAll = async () => {
+    await Promise.all([refetchProxySettings(), refetchRoutingSettings(), refetchForwardingPolicy()]);
+  };
+
   return (
     <div className="bp-page">
       <div className="bp-page-header">
@@ -33,6 +56,19 @@ export default function Settings() {
           <p className="bp-page-subtitle">
             {tr("settings.subtitle", "Configure global HTTP and SOCKS5 forwarding behavior.")}
           </p>
+        </div>
+        <div className="bp-page-actions bp-page-actions--header">
+          <Button
+            className="bp-btn-fixed"
+            type="primary"
+            loading={applyAll.isPending}
+            onClick={() => applyAll.mutate()}
+          >
+            {tr("settings.proxy.apply", "Apply / Restart")}
+          </Button>
+          <Button className="bp-btn-fixed" loading={refreshing} onClick={() => void onRefreshAll()}>
+            {tr("common.refresh", "Refresh")}
+          </Button>
         </div>
       </div>
       <div className="bp-settings-grid">
@@ -237,13 +273,13 @@ function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
         )}
       </Form>
       <div className="bp-page-actions bp-settings-actions">
-        <Button onClick={onSave} type="primary" loading={update.isPending}>
+        <Button className="bp-btn-fixed" onClick={onSave} type="primary" loading={update.isPending}>
           {tr("common.save", "Save")}
         </Button>
-        <Button onClick={() => apply.mutate()} loading={apply.isPending}>
+        <Button className="bp-btn-fixed" onClick={() => apply.mutate()} loading={apply.isPending}>
           {tr("settings.proxy.apply", "Apply / Restart")}
         </Button>
-        <Button onClick={onCopy} disabled={!data}>
+        <Button className="bp-btn-fixed" onClick={onCopy} disabled={!data}>
           {copied ? tr("settings.copy.done", "Copied") : tr("settings.copy.url", "Copy URL")}
         </Button>
       </div>
@@ -312,10 +348,10 @@ function RoutingSettingsCard({ data }: RoutingCardProps) {
         </Form.Item>
       </Form>
       <div className="bp-page-actions bp-settings-actions">
-        <Button onClick={onSave} type="primary" loading={update.isPending}>
+        <Button className="bp-btn-fixed" onClick={onSave} type="primary" loading={update.isPending}>
           {tr("common.save", "Save")}
         </Button>
-        <Button onClick={() => apply.mutate()} loading={apply.isPending}>
+        <Button className="bp-btn-fixed" onClick={() => apply.mutate()} loading={apply.isPending}>
           {tr("settings.proxy.apply", "Apply / Restart")}
         </Button>
       </div>
@@ -422,10 +458,10 @@ function ForwardingPolicyCard({ data }: ForwardingPolicyCardProps) {
         </Form.Item>
       </Form>
       <div className="bp-page-actions bp-settings-actions">
-        <Button onClick={onSave} type="primary" loading={update.isPending}>
+        <Button className="bp-btn-fixed" onClick={onSave} type="primary" loading={update.isPending}>
           {tr("common.save", "Save")}
         </Button>
-        <Button onClick={() => apply.mutate()} loading={apply.isPending}>
+        <Button className="bp-btn-fixed" onClick={() => apply.mutate()} loading={apply.isPending}>
           {tr("settings.proxy.apply", "Apply / Restart")}
         </Button>
       </div>
