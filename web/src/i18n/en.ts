@@ -281,6 +281,7 @@ const en = {
   "toast.forwarding.policy_saved": "Forwarding policy saved",
   "toast.forwarding.node_restarted": "Node proxy restarted",
   "toast.runtime.reloaded": "Runtime reloaded",
+  "toast.runtime.auto_reload_queued": "Changes detected. Runtime reload has been queued.",
   "toast.runtime.reload_failed": "Runtime reload failed: {message}",
   "toast.runtime.proxy_check_ok": "Proxy chain check completed",
   "toast.runtime.proxy_check_failed": "Proxy chain check failed: {message}",

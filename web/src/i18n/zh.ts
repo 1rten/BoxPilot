@@ -281,6 +281,7 @@ const zh = {
   "toast.forwarding.policy_saved": "转发策略已保存",
   "toast.forwarding.node_restarted": "节点代理已重启",
   "toast.runtime.reloaded": "运行时已重载",
+  "toast.runtime.auto_reload_queued": "检测到配置变化，已加入自动重载队列。",
   "toast.runtime.reload_failed": "运行时重载失败：{message}",
   "toast.runtime.proxy_check_ok": "代理链路检查完成",
   "toast.runtime.proxy_check_failed": "代理链路检查失败：{message}",

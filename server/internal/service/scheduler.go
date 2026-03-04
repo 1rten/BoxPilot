@@ -46,8 +46,13 @@ func runSubscriptionAutoRefresh(ctx context.Context, db *sql.DB) {
 		if !shouldRefreshByInterval(s, now, time.Duration(interval)*time.Second) {
 			continue
 		}
-		if _, _, _, err := RefreshSubscription(db, s.ID); err != nil {
+		notModified, _, _, err := RefreshSubscription(db, s.ID)
+		if err != nil {
 			log.Printf("scheduler: refresh %s failed: %v", s.ID, err)
+		} else if !notModified {
+			if err := ReloadIfForwardingRunning(ctx, db); err != nil {
+				log.Printf("scheduler: reload after refresh %s failed: %v", s.ID, err)
+			}
 		}
 		select {
 		case <-ctx.Done():

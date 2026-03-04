@@ -88,6 +88,17 @@ func (h *Nodes) Update(c *gin.Context) {
 		writeError(c, errorx.New(errorx.NODENotFound, "node not found"))
 		return
 	}
+	if err := service.ReloadIfForwardingRunning(c.Request.Context(), h.DB); err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.RTRestartFailed, "reload after node update failed").WithDetails(map[string]any{
+			"id":  req.ID,
+			"err": err.Error(),
+		}))
+		return
+	}
 	row, _ := repo.GetNode(h.DB, req.ID)
 	if row != nil {
 		c.JSON(http.StatusOK, gin.H{"data": nodeRowToDTO(*row)})
@@ -130,6 +141,17 @@ func (h *Nodes) BatchForwarding(c *gin.Context) {
 		if ok {
 			updated++
 		}
+	}
+	if err := service.ReloadIfForwardingRunning(c.Request.Context(), h.DB); err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.RTRestartFailed, "reload after batch forwarding update failed").WithDetails(map[string]any{
+			"updated": updated,
+			"err":     err.Error(),
+		}))
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"updated": updated}})
 }

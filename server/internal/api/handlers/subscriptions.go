@@ -142,6 +142,17 @@ func (h *Subscriptions) Update(c *gin.Context) {
 			}))
 			return
 		}
+		if err := service.ReloadIfForwardingRunning(c.Request.Context(), h.DB); err != nil {
+			if appErr, ok := err.(*errorx.AppError); ok {
+				writeError(c, appErr)
+				return
+			}
+			writeError(c, errorx.New(errorx.RTRestartFailed, "reload after subscription url update failed").WithDetails(map[string]any{
+				"id":  req.ID,
+				"err": err.Error(),
+			}))
+			return
+		}
 	}
 
 	row, _ := repo.GetSubscription(h.DB, req.ID)
@@ -167,6 +178,17 @@ func (h *Subscriptions) Delete(c *gin.Context) {
 	}
 	if !ok {
 		writeError(c, errorx.New(errorx.SUBNotFound, "subscription not found").WithDetails(map[string]any{"id": req.ID}))
+		return
+	}
+	if err := service.ReloadIfForwardingRunning(c.Request.Context(), h.DB); err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.RTRestartFailed, "reload after subscription delete failed").WithDetails(map[string]any{
+			"id":  req.ID,
+			"err": err.Error(),
+		}))
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
@@ -199,6 +221,19 @@ func (h *Subscriptions) Refresh(c *gin.Context) {
 			"err": err.Error(),
 		}))
 		return
+	}
+	if !notModified {
+		if err := service.ReloadIfForwardingRunning(c.Request.Context(), h.DB); err != nil {
+			if appErr, ok := err.(*errorx.AppError); ok {
+				writeError(c, appErr)
+				return
+			}
+			writeError(c, errorx.New(errorx.RTRestartFailed, "reload after subscription refresh failed").WithDetails(map[string]any{
+				"id":  req.ID,
+				"err": err.Error(),
+			}))
+			return
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"sub_id": req.ID, "not_modified": notModified, "nodes_total": total, "nodes_enabled": enabled,

@@ -12,6 +12,7 @@ import {
 } from "../api/subscriptions";
 import { useToast } from "../components/common/ToastContext";
 import { useI18n } from "../i18n/context";
+import { notifyAutoReloadQueuedIfRunning } from "./notifyAutoReload";
 
 export function useSubscriptions() {
   return useQuery<Subscription[]>({
@@ -33,8 +34,10 @@ export function useCreateSubscription() {
     mutationFn: (body: CreateSubscriptionBody) => createSubscription(body),
     onSuccess: async (created) => {
       let refreshed = false;
+      let refreshResult: RefreshSubscriptionResult | null = null;
       try {
         const result = await refreshSubscription(created.id);
+        refreshResult = result;
         refreshed = true;
         addToast("success", buildRefreshMessage(result, true, tr));
       } catch (error: unknown) {
@@ -44,10 +47,15 @@ export function useCreateSubscription() {
       q.invalidateQueries({ queryKey: ["subscriptions"] });
       q.invalidateQueries({ queryKey: ["nodes"] });
       q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["forwarding-runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
       if (!refreshed) {
         addToast("success", tr("toast.sub.created", "Subscription created"));
+      } else if (refreshResult && !refreshResult.not_modified) {
+        void notifyAutoReloadQueuedIfRunning(q, addToast, tr);
       }
     },
     onError: (error: unknown) => {
@@ -63,13 +71,19 @@ export function useUpdateSubscription() {
   const { addToast } = useToast();
   return useMutation({
     mutationFn: (body: UpdateSubscriptionBody) => updateSubscription(body),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       q.invalidateQueries({ queryKey: ["subscriptions"] });
       q.invalidateQueries({ queryKey: ["nodes"] });
       q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["forwarding-runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
       addToast("success", tr("toast.sub.updated", "Subscription updated"));
+      if (typeof variables.url === "string" && variables.url.trim() !== "") {
+        void notifyAutoReloadQueuedIfRunning(q, addToast, tr);
+      }
     },
     onError: (error: unknown) => {
       const message = extractErrorMessage(error);
@@ -88,9 +102,13 @@ export function useDeleteSubscription() {
       q.invalidateQueries({ queryKey: ["subscriptions"] });
       q.invalidateQueries({ queryKey: ["nodes"] });
       q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["forwarding-runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
       addToast("success", tr("toast.sub.deleted", "Subscription deleted"));
+      void notifyAutoReloadQueuedIfRunning(q, addToast, tr);
     },
     onError: (error: unknown) => {
       const message = extractErrorMessage(error);
@@ -109,9 +127,15 @@ export function useRefreshSubscription() {
       q.invalidateQueries({ queryKey: ["subscriptions"] });
       q.invalidateQueries({ queryKey: ["nodes"] });
       q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["forwarding-runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
       addToast("success", buildRefreshMessage(result, false, tr));
+      if (!result.not_modified) {
+        void notifyAutoReloadQueuedIfRunning(q, addToast, tr);
+      }
     },
     onError: (error: unknown) => {
       const message = extractErrorMessage(error);

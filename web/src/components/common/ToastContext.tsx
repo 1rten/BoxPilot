@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { createContext, useContext, useState, useCallback } from "react";
 
-type ToastType = "success" | "error";
+type ToastType = "success" | "error" | "info";
 
 interface Toast {
   id: number;
@@ -89,7 +89,11 @@ function ToastList() {
             minWidth: 240,
             maxWidth: "min(420px, calc(100vw - 24px))",
             borderLeft:
-              t.type === "success" ? "4px solid #16A34A" : "4px solid #DC2626",
+              t.type === "success"
+                ? "4px solid #16A34A"
+                : t.type === "error"
+                ? "4px solid #DC2626"
+                : "4px solid #2563EB",
             pointerEvents: "auto",
           }}
         >
@@ -97,7 +101,12 @@ function ToastList() {
             style={{
               margin: 0,
               fontSize: 14,
-              color: t.type === "success" ? "#166534" : "#B91C1C",
+              color:
+                t.type === "success"
+                  ? "#166534"
+                  : t.type === "error"
+                  ? "#B91C1C"
+                  : "#1D4ED8",
             }}
           >
             {t.message}

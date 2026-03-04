@@ -126,6 +126,8 @@ Typical flow:
 
 If step 3 is skipped under strict policy, you may get `CFG_NO_ENABLED_NODES`.
 
+When forwarding is already running, changing node forwarding flags or refreshing/deleting subscriptions will trigger an automatic debounced runtime reload (rapid updates are coalesced).
+
 ## Environment Variables
 
 | Variable | Default | Required | Description |

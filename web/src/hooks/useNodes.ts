@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import type { Node } from "../api/types";
 import { useToast } from "../components/common/ToastContext";
 import { useI18n } from "../i18n/context";
+import { notifyAutoReloadQueuedIfRunning } from "./notifyAutoReload";
 
 export function useNodes(params?: { enabled?: number; sub_id?: string }) {
   return useQuery({
@@ -31,9 +32,13 @@ export function useUpdateNode() {
     onSuccess: () => {
       q.invalidateQueries({ queryKey: ["nodes"] });
       q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["forwarding-runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
       addToast("success", tr("toast.node.updated", "Node updated"));
+      void notifyAutoReloadQueuedIfRunning(q, addToast, tr);
     },
     onError: (error: unknown) => {
       const anyErr = error as any;
@@ -95,13 +100,16 @@ export function useBatchForwarding() {
     onSuccess: (result, variables) => {
       q.invalidateQueries({ queryKey: ["nodes"] });
       q.invalidateQueries({ queryKey: ["forwarding-summary"] });
+      q.invalidateQueries({ queryKey: ["forwarding-runtime-status"] });
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
       q.invalidateQueries({ queryKey: ["runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
       const action = variables.forwarding_enabled
         ? tr("nodes.forwarding.enable", "Enable forwarding")
         : tr("nodes.forwarding.disable", "Disable forwarding");
       addToast("success", tr("toast.forwarding.batch", "{action}: {count} node(s)", { action, count: result.updated }));
+      void notifyAutoReloadQueuedIfRunning(q, addToast, tr);
     },
     onError: (error: unknown) => {
       const anyErr = error as any;
