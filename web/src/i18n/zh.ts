@@ -322,6 +322,7 @@ const zh = {
   "toast.runtime.proxy_check_failed": "代理链路检查失败：{message}",
   "toast.runtime.group_selected": "分组选择已应用",
   "toast.runtime.group_selected_auto": "自动候选已测速，当前最优节点：{outbound}",
+  "toast.runtime.group_selected_auto_probe_deferred": "已开启自动，当前运行时测速暂不可用；将继续按周期测速。",
   "toast.runtime.group_selected_auto_probe_failed": "已开启自动，但立即测速失败（{message}）；运行时将继续按周期测速。",
   "toast.runtime.group_selected_auto_pending": "已开启自动并触发测速，最优节点将很快更新。",
   "toast.runtime.group_select_failed": "更新分组失败：{message}",

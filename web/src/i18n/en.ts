@@ -322,6 +322,8 @@ const en = {
   "toast.runtime.proxy_check_failed": "Proxy chain check failed: {message}",
   "toast.runtime.group_selected": "Routing group selection applied",
   "toast.runtime.group_selected_auto": "Auto tested candidates. Current best node: {outbound}",
+  "toast.runtime.group_selected_auto_probe_deferred":
+    "Auto mode enabled. Runtime probe is temporarily unavailable; periodic checks will continue.",
   "toast.runtime.group_selected_auto_probe_failed":
     "Auto mode enabled, but immediate probe failed ({message}). Runtime will continue periodic checks.",
   "toast.runtime.group_selected_auto_pending": "Auto mode enabled. Candidate test was triggered; best node will update shortly.",

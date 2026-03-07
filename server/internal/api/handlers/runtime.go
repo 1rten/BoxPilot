@@ -1082,7 +1082,7 @@ func resolveRuntimeSelectionAfterGroupSelect(parent context.Context, group *dto.
 		if autoTag != "" && autoTag == selected {
 			autoSelected = true
 			if err := triggerClashProxyDelayTest(parent, autoTag, generator.DefaultAutoTestURL, probeTimeoutMS); err != nil {
-				probeError = err.Error()
+				probeError = summarizeAutoProbeError(err)
 			}
 			for _, candidate := range group.AutoCandidates {
 				tag := strings.TrimSpace(candidate)
@@ -1219,6 +1219,29 @@ func optionalString(value string) *string {
 		return nil
 	}
 	return &v
+}
+
+func summarizeAutoProbeError(err error) string {
+	if err == nil {
+		return ""
+	}
+	raw := strings.TrimSpace(err.Error())
+	lower := strings.ToLower(raw)
+	switch {
+	case strings.Contains(lower, "clash api disabled"),
+		strings.Contains(lower, "connection refused"),
+		strings.Contains(lower, "i/o timeout"),
+		strings.Contains(lower, "context deadline exceeded"),
+		strings.Contains(lower, "no such host"):
+		return "clash api unavailable"
+	case strings.Contains(lower, "status 401"),
+		strings.Contains(lower, "status 403"):
+		return "clash api unauthorized"
+	}
+	if raw == "" {
+		return "auto probe failed"
+	}
+	return raw
 }
 
 func resolveClashAPIBaseURL() (string, bool) {

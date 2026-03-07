@@ -148,6 +148,16 @@ export function useSelectRuntimeGroup() {
       const isAutoChoice = data.selected_is_auto;
       if (isAutoChoice) {
         if (data.auto_probe_error) {
+          if (isSoftAutoProbeError(data.auto_probe_error)) {
+            addToast(
+              "success",
+              tr(
+                "toast.runtime.group_selected_auto_probe_deferred",
+                "Auto mode enabled. Runtime probe is temporarily unavailable; periodic checks will continue."
+              )
+            );
+            return;
+          }
           addToast(
             "info",
             tr(
@@ -188,6 +198,17 @@ export function useSelectRuntimeGroup() {
       addToast("error", tr("toast.runtime.group_select_failed", "Failed to update routing group: {message}", { message }));
     },
   });
+}
+
+function isSoftAutoProbeError(message?: string): boolean {
+  const lower = (message || "").toLowerCase();
+  if (!lower) return false;
+  return (
+    lower.includes("clash api unavailable") ||
+    lower.includes("connection refused") ||
+    lower.includes("context deadline exceeded") ||
+    lower.includes("i/o timeout")
+  );
 }
 
 export function useRuntimeLogs(params?: {
