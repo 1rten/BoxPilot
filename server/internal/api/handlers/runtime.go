@@ -759,20 +759,32 @@ func parseSelectorGroups(cfg []byte, persisted map[string]repo.RuntimeGroupSelec
 			Outbounds: members,
 			Default:   defaultOutbound,
 		}
+		nodeCandidates := make([]string, 0, len(members))
+		autoTag := ""
 		autoCandidates := make([]string, 0)
 		autoSeen := map[string]struct{}{}
 		for _, memberTag := range members {
 			candidates, ok := urltestMembers[memberTag]
-			if !ok {
+			if ok {
+				if autoTag == "" {
+					autoTag = memberTag
+				}
+				for _, nodeTag := range candidates {
+					if _, exists := autoSeen[nodeTag]; exists {
+						continue
+					}
+					autoSeen[nodeTag] = struct{}{}
+					autoCandidates = append(autoCandidates, nodeTag)
+				}
 				continue
 			}
-			for _, nodeTag := range candidates {
-				if _, exists := autoSeen[nodeTag]; exists {
-					continue
-				}
-				autoSeen[nodeTag] = struct{}{}
-				autoCandidates = append(autoCandidates, nodeTag)
-			}
+			nodeCandidates = append(nodeCandidates, memberTag)
+		}
+		if autoTag != "" {
+			item.AutoOutbound = &autoTag
+		}
+		if len(nodeCandidates) > 0 {
+			item.NodeCandidates = nodeCandidates
 		}
 		if len(autoCandidates) > 0 {
 			item.AutoCandidates = autoCandidates

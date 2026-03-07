@@ -293,9 +293,11 @@ func buildBusinessGroups(
 		autoTag := resolveUniqueTag(selectorTag+"-auto", used)
 		used[autoTag] = struct{}{}
 		result[target] = selectorTag
-		selectorOutbounds := []string{"manual"}
-		autoMembers := filterExistingNodeTags(nodeTags, businessNodePools[target])
-		if len(autoMembers) > 0 {
+		poolMembers := businessNodePools[target]
+		autoMembers := filterExistingNodeTags(nodeTags, poolMembers)
+		manualMembers := filterExistingGroupMembers(nodeTags, poolMembers)
+		selectorOutbounds := make([]string, 0, 1+len(manualMembers))
+		if len(autoMembers) > 0 && len(manualMembers) > 0 {
 			*outbounds = append(*outbounds, map[string]any{
 				"type":      "urltest",
 				"tag":       autoTag,
@@ -306,7 +308,15 @@ func buildBusinessGroups(
 			})
 			selectorOutbounds = append(selectorOutbounds, autoTag)
 		}
-		selectedDefault := "manual"
+		if len(manualMembers) > 0 {
+			selectorOutbounds = append(selectorOutbounds, manualMembers...)
+		} else {
+			selectorOutbounds = append(selectorOutbounds, "manual")
+		}
+		selectedDefault := selectorOutbounds[0]
+		if len(manualMembers) > 0 {
+			selectedDefault = manualMembers[0]
+		}
 		if selected, ok := selections[selectorTag]; ok && containsString(selectorOutbounds, selected) {
 			selectedDefault = selected
 		}
@@ -340,6 +350,35 @@ func filterExistingNodeTags(availableNodeTags, preferredNodeTags []string) []str
 		}
 		if _, ok := seen[tag]; ok {
 			continue
+		}
+		seen[tag] = struct{}{}
+		out = append(out, tag)
+	}
+	return out
+}
+
+func filterExistingGroupMembers(availableNodeTags, preferredNodeTags []string) []string {
+	if len(preferredNodeTags) == 0 {
+		return nil
+	}
+	availableSet := map[string]struct{}{}
+	for _, tag := range availableNodeTags {
+		availableSet[tag] = struct{}{}
+	}
+	out := make([]string, 0, len(preferredNodeTags))
+	seen := map[string]struct{}{}
+	for _, raw := range preferredNodeTags {
+		tag := strings.TrimSpace(raw)
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		if tag != "direct" && tag != "block" {
+			if _, ok := availableSet[tag]; !ok {
+				continue
+			}
 		}
 		seen[tag] = struct{}{}
 		out = append(out, tag)

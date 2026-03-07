@@ -117,7 +117,7 @@ function RuntimeGroupsCard({ items }: RuntimeGroupsCardProps) {
   useEffect(() => {
     const next: Record<string, string> = {};
     for (const item of groups) {
-      next[item.tag] = item.default;
+      next[item.tag] = item.runtime_selected_outbound ?? item.default;
     }
     setDrafts(next);
   }, [groups]);
@@ -131,7 +131,10 @@ function RuntimeGroupsCard({ items }: RuntimeGroupsCardProps) {
         </div>
       </div>
       <p className="bp-muted" style={{ marginTop: 0 }}>
-        {tr("settings.groups.desc", "Each business group defaults to manual; you can switch to auto urltest (30m) per group.")}
+        {tr(
+          "settings.groups.desc",
+          "Each business group supports auto toggle: on = urltest best node (30m), off = manual node pick in that business pool."
+        )}
       </p>
       {groups.length === 0 ? (
         <p className="bp-muted">{tr("settings.groups.empty", "No runtime groups available yet.")}</p>
@@ -148,6 +151,15 @@ function RuntimeGroupsCard({ items }: RuntimeGroupsCardProps) {
                 gap: 8,
               }}
             >
+              {(() => {
+                const draftValue = drafts[group.tag] ?? group.runtime_selected_outbound ?? group.default;
+                const currentValue = group.runtime_selected_outbound ?? group.default;
+                const autoOutbound = group.auto_outbound;
+                const nodeCandidates = group.node_candidates ?? group.outbounds.filter((v) => v !== autoOutbound);
+                const isBizGroup = group.tag.startsWith("biz-");
+                const autoEnabled = Boolean(autoOutbound && draftValue === autoOutbound);
+                return (
+                  <>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                 <strong>{formatGroupLabel(group.tag)}</strong>
                 <Tag>{group.tag}</Tag>
@@ -207,32 +219,87 @@ function RuntimeGroupsCard({ items }: RuntimeGroupsCardProps) {
                   )}
                 </p>
               ) : null}
-              <Select
-                value={drafts[group.tag] ?? group.default}
-                options={group.outbounds.map((value) => ({ value, label: value }))}
-                onChange={(value) =>
-                  setDrafts((prev) => ({
-                    ...prev,
-                    [group.tag]: value,
-                  }))
-                }
-              />
+              {isBizGroup ? (
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                    <span className="bp-muted">{tr("settings.groups.auto_toggle", "Auto Best Node")}</span>
+                    <Switch
+                      checked={autoEnabled}
+                      disabled={!autoOutbound}
+                      onChange={(checked) => {
+                        setDrafts((prev) => {
+                          const next = { ...prev };
+                          if (checked && autoOutbound) {
+                            next[group.tag] = autoOutbound;
+                            return next;
+                          }
+                          if (!checked) {
+                            if (draftValue && draftValue !== autoOutbound && nodeCandidates.includes(draftValue)) {
+                              next[group.tag] = draftValue;
+                            } else if (
+                              group.runtime_effective_outbound &&
+                              nodeCandidates.includes(group.runtime_effective_outbound)
+                            ) {
+                              next[group.tag] = group.runtime_effective_outbound;
+                            } else if (nodeCandidates.length > 0) {
+                              next[group.tag] = nodeCandidates[0];
+                            }
+                          }
+                          return next;
+                        });
+                      }}
+                    />
+                  </div>
+                  {nodeCandidates.length > 0 ? (
+                    <Select
+                      value={autoEnabled ? undefined : draftValue}
+                      placeholder={tr("settings.groups.node_pick", "Choose Node")}
+                      disabled={autoEnabled}
+                      options={nodeCandidates.map((value) => ({ value, label: value }))}
+                      onChange={(value) =>
+                        setDrafts((prev) => ({
+                          ...prev,
+                          [group.tag]: value,
+                        }))
+                      }
+                    />
+                  ) : (
+                    <p className="bp-muted" style={{ margin: 0 }}>
+                      {tr("settings.groups.node_empty", "No business nodes available for manual selection.")}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <Select
+                  value={draftValue}
+                  options={group.outbounds.map((value) => ({ value, label: value }))}
+                  onChange={(value) =>
+                    setDrafts((prev) => ({
+                      ...prev,
+                      [group.tag]: value,
+                    }))
+                  }
+                />
+              )}
               <div className="bp-page-actions bp-settings-actions">
                 <Button
                   className="bp-btn-fixed"
                   type="primary"
                   loading={updateGroup.isPending}
-                  disabled={!drafts[group.tag] || drafts[group.tag] === group.default}
+                  disabled={!draftValue || draftValue === currentValue}
                   onClick={() =>
                     updateGroup.mutate({
                       group_tag: group.tag,
-                      selected_outbound: drafts[group.tag] ?? group.default,
+                      selected_outbound: draftValue,
                     })
                   }
                 >
                   {tr("settings.groups.apply", "Apply Group Choice")}
                 </Button>
               </div>
+                  </>
+                );
+              })()}
             </div>
           ))}
         </div>

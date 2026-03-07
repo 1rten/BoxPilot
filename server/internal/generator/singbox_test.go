@@ -304,3 +304,126 @@ func TestBuildConfigWithRuntime_BusinessGroupsWithoutPool(t *testing.T) {
 		t.Fatalf("did not expect biz auto when pool missing")
 	}
 }
+
+func TestBuildConfigWithRuntime_BusinessGroupsDefaultNodeWhenToggleOff(t *testing.T) {
+	cfg, err := BuildConfigWithRuntime(
+		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		RoutingSettings{BypassPrivateEnabled: true},
+		[]NodeOutbound{
+			{
+				Tag:     "node-a",
+				RawJSON: `{"type":"trojan","tag":"node-a","server":"example.com","server_port":443,"password":"p"}`,
+			},
+			{
+				Tag:     "node-b",
+				RawJSON: `{"type":"trojan","tag":"node-b","server":"example.org","server_port":443,"password":"p"}`,
+			},
+		},
+		RoutingExtras{
+			Rules: []RouteRule{
+				{
+					Priority:       200,
+					RuleOrder:      1,
+					MatcherType:    "domain_suffix",
+					MatcherValue:   "apple.com",
+					TargetOutbound: "Apple",
+				},
+			},
+			BusinessNodePools: map[string][]string{
+				"Apple": {"node-a", "node-b"},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("BuildConfigWithRuntime returned error: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(cfg, &parsed); err != nil {
+		t.Fatalf("unmarshal config: %v", err)
+	}
+	outbounds, ok := parsed["outbounds"].([]any)
+	if !ok {
+		t.Fatalf("missing outbounds")
+	}
+	for _, item := range outbounds {
+		outbound, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		tag, _ := outbound["tag"].(string)
+		typ, _ := outbound["type"].(string)
+		if tag == "biz-apple" && typ == "selector" {
+			if d, _ := outbound["default"].(string); d != "node-a" {
+				t.Fatalf("expected biz default node-a when toggle off, got %v", outbound["default"])
+			}
+			members, _ := outbound["outbounds"].([]any)
+			if len(members) != 3 || members[0] != "biz-apple-auto" || members[1] != "node-a" || members[2] != "node-b" {
+				t.Fatalf("unexpected biz members: %v", outbound["outbounds"])
+			}
+			return
+		}
+	}
+	t.Fatalf("expected biz-apple selector")
+}
+
+func TestBuildConfigWithRuntime_BusinessGroupsKeepDirectInManualCandidates(t *testing.T) {
+	cfg, err := BuildConfigWithRuntime(
+		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		RoutingSettings{BypassPrivateEnabled: true},
+		[]NodeOutbound{
+			{
+				Tag:     "node-a",
+				RawJSON: `{"type":"trojan","tag":"node-a","server":"example.com","server_port":443,"password":"p"}`,
+			},
+		},
+		RoutingExtras{
+			Rules: []RouteRule{
+				{
+					Priority:       200,
+					RuleOrder:      1,
+					MatcherType:    "domain_suffix",
+					MatcherValue:   "apple.com",
+					TargetOutbound: "Apple",
+				},
+			},
+			BusinessNodePools: map[string][]string{
+				"Apple": {"direct", "node-a"},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("BuildConfigWithRuntime returned error: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(cfg, &parsed); err != nil {
+		t.Fatalf("unmarshal config: %v", err)
+	}
+	outbounds, ok := parsed["outbounds"].([]any)
+	if !ok {
+		t.Fatalf("missing outbounds")
+	}
+	for _, item := range outbounds {
+		outbound, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		tag, _ := outbound["tag"].(string)
+		typ, _ := outbound["type"].(string)
+		if tag == "biz-apple-auto" && typ == "urltest" {
+			members, _ := outbound["outbounds"].([]any)
+			if len(members) != 1 || members[0] != "node-a" {
+				t.Fatalf("auto should exclude direct, got %v", outbound["outbounds"])
+			}
+		}
+		if tag == "biz-apple" && typ == "selector" {
+			members, _ := outbound["outbounds"].([]any)
+			if len(members) != 3 || members[0] != "biz-apple-auto" || members[1] != "direct" || members[2] != "node-a" {
+				t.Fatalf("selector should keep direct in manual candidates, got %v", outbound["outbounds"])
+			}
+			return
+		}
+	}
+	t.Fatalf("expected biz-apple selector")
+}
