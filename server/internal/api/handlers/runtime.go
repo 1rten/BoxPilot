@@ -49,6 +49,10 @@ type proxyTrafficSample struct {
 	hasTotals bool
 }
 
+type clashProxyState struct {
+	nowByTag map[string]string
+}
+
 var trafficSnapshot runtimeTrafficSnapshot
 
 func (h *Runtime) Status(c *gin.Context) {
@@ -393,7 +397,8 @@ func (h *Runtime) Groups(c *gin.Context) {
 	for _, row := range selectionRows {
 		selectionByTag[row.GroupTag] = row
 	}
-	groups, err := parseSelectorGroups(cfg, selectionByTag)
+	clashState, _ := fetchClashProxyState(c.Request.Context())
+	groups, err := parseSelectorGroups(cfg, selectionByTag, clashState)
 	if err != nil {
 		writeError(c, errorx.New(errorx.CFGJSONInvalid, "parse runtime groups"))
 		return
@@ -431,7 +436,7 @@ func (h *Runtime) SelectGroup(c *gin.Context) {
 		writeError(c, errorx.New(errorx.CFGBuildFailed, "build runtime groups"))
 		return
 	}
-	groups, err := parseSelectorGroups(cfg, nil)
+	groups, err := parseSelectorGroups(cfg, nil, nil)
 	if err != nil {
 		writeError(c, errorx.New(errorx.CFGJSONInvalid, "parse runtime groups"))
 		return
@@ -647,15 +652,20 @@ func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool) ([]byte, []strin
 	if err != nil {
 		return nil, nil, errorx.New(errorx.DBError, "list subscription rules")
 	}
+	groupMemberRows, err := repo.ListEnabledSubscriptionGroupMembers(h.DB)
+	if err != nil {
+		return nil, nil, errorx.New(errorx.DBError, "list subscription group members")
+	}
 	selectionRows, err := repo.ListRuntimeGroupSelections(h.DB)
 	if err != nil {
 		return nil, nil, errorx.New(errorx.DBError, "list runtime group selections")
 	}
 
 	extras := generator.RoutingExtras{
-		RuleSets:        make([]generator.RouteRuleSetRef, 0, len(ruleSetRows)),
-		Rules:           make([]generator.RouteRule, 0, len(ruleRows)),
-		GroupSelections: map[string]string{},
+		RuleSets:          make([]generator.RouteRuleSetRef, 0, len(ruleSetRows)),
+		Rules:             make([]generator.RouteRule, 0, len(ruleRows)),
+		GroupSelections:   map[string]string{},
+		BusinessNodePools: map[string][]string{},
 	}
 	for _, rs := range ruleSetRows {
 		extras.RuleSets = append(extras.RuleSets, generator.RouteRuleSetRef{
@@ -675,6 +685,14 @@ func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool) ([]byte, []strin
 			TargetOutbound: r.TargetOutbound,
 		})
 	}
+	for _, g := range groupMemberRows {
+		target := strings.TrimSpace(g.TargetOutbound)
+		tag := strings.TrimSpace(g.NodeTag)
+		if target == "" || tag == "" {
+			continue
+		}
+		extras.BusinessNodePools[target] = append(extras.BusinessNodePools[target], tag)
+	}
 	for _, s := range selectionRows {
 		extras.GroupSelections[s.GroupTag] = s.SelectedOutbound
 	}
@@ -686,13 +704,36 @@ func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool) ([]byte, []strin
 	return cfg, tags, nil
 }
 
-func parseSelectorGroups(cfg []byte, persisted map[string]repo.RuntimeGroupSelectionRow) ([]dto.RuntimeGroupItem, error) {
+func parseSelectorGroups(cfg []byte, persisted map[string]repo.RuntimeGroupSelectionRow, clashState *clashProxyState) ([]dto.RuntimeGroupItem, error) {
 	var parsed struct {
 		Outbounds []map[string]any `json:"outbounds"`
 	}
 	if err := json.Unmarshal(cfg, &parsed); err != nil {
 		return nil, err
 	}
+	urltestMembers := map[string][]string{}
+	for _, outbound := range parsed.Outbounds {
+		typ := strings.TrimSpace(fmt.Sprintf("%v", outbound["type"]))
+		if typ != "urltest" {
+			continue
+		}
+		tag := strings.TrimSpace(fmt.Sprintf("%v", outbound["tag"]))
+		if tag == "" {
+			continue
+		}
+		memberAny, _ := outbound["outbounds"].([]any)
+		members := make([]string, 0, len(memberAny))
+		for _, m := range memberAny {
+			member := strings.TrimSpace(fmt.Sprintf("%v", m))
+			if member != "" {
+				members = append(members, member)
+			}
+		}
+		if len(members) > 0 {
+			urltestMembers[tag] = members
+		}
+	}
+
 	items := make([]dto.RuntimeGroupItem, 0, len(parsed.Outbounds))
 	for _, outbound := range parsed.Outbounds {
 		typ := strings.TrimSpace(fmt.Sprintf("%v", outbound["type"]))
@@ -717,6 +758,33 @@ func parseSelectorGroups(cfg []byte, persisted map[string]repo.RuntimeGroupSelec
 			Type:      typ,
 			Outbounds: members,
 			Default:   defaultOutbound,
+		}
+		autoCandidates := make([]string, 0)
+		autoSeen := map[string]struct{}{}
+		for _, memberTag := range members {
+			candidates, ok := urltestMembers[memberTag]
+			if !ok {
+				continue
+			}
+			for _, nodeTag := range candidates {
+				if _, exists := autoSeen[nodeTag]; exists {
+					continue
+				}
+				autoSeen[nodeTag] = struct{}{}
+				autoCandidates = append(autoCandidates, nodeTag)
+			}
+		}
+		if len(autoCandidates) > 0 {
+			item.AutoCandidates = autoCandidates
+		}
+		if clashState != nil && clashState.nowByTag != nil {
+			selected := strings.TrimSpace(clashState.nowByTag[tag])
+			if selected != "" {
+				item.RuntimeSelectedOutbound = &selected
+				if resolved := resolveEffectiveOutbound(selected, clashState.nowByTag); resolved != "" {
+					item.RuntimeEffectiveOutbound = &resolved
+				}
+			}
 		}
 		if persisted != nil {
 			if row, ok := persisted[tag]; ok {
@@ -904,6 +972,74 @@ func fetchProxyTraffic(parent context.Context) (proxyTrafficSample, error) {
 	}
 
 	return sample, nil
+}
+
+func fetchClashProxyState(parent context.Context) (*clashProxyState, error) {
+	baseURL, enabled := resolveClashAPIBaseURL()
+	if !enabled {
+		return nil, fmt.Errorf("clash api disabled")
+	}
+	ctx, cancel := context.WithTimeout(parent, 2*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/proxies", nil)
+	if err != nil {
+		return nil, err
+	}
+	if secret := strings.TrimSpace(os.Getenv("SINGBOX_CLASH_API_SECRET")); secret != "" {
+		req.Header.Set("Authorization", "Bearer "+secret)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("clash api /proxies status %d", resp.StatusCode)
+	}
+	var payload struct {
+		Proxies map[string]map[string]any `json:"proxies"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return nil, err
+	}
+	nowByTag := map[string]string{}
+	for tag, data := range payload.Proxies {
+		if data == nil {
+			continue
+		}
+		now := ""
+		if raw, ok := data["now"]; ok {
+			switch v := raw.(type) {
+			case string:
+				now = strings.TrimSpace(v)
+			default:
+				now = strings.TrimSpace(fmt.Sprintf("%v", raw))
+			}
+		}
+		if now != "" {
+			nowByTag[strings.TrimSpace(tag)] = now
+		}
+	}
+	return &clashProxyState{nowByTag: nowByTag}, nil
+}
+
+func resolveEffectiveOutbound(outbound string, nowByTag map[string]string) string {
+	current := strings.TrimSpace(outbound)
+	if current == "" || nowByTag == nil {
+		return current
+	}
+	visited := map[string]struct{}{}
+	for {
+		if _, ok := visited[current]; ok {
+			return current
+		}
+		visited[current] = struct{}{}
+		next := strings.TrimSpace(nowByTag[current])
+		if next == "" {
+			return current
+		}
+		current = next
+	}
 }
 
 func resolveClashAPIBaseURL() (string, bool) {

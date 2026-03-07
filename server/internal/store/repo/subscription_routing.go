@@ -2,6 +2,7 @@ package repo
 
 import (
 	"database/sql"
+	"strings"
 )
 
 type SubscriptionRuleSetRow struct {
@@ -27,7 +28,21 @@ type SubscriptionRuleRow struct {
 	CreatedAt      string
 }
 
-func ReplaceSubscriptionRouting(db *sql.DB, subID string, ruleSets []SubscriptionRuleSetRow, rules []SubscriptionRuleRow) error {
+type SubscriptionGroupMemberRow struct {
+	ID             string
+	SubID          string
+	TargetOutbound string
+	NodeTag        string
+	CreatedAt      string
+}
+
+func ReplaceSubscriptionRouting(
+	db *sql.DB,
+	subID string,
+	ruleSets []SubscriptionRuleSetRow,
+	rules []SubscriptionRuleRow,
+	groupMembers []SubscriptionGroupMemberRow,
+) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -39,6 +54,12 @@ func ReplaceSubscriptionRouting(db *sql.DB, subID string, ruleSets []Subscriptio
 	}
 	if _, err := tx.Exec("DELETE FROM subscription_rules WHERE sub_id = ?", subID); err != nil {
 		return err
+	}
+	if _, err := tx.Exec("DELETE FROM subscription_group_members WHERE sub_id = ?", subID); err != nil {
+		if !isNoSuchTableErr(err, "subscription_group_members") {
+			return err
+		}
+		groupMembers = nil
 	}
 
 	for _, rs := range ruleSets {
@@ -54,6 +75,17 @@ func ReplaceSubscriptionRouting(db *sql.DB, subID string, ruleSets []Subscriptio
 			"INSERT INTO subscription_rules (id, sub_id, source_kind, priority, rule_order, matcher_type, matcher_value, target_outbound, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
 			r.ID, subID, r.SourceKind, r.Priority, r.RuleOrder, r.MatcherType, r.MatcherValue, r.TargetOutbound, r.CreatedAt,
 		); err != nil {
+			return err
+		}
+	}
+	for _, g := range groupMembers {
+		if _, err := tx.Exec(
+			"INSERT INTO subscription_group_members (id, sub_id, target_outbound, node_tag, created_at) VALUES (?, ?, ?, ?, ?)",
+			g.ID, subID, g.TargetOutbound, g.NodeTag, g.CreatedAt,
+		); err != nil {
+			if isNoSuchTableErr(err, "subscription_group_members") {
+				break
+			}
 			return err
 		}
 	}
@@ -115,4 +147,38 @@ func ListEnabledSubscriptionRules(db *sql.DB) ([]SubscriptionRuleRow, error) {
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+func ListEnabledSubscriptionGroupMembers(db *sql.DB) ([]SubscriptionGroupMemberRow, error) {
+	rows, err := db.Query(`
+		SELECT g.id, g.sub_id, g.target_outbound, g.node_tag, g.created_at
+		FROM subscription_group_members g
+		INNER JOIN subscriptions s ON s.id = g.sub_id
+		WHERE s.enabled = 1
+		ORDER BY g.target_outbound, g.created_at
+	`)
+	if err != nil {
+		if isNoSuchTableErr(err, "subscription_group_members") {
+			return []SubscriptionGroupMemberRow{}, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SubscriptionGroupMemberRow
+	for rows.Next() {
+		var r SubscriptionGroupMemberRow
+		if err := rows.Scan(&r.ID, &r.SubID, &r.TargetOutbound, &r.NodeTag, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func isNoSuchTableErr(err error, table string) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such table") && strings.Contains(msg, strings.ToLower(table))
 }

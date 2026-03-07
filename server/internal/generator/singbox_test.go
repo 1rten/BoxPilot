@@ -187,6 +187,9 @@ func TestBuildConfigWithRuntime_BusinessGroups(t *testing.T) {
 				"manual":     "node-b",
 				"biz-openai": "biz-openai-auto",
 			},
+			BusinessNodePools: map[string][]string{
+				"OpenAI": {"node-a", "node-b"},
+			},
 		},
 	)
 	if err != nil {
@@ -228,9 +231,76 @@ func TestBuildConfigWithRuntime_BusinessGroups(t *testing.T) {
 			if interval, _ := outbound["interval"].(string); interval != "30m" {
 				t.Fatalf("expected business urltest interval 30m, got %v", outbound["interval"])
 			}
+			members, _ := outbound["outbounds"].([]any)
+			if len(members) != 2 {
+				t.Fatalf("expected business urltest members size 2, got %v", outbound["outbounds"])
+			}
 		}
 	}
 	if !hasManual || !hasBiz || !hasBizAuto {
 		t.Fatalf("expected manual+biz+biz-auto outbounds, got %#v", outbounds)
+	}
+}
+
+func TestBuildConfigWithRuntime_BusinessGroupsWithoutPool(t *testing.T) {
+	cfg, err := BuildConfigWithRuntime(
+		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		RoutingSettings{BypassPrivateEnabled: true},
+		[]NodeOutbound{
+			{
+				Tag:     "node-a",
+				RawJSON: `{"type":"trojan","tag":"node-a","server":"example.com","server_port":443,"password":"p"}`,
+			},
+		},
+		RoutingExtras{
+			Rules: []RouteRule{
+				{
+					Priority:       200,
+					RuleOrder:      1,
+					MatcherType:    "domain_suffix",
+					MatcherValue:   "apple.com",
+					TargetOutbound: "Apple",
+				},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("BuildConfigWithRuntime returned error: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(cfg, &parsed); err != nil {
+		t.Fatalf("unmarshal config: %v", err)
+	}
+	outbounds, ok := parsed["outbounds"].([]any)
+	if !ok {
+		t.Fatalf("missing outbounds")
+	}
+	hasBizSelector := false
+	hasBizAuto := false
+	for _, item := range outbounds {
+		outbound, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		tag, _ := outbound["tag"].(string)
+		typ, _ := outbound["type"].(string)
+		if tag == "biz-apple" && typ == "selector" {
+			hasBizSelector = true
+			members, _ := outbound["outbounds"].([]any)
+			if len(members) != 1 || members[0] != "manual" {
+				t.Fatalf("expected biz selector only manual when pool missing, got %v", outbound["outbounds"])
+			}
+		}
+		if tag == "biz-apple-auto" {
+			hasBizAuto = true
+		}
+	}
+	if !hasBizSelector {
+		t.Fatalf("expected biz selector created")
+	}
+	if hasBizAuto {
+		t.Fatalf("did not expect biz auto when pool missing")
 	}
 }

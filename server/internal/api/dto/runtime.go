@@ -142,6 +142,9 @@ type RuntimeGroupItem struct {
 	Type                      string   `json:"type"`
 	Outbounds                 []string `json:"outbounds"`
 	Default                   string   `json:"default"`
+	AutoCandidates            []string `json:"auto_candidates,omitempty"`
+	RuntimeSelectedOutbound   *string  `json:"runtime_selected_outbound,omitempty"`
+	RuntimeEffectiveOutbound  *string  `json:"runtime_effective_outbound,omitempty"`
 	PersistedSelectedOutbound *string  `json:"persisted_selected_outbound,omitempty"`
 	PersistedUpdatedAt        *string  `json:"persisted_updated_at,omitempty"`
 }

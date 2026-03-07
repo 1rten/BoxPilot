@@ -122,6 +122,9 @@ export type RuntimeGroupItem = {
   type: string;
   outbounds: string[];
   default: string;
+  auto_candidates?: string[];
+  runtime_selected_outbound?: string;
+  runtime_effective_outbound?: string;
   persisted_selected_outbound?: string;
   persisted_updated_at?: string;
 };

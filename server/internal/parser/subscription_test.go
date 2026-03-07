@@ -166,6 +166,17 @@ proxies:
     server: hk.example.com
     port: 443
     uuid: 11111111-1111-1111-1111-111111111111
+  - name: vmess-us
+    type: vmess
+    server: us.example.com
+    port: 443
+    uuid: 22222222-2222-2222-2222-222222222222
+proxy-groups:
+  - name: openAI
+    type: select
+    proxies:
+      - vmess-hk
+      - vmess-us
 rules:
   - DOMAIN-SUFFIX,openai.com,openAI
   - GEOIP,CN,DIRECT
@@ -185,6 +196,45 @@ rule-providers:
 	}
 	if len(parsed.RuleSets) != 1 || parsed.RuleSets[0].Tag != "openai_rule" {
 		t.Fatalf("expected one rule_set provider, got %+v", parsed.RuleSets)
+	}
+	if len(parsed.BusinessGroups) != 1 {
+		t.Fatalf("expected one business group mapping, got %+v", parsed.BusinessGroups)
+	}
+	if parsed.BusinessGroups[0].TargetOutbound != "openAI" {
+		t.Fatalf("unexpected business target: %+v", parsed.BusinessGroups[0])
+	}
+	if len(parsed.BusinessGroups[0].NodeTags) != 2 {
+		t.Fatalf("expected two business members, got %+v", parsed.BusinessGroups[0].NodeTags)
+	}
+}
+
+func TestParseSubscriptionBundle_SingboxBusinessGroupMembers(t *testing.T) {
+	payload := `{
+	  "outbounds": [
+	    {"type":"vmess","tag":"node-a","server":"example.com","server_port":443,"uuid":"11111111-1111-1111-1111-111111111111"},
+	    {"type":"trojan","tag":"node-b","server":"example.org","server_port":443,"password":"p"},
+	    {"type":"selector","tag":"Apple","outbounds":["node-a","node-b"]}
+	  ],
+	  "route": {
+	    "rules": [
+	      {"domain_suffix":["apple.com"],"outbound":"Apple"}
+	    ]
+	  }
+	}`
+
+	parsed, err := ParseSubscriptionBundle([]byte(payload))
+	if err != nil {
+		t.Fatalf("ParseSubscriptionBundle returned error: %v", err)
+	}
+	if len(parsed.BusinessGroups) != 1 {
+		t.Fatalf("expected one business group mapping, got %+v", parsed.BusinessGroups)
+	}
+	group := parsed.BusinessGroups[0]
+	if group.TargetOutbound != "Apple" {
+		t.Fatalf("unexpected target outbound: %+v", group)
+	}
+	if len(group.NodeTags) != 2 || group.NodeTags[0] != "node-a" || group.NodeTags[1] != "node-b" {
+		t.Fatalf("unexpected singbox business node tags: %+v", group.NodeTags)
 	}
 }
 

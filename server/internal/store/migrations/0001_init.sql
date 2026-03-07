@@ -162,6 +162,19 @@ CREATE TABLE IF NOT EXISTS subscription_rules (
 CREATE INDEX IF NOT EXISTS idx_subscription_rules_sub_id ON subscription_rules(sub_id);
 CREATE INDEX IF NOT EXISTS idx_subscription_rules_order ON subscription_rules(priority, rule_order);
 
+CREATE TABLE IF NOT EXISTS subscription_group_members (
+  id TEXT PRIMARY KEY,
+  sub_id TEXT NOT NULL,
+  target_outbound TEXT NOT NULL,
+  node_tag TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (sub_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
+  UNIQUE (sub_id, target_outbound, node_tag)
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscription_group_members_sub_id ON subscription_group_members(sub_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_group_members_target ON subscription_group_members(target_outbound);
+
 CREATE TABLE IF NOT EXISTS runtime_group_selections (
   group_tag TEXT PRIMARY KEY,
   selected_outbound TEXT NOT NULL,

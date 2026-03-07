@@ -37,10 +37,16 @@ type RoutingRuleItem struct {
 	SourceKind     string
 }
 
+type BusinessGroupItem struct {
+	TargetOutbound string
+	NodeTags       []string
+}
+
 type ParsedSubscription struct {
-	Outbounds []OutboundItem
-	RuleSets  []RuleSetItem
-	Rules     []RoutingRuleItem
+	Outbounds      []OutboundItem
+	RuleSets       []RuleSetItem
+	Rules          []RoutingRuleItem
+	BusinessGroups []BusinessGroupItem
 }
 
 var filterTypes = map[string]bool{
@@ -110,6 +116,7 @@ func finalizeParsedBundle(out []OutboundItem, routeParsed *ParsedSubscription, p
 	if routeParsed != nil {
 		result.RuleSets = routeParsed.RuleSets
 		result.Rules = routeParsed.Rules
+		result.BusinessGroups = routeParsed.BusinessGroups
 	}
 	return result, nil
 }
@@ -154,7 +161,8 @@ func parseSingboxArray(arr []json.RawMessage) ([]OutboundItem, error) {
 
 func parseSingboxRouting(payload []byte) *ParsedSubscription {
 	var doc struct {
-		Route struct {
+		Outbounds []map[string]any `json:"outbounds"`
+		Route     struct {
 			RuleSet []json.RawMessage `json:"rule_set"`
 			Rules   []json.RawMessage `json:"rules"`
 		} `json:"route"`
@@ -164,9 +172,12 @@ func parseSingboxRouting(payload []byte) *ParsedSubscription {
 	}
 
 	result := &ParsedSubscription{
-		RuleSets: make([]RuleSetItem, 0, len(doc.Route.RuleSet)),
-		Rules:    make([]RoutingRuleItem, 0, len(doc.Route.Rules)),
+		RuleSets:       make([]RuleSetItem, 0, len(doc.Route.RuleSet)),
+		Rules:          make([]RoutingRuleItem, 0, len(doc.Route.Rules)),
+		BusinessGroups: []BusinessGroupItem{},
 	}
+	targetOrder := make([]string, 0, len(doc.Route.Rules))
+	targetSeen := map[string]struct{}{}
 
 	for idx, raw := range doc.Route.Rules {
 		var m map[string]any
@@ -177,10 +188,16 @@ func parseSingboxRouting(payload []byte) *ParsedSubscription {
 		if !isBusinessTargetTag(target) {
 			continue
 		}
+		if _, ok := targetSeen[target]; !ok {
+			targetSeen[target] = struct{}{}
+			targetOrder = append(targetOrder, target)
+		}
 		result.Rules = append(result.Rules, explodeRuleMatchers(
 			m, target, "singbox", 200, idx,
 		)...)
 	}
+	nodeSet, groupRefs := parseSingboxGroupRefs(doc.Outbounds)
+	result.BusinessGroups = buildBusinessGroupsForTargets(targetOrder, nodeSet, groupRefs, nil)
 
 	usedRuleSetTags := map[string]struct{}{}
 	for _, r := range result.Rules {
@@ -229,6 +246,12 @@ func parseSingboxRouting(payload []byte) *ParsedSubscription {
 
 func parseClashRouting(payload []byte) *ParsedSubscription {
 	var doc struct {
+		Proxies     []map[string]any `yaml:"proxies"`
+		ProxyGroups []struct {
+			Name    string   `yaml:"name"`
+			Type    string   `yaml:"type"`
+			Proxies []string `yaml:"proxies"`
+		} `yaml:"proxy-groups"`
 		Rules         []string                  `yaml:"rules"`
 		RuleProviders map[string]map[string]any `yaml:"rule-providers"`
 	}
@@ -237,10 +260,13 @@ func parseClashRouting(payload []byte) *ParsedSubscription {
 	}
 
 	result := &ParsedSubscription{
-		RuleSets: []RuleSetItem{},
-		Rules:    []RoutingRuleItem{},
+		RuleSets:       []RuleSetItem{},
+		Rules:          []RoutingRuleItem{},
+		BusinessGroups: []BusinessGroupItem{},
 	}
 	usedProviders := map[string]struct{}{}
+	targetOrder := make([]string, 0, len(doc.Rules))
+	targetSeen := map[string]struct{}{}
 
 	for idx, line := range doc.Rules {
 		parts := splitClashRuleLine(line)
@@ -252,6 +278,10 @@ func parseClashRouting(payload []byte) *ParsedSubscription {
 		target := strings.TrimSpace(parts[2])
 		if !isBusinessTargetTag(target) {
 			continue
+		}
+		if _, ok := targetSeen[target]; !ok {
+			targetSeen[target] = struct{}{}
+			targetOrder = append(targetOrder, target)
 		}
 
 		var matcherType string
@@ -285,6 +315,8 @@ func parseClashRouting(payload []byte) *ParsedSubscription {
 			SourceKind:     "clash",
 		})
 	}
+	nodeSet, groupRefs, alias := parseClashGroupRefs(doc.Proxies, doc.ProxyGroups)
+	result.BusinessGroups = buildBusinessGroupsForTargets(targetOrder, nodeSet, groupRefs, alias)
 
 	for tag, provider := range doc.RuleProviders {
 		if len(usedProviders) > 0 {
@@ -314,6 +346,156 @@ func parseClashRouting(payload []byte) *ParsedSubscription {
 		})
 	}
 	return result
+}
+
+func parseSingboxGroupRefs(outbounds []map[string]any) (map[string]struct{}, map[string][]string) {
+	nodeSet := map[string]struct{}{}
+	groupRefs := map[string][]string{}
+	for _, outbound := range outbounds {
+		tag := strings.TrimSpace(toString(outbound["tag"]))
+		if tag == "" {
+			continue
+		}
+		typ := strings.ToLower(strings.TrimSpace(toString(outbound["type"])))
+		if !filterTypes[typ] {
+			nodeSet[tag] = struct{}{}
+			continue
+		}
+		switch typ {
+		case "selector", "urltest", "fallback", "load_balance", "load-balance":
+			members := explodeMatcherValues(outbound["outbounds"])
+			if len(members) > 0 {
+				groupRefs[tag] = members
+			}
+		}
+	}
+	return nodeSet, groupRefs
+}
+
+func parseClashGroupRefs(
+	proxies []map[string]any,
+	proxyGroups []struct {
+		Name    string   `yaml:"name"`
+		Type    string   `yaml:"type"`
+		Proxies []string `yaml:"proxies"`
+	},
+) (map[string]struct{}, map[string][]string, map[string]string) {
+	nodeSet := map[string]struct{}{}
+	groupRefs := map[string][]string{}
+	alias := map[string]string{}
+	for _, p := range proxies {
+		item, err := clashProxyToOutbound(p)
+		if err != nil || item == nil {
+			continue
+		}
+		tag := strings.TrimSpace(item.Tag)
+		if tag == "" {
+			continue
+		}
+		nodeSet[tag] = struct{}{}
+		if _, ok := alias[strings.ToLower(tag)]; !ok {
+			alias[strings.ToLower(tag)] = tag
+		}
+	}
+	for _, g := range proxyGroups {
+		name := strings.TrimSpace(g.Name)
+		if name == "" {
+			continue
+		}
+		members := make([]string, 0, len(g.Proxies))
+		for _, raw := range g.Proxies {
+			member := strings.TrimSpace(raw)
+			if member != "" {
+				members = append(members, member)
+			}
+		}
+		groupRefs[name] = members
+		if _, ok := alias[strings.ToLower(name)]; !ok {
+			alias[strings.ToLower(name)] = name
+		}
+	}
+	return nodeSet, groupRefs, alias
+}
+
+func buildBusinessGroupsForTargets(
+	targets []string,
+	nodeSet map[string]struct{},
+	groupRefs map[string][]string,
+	alias map[string]string,
+) []BusinessGroupItem {
+	if len(targets) == 0 {
+		return nil
+	}
+	out := make([]BusinessGroupItem, 0, len(targets))
+	for _, rawTarget := range targets {
+		target := strings.TrimSpace(rawTarget)
+		if target == "" {
+			continue
+		}
+		members := resolveBusinessNodeTags(target, nodeSet, groupRefs, alias)
+		if len(members) == 0 {
+			continue
+		}
+		out = append(out, BusinessGroupItem{
+			TargetOutbound: target,
+			NodeTags:       members,
+		})
+	}
+	return out
+}
+
+func resolveBusinessNodeTags(
+	target string,
+	nodeSet map[string]struct{},
+	groupRefs map[string][]string,
+	alias map[string]string,
+) []string {
+	canonical := func(raw string) string {
+		name := strings.TrimSpace(raw)
+		if name == "" || alias == nil {
+			return name
+		}
+		if mapped, ok := alias[strings.ToLower(name)]; ok {
+			return mapped
+		}
+		return name
+	}
+	target = canonical(target)
+	if target == "" {
+		return nil
+	}
+	visitedGroup := map[string]bool{}
+	seenNode := map[string]struct{}{}
+	out := []string{}
+	var walk func(name string)
+	walk = func(name string) {
+		current := canonical(name)
+		if current == "" {
+			return
+		}
+		if _, ok := nodeSet[current]; ok {
+			if _, done := seenNode[current]; done {
+				return
+			}
+			seenNode[current] = struct{}{}
+			out = append(out, current)
+			return
+		}
+		refs, ok := groupRefs[current]
+		if !ok {
+			return
+		}
+		if visitedGroup[current] {
+			return
+		}
+		visitedGroup[current] = true
+		for _, child := range refs {
+			walk(child)
+		}
+		visitedGroup[current] = false
+	}
+	walk(target)
+	return out
 }
 
 func explodeRuleMatchers(rule map[string]any, target, sourceKind string, priority, ruleOrder int) []RoutingRuleItem {

@@ -48,9 +48,10 @@ type RouteRule struct {
 }
 
 type RoutingExtras struct {
-	RuleSets        []RouteRuleSetRef
-	Rules           []RouteRule
-	GroupSelections map[string]string
+	RuleSets          []RouteRuleSetRef
+	Rules             []RouteRule
+	GroupSelections   map[string]string
+	BusinessNodePools map[string][]string
 }
 
 func DefaultRoutingSettings() RoutingSettings {
@@ -163,7 +164,7 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 	}
 	routeRuleSets = append(routeRuleSets, buildRouteRuleSets(extras.RuleSets)...)
 
-	targetMap := buildBusinessGroups(&outbounds, tags, extras.Rules, extras.GroupSelections)
+	targetMap := buildBusinessGroups(&outbounds, tags, extras.Rules, extras.GroupSelections, extras.BusinessNodePools)
 	availableRuleSets := make(map[string]struct{}, len(routeRuleSets))
 	for _, rs := range routeRuleSets {
 		if tag, ok := rs["tag"].(string); ok && strings.TrimSpace(tag) != "" {
@@ -253,7 +254,13 @@ func buildRouteRuleSets(extras []RouteRuleSetRef) []map[string]any {
 	return out
 }
 
-func buildBusinessGroups(outbounds *[]any, nodeTags []string, rules []RouteRule, selections map[string]string) map[string]string {
+func buildBusinessGroups(
+	outbounds *[]any,
+	nodeTags []string,
+	rules []RouteRule,
+	selections map[string]string,
+	businessNodePools map[string][]string,
+) map[string]string {
 	targets := map[string]struct{}{}
 	for _, r := range rules {
 		target := strings.TrimSpace(r.TargetOutbound)
@@ -287,11 +294,12 @@ func buildBusinessGroups(outbounds *[]any, nodeTags []string, rules []RouteRule,
 		used[autoTag] = struct{}{}
 		result[target] = selectorTag
 		selectorOutbounds := []string{"manual"}
-		if len(nodeTags) > 0 {
+		autoMembers := filterExistingNodeTags(nodeTags, businessNodePools[target])
+		if len(autoMembers) > 0 {
 			*outbounds = append(*outbounds, map[string]any{
 				"type":      "urltest",
 				"tag":       autoTag,
-				"outbounds": nodeTags,
+				"outbounds": autoMembers,
 				"url":       "https://www.gstatic.com/generate_204",
 				"interval":  "30m",
 				"tolerance": 120,
@@ -310,6 +318,33 @@ func buildBusinessGroups(outbounds *[]any, nodeTags []string, rules []RouteRule,
 		})
 	}
 	return result
+}
+
+func filterExistingNodeTags(availableNodeTags, preferredNodeTags []string) []string {
+	if len(availableNodeTags) == 0 || len(preferredNodeTags) == 0 {
+		return nil
+	}
+	availableSet := map[string]struct{}{}
+	for _, tag := range availableNodeTags {
+		availableSet[tag] = struct{}{}
+	}
+	out := make([]string, 0, len(preferredNodeTags))
+	seen := map[string]struct{}{}
+	for _, raw := range preferredNodeTags {
+		tag := strings.TrimSpace(raw)
+		if tag == "" {
+			continue
+		}
+		if _, ok := availableSet[tag]; !ok {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		out = append(out, tag)
+	}
+	return out
 }
 
 func containsString(items []string, candidate string) bool {

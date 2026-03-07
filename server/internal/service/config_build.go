@@ -44,10 +44,15 @@ func BuildConfigFromDB(db *sql.DB, httpProxy, socksProxy generator.ProxyInbound,
 	if err != nil {
 		return nil, nil, "", err
 	}
+	groupMemberRows, err := repo.ListEnabledSubscriptionGroupMembers(db)
+	if err != nil {
+		return nil, nil, "", err
+	}
 	extras := generator.RoutingExtras{
-		RuleSets:        make([]generator.RouteRuleSetRef, 0, len(ruleSetRows)),
-		Rules:           make([]generator.RouteRule, 0, len(ruleRows)),
-		GroupSelections: map[string]string{},
+		RuleSets:          make([]generator.RouteRuleSetRef, 0, len(ruleSetRows)),
+		Rules:             make([]generator.RouteRule, 0, len(ruleRows)),
+		GroupSelections:   map[string]string{},
+		BusinessNodePools: map[string][]string{},
 	}
 	for _, rs := range ruleSetRows {
 		extras.RuleSets = append(extras.RuleSets, generator.RouteRuleSetRef{
@@ -66,6 +71,14 @@ func BuildConfigFromDB(db *sql.DB, httpProxy, socksProxy generator.ProxyInbound,
 			MatcherValue:   r.MatcherValue,
 			TargetOutbound: r.TargetOutbound,
 		})
+	}
+	for _, g := range groupMemberRows {
+		target := strings.TrimSpace(g.TargetOutbound)
+		tag := strings.TrimSpace(g.NodeTag)
+		if target == "" || tag == "" {
+			continue
+		}
+		extras.BusinessNodePools[target] = append(extras.BusinessNodePools[target], tag)
 	}
 	selectionRows, err := repo.ListRuntimeGroupSelections(db)
 	if err != nil {

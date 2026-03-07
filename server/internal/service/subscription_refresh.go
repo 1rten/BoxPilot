@@ -57,10 +57,14 @@ func RefreshSubscription(db *sql.DB, subID string) (notModified bool, nodesTotal
 		subShort = subShort[:8]
 	}
 	nodes := make([]repo.NodeRow, 0, len(parsed.Outbounds))
+	sourceToFinalTag := map[string]string{}
 	for i, o := range parsed.Outbounds {
 		tag := o.Tag
 		if tag == "" {
 			tag = subShort + "-" + strconv.Itoa(i) + "-node"
+		}
+		if strings.TrimSpace(o.Tag) != "" {
+			sourceToFinalTag[strings.TrimSpace(o.Tag)] = tag
 		}
 		nodes = append(nodes, repo.NodeRow{
 			ID: util.NewID(), SubID: row.ID, Tag: tag, Name: tag, Type: o.Type, Enabled: 1,
@@ -97,7 +101,43 @@ func RefreshSubscription(db *sql.DB, subID string) (notModified bool, nodesTotal
 			CreatedAt:      util.NowRFC3339(),
 		})
 	}
-	if err := repo.ReplaceSubscriptionRouting(db, row.ID, ruleSets, rules); err != nil {
+	availableTags := map[string]struct{}{}
+	for _, node := range nodes {
+		availableTags[node.Tag] = struct{}{}
+	}
+	groupMembers := make([]repo.SubscriptionGroupMemberRow, 0)
+	memberDedup := map[string]struct{}{}
+	for _, group := range parsed.BusinessGroups {
+		target := strings.TrimSpace(group.TargetOutbound)
+		if target == "" {
+			continue
+		}
+		for _, rawTag := range group.NodeTags {
+			tag := strings.TrimSpace(rawTag)
+			if tag == "" {
+				continue
+			}
+			if mapped, ok := sourceToFinalTag[tag]; ok {
+				tag = mapped
+			}
+			if _, ok := availableTags[tag]; !ok {
+				continue
+			}
+			key := target + "\x00" + tag
+			if _, ok := memberDedup[key]; ok {
+				continue
+			}
+			memberDedup[key] = struct{}{}
+			groupMembers = append(groupMembers, repo.SubscriptionGroupMemberRow{
+				ID:             util.NewID(),
+				SubID:          row.ID,
+				TargetOutbound: target,
+				NodeTag:        tag,
+				CreatedAt:      util.NowRFC3339(),
+			})
+		}
+	}
+	if err := repo.ReplaceSubscriptionRouting(db, row.ID, ruleSets, rules, groupMembers); err != nil {
 		return false, 0, 0, errorx.New(errorx.DBError, "replace subscription routing").WithDetails(map[string]any{"id": subID})
 	}
 	etag := resp.Header.Get("Etag")

@@ -162,6 +162,51 @@ function RuntimeGroupsCard({ items }: RuntimeGroupsCardProps) {
                     : ""}
                 </p>
               ) : null}
+              {group.runtime_selected_outbound ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <Tag color="processing">
+                    {tr("settings.groups.runtime_selected", "Runtime selected: {outbound}", {
+                      outbound: group.runtime_selected_outbound,
+                    })}
+                  </Tag>
+                  {group.runtime_effective_outbound ? (
+                    <Tag
+                      color={
+                        group.runtime_effective_outbound === group.runtime_selected_outbound ? "blue" : "success"
+                      }
+                    >
+                      {tr("settings.groups.runtime_effective", "Effective: {outbound}", {
+                        outbound: group.runtime_effective_outbound,
+                      })}
+                    </Tag>
+                  ) : null}
+                </div>
+              ) : group.tag.startsWith("biz-") ? (
+                <p className="bp-muted" style={{ margin: 0 }}>
+                  {tr("settings.groups.runtime_unavailable", "Runtime state unavailable (Clash API unreachable).")}
+                </p>
+              ) : null}
+              {group.auto_candidates && group.auto_candidates.length > 0 ? (
+                <details>
+                  <summary className="bp-muted" style={{ cursor: "pointer" }}>
+                    {tr("settings.groups.auto_candidates_toggle", "View auto candidates ({count})", {
+                      count: String(group.auto_candidates.length),
+                    })}
+                  </summary>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                    {group.auto_candidates.map((nodeTag) => (
+                      <Tag key={`${group.tag}-${nodeTag}`}>{nodeTag}</Tag>
+                    ))}
+                  </div>
+                </details>
+              ) : group.tag.startsWith("biz-") ? (
+                <p className="bp-muted" style={{ margin: 0 }}>
+                  {tr(
+                    "settings.groups.auto_empty",
+                    "No business node pool was parsed for this group, so only manual is available."
+                  )}
+                </p>
+              ) : null}
               <Select
                 value={drafts[group.tag] ?? group.default}
                 options={group.outbounds.map((value) => ({ value, label: value }))}
