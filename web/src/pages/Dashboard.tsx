@@ -39,12 +39,13 @@ export default function Dashboard() {
     enabled: logsModalOpen,
     refetchIntervalMs: 8000,
   });
+  const [connectionsModalOpen, setConnectionsModalOpen] = useState(false);
   const [connQuery, setConnQuery] = useState("");
   const {
     data: connectionsData,
     isLoading: connectionsLoading,
     isFetching: connectionsFetching,
-  } = useRuntimeConnections(connQuery);
+  } = useRuntimeConnections();
   const [proxyCheckTarget, setProxyCheckTarget] = useState("https://www.gstatic.com/generate_204");
   const proxyCheck = useRuntimeProxyCheck();
   const proxyCheckResult = proxyCheck.data;
@@ -77,8 +78,25 @@ export default function Dashboard() {
   const forwardingStatusLabel = tr(`app.proxy.runtime.${forwardingStatus}`, forwardingStatus.toUpperCase());
 
   const connections = connectionsData?.items ?? [];
-  const recentLogs = logsData?.items?.slice(0, 8) ?? [];
+  const recentLogs = logsData?.items?.slice(0, 4) ?? [];
   const recentLogsTotal = logsData?.items?.length ?? 0;
+  const filteredConnections = useMemo(() => {
+    const q = connQuery.trim().toLowerCase();
+    if (!q) {
+      return connections;
+    }
+    return connections.filter((row) => {
+      const nodeName = row.node_name?.toLowerCase() ?? "";
+      const nodeType = row.node_type?.toLowerCase() ?? "";
+      const target = row.target?.toLowerCase() ?? "";
+      const status = row.status?.toLowerCase() ?? "";
+      return nodeName.includes(q) || nodeType.includes(q) || target.includes(q) || status.includes(q);
+    });
+  }, [connQuery, connections]);
+  const connectionErrorCount = useMemo(
+    () => connections.filter((row) => (row.status || "").toLowerCase() === "error").length,
+    [connections]
+  );
   const connectionColumns: ColumnsType<RuntimeConnection> = useMemo(
     () => [
       {
@@ -151,341 +169,372 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <div className="bp-dashboard-grid">
-        <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
-          <div className="bp-card-header">
-            <div>
-              <p className="bp-card-kicker">{tr("dashboard.kicker.system", "System")}</p>
-              <h2 className="bp-card-title">{tr("dashboard.runtime", "Runtime")}</h2>
-            </div>
-            <span className={`bp-badge bp-badge--${runtimeTone}`}>{runtimeState}</span>
-          </div>
-
-          {runtimeLoading && !runtime && (
-            <p className="bp-muted">{tr("dashboard.runtime.loading", "Loading runtime status...")}</p>
-          )}
-          {runtimeError && (
-            <ErrorState
-              message={tr("dashboard.runtime.error", "Failed to load runtime status: {message}", {
-                message: (runtimeError as Error).message,
-              })}
-            />
-          )}
-          {runtime && !runtimeError && (
-            <div className="bp-runtime-grid">
-              <div className="bp-runtime-item">
-                <span className="bp-runtime-label">{tr("dashboard.runtime.config_version", "Config version")}</span>
-                <span className="bp-runtime-value">{runtime.config_version}</span>
-              </div>
-              <div className="bp-runtime-item">
-                <span className="bp-runtime-label">{tr("dashboard.runtime.hash", "Hash")}</span>
-                <span className="bp-runtime-value bp-mono">{configHash}</span>
-              </div>
-              <div className="bp-runtime-item">
-                <span className="bp-runtime-label">{tr("dashboard.runtime.nodes_included", "Nodes Included")}</span>
-                <span className="bp-runtime-value">{runtime.nodes_included}</span>
-              </div>
-              <div className="bp-runtime-item">
-                <span className="bp-runtime-label">{tr("dashboard.runtime.apply_duration", "Last Apply Duration")}</span>
-                <span className="bp-runtime-value">
-                  {runtime.last_apply_duration_ms ? `${runtime.last_apply_duration_ms} ms` : "-"}
-                </span>
-              </div>
-              <div className="bp-runtime-item">
-                <span className="bp-runtime-label">{tr("dashboard.runtime.http_port", "HTTP Port")}</span>
-                <span className="bp-runtime-value">{runtime.ports.http}</span>
-              </div>
-              <div className="bp-runtime-item">
-                <span className="bp-runtime-label">{tr("dashboard.runtime.socks_port", "SOCKS Port")}</span>
-                <span className="bp-runtime-value">{runtime.ports.socks}</span>
-              </div>
-              <div className="bp-runtime-item">
-                <span className="bp-runtime-label">{tr("dashboard.runtime.last_reload", "Last Reload")}</span>
-                <span className="bp-runtime-value bp-mono">
-                  {runtime.last_reload_at ? formatDateTime(runtime.last_reload_at) : "-"}
-                </span>
-              </div>
-              <div className="bp-runtime-item">
-                <span className="bp-runtime-label">{tr("dashboard.runtime.last_success", "Last Successful Apply")}</span>
-                <span className="bp-runtime-value bp-mono">
-                  {runtime.last_apply_success_at ? formatDateTime(runtime.last_apply_success_at) : "-"}
-                </span>
-              </div>
-              <div className="bp-runtime-item">
-                <span className="bp-runtime-label">{tr("dashboard.runtime.last_error", "Last Error")}</span>
-                <span className="bp-runtime-value">{runtime.last_reload_error || "-"}</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="bp-card bp-dashboard-card">
-          <div className="bp-card-header">
-            <div>
-              <p className="bp-card-kicker">{tr("dashboard.kicker.forwarding", "Forwarding")}</p>
-              <h2 className="bp-card-title">{tr("dashboard.traffic", "Traffic")}</h2>
-            </div>
-            <span
-              className={`bp-link-pill bp-source-pill bp-source-pill--${trafficSourceMeta.tone}`}
-              title={traffic?.source || tr("common.unknown", "unknown")}
-            >
-              {trafficSourceMeta.label}
-            </span>
-          </div>
-          <p className="bp-muted">{trafficSourceMeta.description}</p>
-          <div className="bp-runtime-grid">
-            <div className="bp-runtime-item">
-              <span className="bp-runtime-label">{tr("dashboard.traffic.download", "Download Rate")}</span>
-              <span className="bp-runtime-value">{formatRate(traffic?.rx_rate_bps ?? 0)}</span>
-            </div>
-            <div className="bp-runtime-item">
-              <span className="bp-runtime-label">{tr("dashboard.traffic.upload", "Upload Rate")}</span>
-              <span className="bp-runtime-value">{formatRate(traffic?.tx_rate_bps ?? 0)}</span>
-            </div>
-            <div className="bp-runtime-item">
-              <span className="bp-runtime-label">{tr("dashboard.traffic.rx_total", "RX Total")}</span>
-              <span className="bp-runtime-value">{formatBytes(traffic?.rx_total_bytes ?? 0)}</span>
-            </div>
-            <div className="bp-runtime-item">
-              <span className="bp-runtime-label">{tr("dashboard.traffic.tx_total", "TX Total")}</span>
-              <span className="bp-runtime-value">{formatBytes(traffic?.tx_total_bytes ?? 0)}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bp-card bp-dashboard-card">
-          <div className="bp-card-header">
-            <div>
-              <p className="bp-card-kicker">{tr("dashboard.kicker.diagnostics", "Diagnostics")}</p>
-              <h2 className="bp-card-title">{tr("dashboard.proxy_check.title", "Proxy Chain Check")}</h2>
-            </div>
-            {proxyCheckResult?.checked_at ? (
-              <span className="bp-metric-subtle">{formatDateTime(proxyCheckResult.checked_at)}</span>
-            ) : (
-              <span className="bp-metric-subtle bp-metric-subtle-hidden">--</span>
-            )}
-          </div>
-          <div className="bp-proxy-check-toolbar">
-            <Input
-              className="bp-input"
-              value={proxyCheckTarget}
-              onChange={(e) => setProxyCheckTarget(e.target.value)}
-              placeholder={tr("dashboard.proxy_check.target.placeholder", "https://www.gstatic.com/generate_204")}
-            />
-            <Button
-              type="primary"
-              className="bp-btn-fixed"
-              loading={proxyCheck.isPending}
-              onClick={() =>
-                proxyCheck.mutate({
-                  target_url: proxyCheckTarget.trim() || undefined,
-                })
-              }
-            >
-              {tr("dashboard.proxy_check.run", "Run Check")}
-            </Button>
-          </div>
-          <div className="bp-proxy-check-grid">
-            <ProxyCheckRow
-              label="HTTP"
-              result={proxyCheckResult?.http}
-              emptyText={tr("dashboard.proxy_check.empty", "Run a check to see proxy chain status.")}
-              labels={{
-                pass: tr("dashboard.proxy_check.pass", "PASS"),
-                fail: tr("dashboard.proxy_check.fail", "FAIL"),
-                disabled: tr("dashboard.proxy_check.disabled", "DISABLED"),
-                tls_ok: tr("dashboard.proxy_check.tls_ok", "TLS OK"),
-                tls_na: tr("dashboard.proxy_check.tls_na", "TLS -"),
-                egress: tr("dashboard.proxy_check.egress", "Egress"),
-              }}
-            />
-            <ProxyCheckRow
-              label="SOCKS5"
-              result={proxyCheckResult?.socks}
-              emptyText={tr("dashboard.proxy_check.empty", "Run a check to see proxy chain status.")}
-              labels={{
-                pass: tr("dashboard.proxy_check.pass", "PASS"),
-                fail: tr("dashboard.proxy_check.fail", "FAIL"),
-                disabled: tr("dashboard.proxy_check.disabled", "DISABLED"),
-                tls_ok: tr("dashboard.proxy_check.tls_ok", "TLS OK"),
-                tls_na: tr("dashboard.proxy_check.tls_na", "TLS -"),
-                egress: tr("dashboard.proxy_check.egress", "Egress"),
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="bp-card bp-dashboard-card">
-          <div className="bp-card-header">
-            <div>
-              <p className="bp-card-kicker">{tr("dashboard.kicker.inventory", "Inventory")}</p>
-              <h2 className="bp-card-title">{tr("nav.subscriptions", "Subscriptions")}</h2>
-            </div>
-            <Link to="/subscriptions" className="bp-link-pill">
-              {tr("dashboard.view_all", "View All")}
-            </Link>
-          </div>
-          <div className="bp-stat">
-            <span className="bp-stat-value">{subs?.length ?? 0}</span>
-            <span className="bp-stat-label">{tr("dashboard.subs.total", "Total active subscriptions")}</span>
-          </div>
-          <p className="bp-muted">{tr("dashboard.subs.desc", "Track usage and refresh subscriptions in one place.")}</p>
-        </div>
-
-        <div className="bp-card bp-dashboard-card">
-          <div className="bp-card-header">
-            <div>
-              <p className="bp-card-kicker">{tr("dashboard.kicker.topology", "Topology")}</p>
-              <h2 className="bp-card-title">{tr("nav.nodes", "Nodes")}</h2>
-            </div>
-            <Link to="/nodes" className="bp-link-pill">
-              {tr("dashboard.view_all", "View All")}
-            </Link>
-          </div>
-          <div className="bp-stat">
-            <span className="bp-stat-value">{nodes?.length ?? 0}</span>
-            <span className="bp-stat-label">{tr("dashboard.nodes.total", "Nodes configured")}</span>
-          </div>
-          <p className="bp-muted">
-            {tr("dashboard.nodes.selected", "Forwarding selected")}: {forwardingSummary?.selected_nodes_count ?? 0}
+      <section className="bp-dashboard-section">
+        <div className="bp-dashboard-section-head">
+          <h2 className="bp-dashboard-section-title">{tr("dashboard.section.overview.title", "Overview")}</h2>
+          <p className="bp-dashboard-section-desc">
+            {tr("dashboard.section.overview.desc", "Core runtime and routing signals for daily monitoring.")}
           </p>
         </div>
+        <div className="bp-dashboard-grid">
+          <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
+            <div className="bp-card-header">
+              <div>
+                <p className="bp-card-kicker">{tr("dashboard.kicker.system", "System")}</p>
+                <h2 className="bp-card-title">{tr("dashboard.runtime", "Runtime")}</h2>
+              </div>
+              <span className={`bp-badge bp-badge--${runtimeTone}`}>{runtimeState}</span>
+            </div>
 
-        <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
-          <div className="bp-card-header">
-            <div>
-              <p className="bp-card-kicker">{tr("dashboard.kicker.routing", "Routing")}</p>
-              <h2 className="bp-card-title">{tr("dashboard.routing.title", "Routing")}</h2>
-            </div>
-            <Link to="/settings" className="bp-link-pill">
-              {tr("dashboard.routing.edit", "Edit Rules")}
-            </Link>
-          </div>
-          <div className="bp-runtime-grid">
-            <div className="bp-runtime-item">
-              <span className="bp-runtime-label">{tr("dashboard.routing.private", "Bypass Private")}</span>
-              <span className="bp-runtime-value">{routingSummary?.bypass_private_enabled ? tr("nodes.status.enabled", "Enabled") : tr("nodes.status.disabled", "Disabled")}</span>
-            </div>
-            <div className="bp-runtime-item">
-              <span className="bp-runtime-label">{tr("dashboard.routing.domains", "Bypass Domains")}</span>
-              <span className="bp-runtime-value">{routingSummary?.bypass_domains_count ?? 0}</span>
-            </div>
-            <div className="bp-runtime-item">
-              <span className="bp-runtime-label">{tr("dashboard.routing.cidrs", "Bypass CIDRs")}</span>
-              <span className="bp-runtime-value">{routingSummary?.bypass_cidrs_count ?? 0}</span>
-            </div>
-            <div className="bp-runtime-item">
-              <span className="bp-runtime-label">{tr("dashboard.routing.geosite_cn", "geosite-cn Direct")}</span>
-              <span className="bp-runtime-value">
-                {(routingSummary?.geosite_status ?? (routingSummary?.bypass_private_enabled ? "enabled" : "disabled")) === "enabled"
-                  ? tr("nodes.status.enabled", "Enabled")
-                  : tr("nodes.status.disabled", "Disabled")}
-              </span>
-            </div>
-            <div className="bp-runtime-item">
-              <span className="bp-runtime-label">{tr("dashboard.routing.geoip_cn", "geoip-cn Direct")}</span>
-              <span className="bp-runtime-value">
-                {(routingSummary?.geoip_status ?? (routingSummary?.bypass_private_enabled ? "enabled" : "disabled")) === "enabled"
-                  ? tr("nodes.status.enabled", "Enabled")
-                  : tr("nodes.status.disabled", "Disabled")}
-              </span>
-            </div>
-          </div>
-          {routingSummary?.notes?.length ? (
-            <div className="bp-list-compact" style={{ marginTop: 12 }}>
-              {routingSummary.notes.slice(0, 2).map((note) => (
-                <p key={note} className="bp-muted">
-                  - {note}
-                </p>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
-          <div className="bp-card-header">
-            <div>
-              <p className="bp-card-kicker">{tr("dashboard.kicker.diagnostics", "Diagnostics")}</p>
-              <h2 className="bp-card-title">{tr("dashboard.logs.title", "Runtime Logs")}</h2>
-            </div>
-            <div className="bp-card-header-meta">
-              <span className="bp-metric-pill bp-metric-pill-neutral">
-                {tr("dashboard.logs.showing", "Showing {shown}/{total}", {
-                  shown: recentLogs.length,
-                  total: recentLogsTotal,
+            {runtimeLoading && !runtime && (
+              <p className="bp-muted">{tr("dashboard.runtime.loading", "Loading runtime status...")}</p>
+            )}
+            {runtimeError && (
+              <ErrorState
+                message={tr("dashboard.runtime.error", "Failed to load runtime status: {message}", {
+                  message: (runtimeError as Error).message,
                 })}
+              />
+            )}
+            {runtime && !runtimeError && (
+              <div className="bp-runtime-grid">
+                <div className="bp-runtime-item">
+                  <span className="bp-runtime-label">{tr("dashboard.runtime.config_version", "Config version")}</span>
+                  <span className="bp-runtime-value">{runtime.config_version}</span>
+                </div>
+                <div className="bp-runtime-item">
+                  <span className="bp-runtime-label">{tr("dashboard.runtime.hash", "Hash")}</span>
+                  <span className="bp-runtime-value bp-mono">{configHash}</span>
+                </div>
+                <div className="bp-runtime-item">
+                  <span className="bp-runtime-label">{tr("dashboard.runtime.nodes_included", "Nodes Included")}</span>
+                  <span className="bp-runtime-value">{runtime.nodes_included}</span>
+                </div>
+                <div className="bp-runtime-item">
+                  <span className="bp-runtime-label">{tr("dashboard.runtime.apply_duration", "Last Apply Duration")}</span>
+                  <span className="bp-runtime-value">
+                    {runtime.last_apply_duration_ms ? `${runtime.last_apply_duration_ms} ms` : "-"}
+                  </span>
+                </div>
+                <div className="bp-runtime-item">
+                  <span className="bp-runtime-label">{tr("dashboard.runtime.http_port", "HTTP Port")}</span>
+                  <span className="bp-runtime-value">{runtime.ports.http}</span>
+                </div>
+                <div className="bp-runtime-item">
+                  <span className="bp-runtime-label">{tr("dashboard.runtime.socks_port", "SOCKS Port")}</span>
+                  <span className="bp-runtime-value">{runtime.ports.socks}</span>
+                </div>
+                <div className="bp-runtime-item">
+                  <span className="bp-runtime-label">{tr("dashboard.runtime.last_reload", "Last Reload")}</span>
+                  <span className="bp-runtime-value bp-mono">
+                    {runtime.last_reload_at ? formatDateTime(runtime.last_reload_at) : "-"}
+                  </span>
+                </div>
+                <div className="bp-runtime-item">
+                  <span className="bp-runtime-label">{tr("dashboard.runtime.last_success", "Last Successful Apply")}</span>
+                  <span className="bp-runtime-value bp-mono">
+                    {runtime.last_apply_success_at ? formatDateTime(runtime.last_apply_success_at) : "-"}
+                  </span>
+                </div>
+                <div className="bp-runtime-item">
+                  <span className="bp-runtime-label">{tr("dashboard.runtime.last_error", "Last Error")}</span>
+                  <span className="bp-runtime-value">{runtime.last_reload_error || "-"}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
+            <div className="bp-card-header">
+              <div>
+                <p className="bp-card-kicker">{tr("dashboard.kicker.routing", "Routing")}</p>
+                <h2 className="bp-card-title">{tr("dashboard.routing.title", "Routing")}</h2>
+              </div>
+              <Link to="/settings" className="bp-link-pill">
+                {tr("dashboard.routing.edit", "Edit Rules")}
+              </Link>
+            </div>
+            <div className="bp-runtime-grid">
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">{tr("dashboard.routing.private", "Bypass Private")}</span>
+                <span className="bp-runtime-value">{routingSummary?.bypass_private_enabled ? tr("nodes.status.enabled", "Enabled") : tr("nodes.status.disabled", "Disabled")}</span>
+              </div>
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">{tr("dashboard.routing.domains", "Bypass Domains")}</span>
+                <span className="bp-runtime-value">{routingSummary?.bypass_domains_count ?? 0}</span>
+              </div>
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">{tr("dashboard.routing.cidrs", "Bypass CIDRs")}</span>
+                <span className="bp-runtime-value">{routingSummary?.bypass_cidrs_count ?? 0}</span>
+              </div>
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">{tr("dashboard.routing.geosite_cn", "geosite-cn Direct")}</span>
+                <span className="bp-runtime-value">
+                  {(routingSummary?.geosite_status ?? (routingSummary?.bypass_private_enabled ? "enabled" : "disabled")) === "enabled"
+                    ? tr("nodes.status.enabled", "Enabled")
+                    : tr("nodes.status.disabled", "Disabled")}
+                </span>
+              </div>
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">{tr("dashboard.routing.geoip_cn", "geoip-cn Direct")}</span>
+                <span className="bp-runtime-value">
+                  {(routingSummary?.geoip_status ?? (routingSummary?.bypass_private_enabled ? "enabled" : "disabled")) === "enabled"
+                    ? tr("nodes.status.enabled", "Enabled")
+                    : tr("nodes.status.disabled", "Disabled")}
+                </span>
+              </div>
+            </div>
+            {routingSummary?.notes?.length ? (
+              <div className="bp-list-compact" style={{ marginTop: 12 }}>
+                {routingSummary.notes.slice(0, 2).map((note) => (
+                  <p key={note} className="bp-muted">
+                    - {note}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="bp-card bp-dashboard-card">
+            <div className="bp-card-header">
+              <div>
+                <p className="bp-card-kicker">{tr("dashboard.kicker.forwarding", "Forwarding")}</p>
+                <h2 className="bp-card-title">{tr("dashboard.traffic", "Traffic")}</h2>
+              </div>
+              <span
+                className={`bp-link-pill bp-source-pill bp-source-pill--${trafficSourceMeta.tone}`}
+                title={traffic?.source || tr("common.unknown", "unknown")}
+              >
+                {trafficSourceMeta.label}
               </span>
-              <span className={logsFetching ? "bp-sync-indicator bp-sync-indicator-fetching" : "bp-sync-indicator"}>
-                <span className="bp-sync-indicator-dot" />
-                {tr("dashboard.sync", "Sync")}
-              </span>
-              <Button size="small" onClick={() => setLogsModalOpen(true)}>
-                {tr("dashboard.logs.more", "View More")}
+            </div>
+            <p className="bp-muted">{trafficSourceMeta.description}</p>
+            <div className="bp-runtime-grid">
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">{tr("dashboard.traffic.download", "Download Rate")}</span>
+                <span className="bp-runtime-value">{formatRate(traffic?.rx_rate_bps ?? 0)}</span>
+              </div>
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">{tr("dashboard.traffic.upload", "Upload Rate")}</span>
+                <span className="bp-runtime-value">{formatRate(traffic?.tx_rate_bps ?? 0)}</span>
+              </div>
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">{tr("dashboard.traffic.rx_total", "RX Total")}</span>
+                <span className="bp-runtime-value">{formatBytes(traffic?.rx_total_bytes ?? 0)}</span>
+              </div>
+              <div className="bp-runtime-item">
+                <span className="bp-runtime-label">{tr("dashboard.traffic.tx_total", "TX Total")}</span>
+                <span className="bp-runtime-value">{formatBytes(traffic?.tx_total_bytes ?? 0)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bp-card bp-dashboard-card">
+            <div className="bp-card-header">
+              <div>
+                <p className="bp-card-kicker">{tr("dashboard.kicker.inventory", "Inventory")}</p>
+                <h2 className="bp-card-title">{tr("nav.subscriptions", "Subscriptions")}</h2>
+              </div>
+              <Link to="/subscriptions" className="bp-link-pill">
+                {tr("dashboard.view_all", "View All")}
+              </Link>
+            </div>
+            <div className="bp-stat">
+              <span className="bp-stat-value">{subs?.length ?? 0}</span>
+              <span className="bp-stat-label">{tr("dashboard.subs.total", "Total active subscriptions")}</span>
+            </div>
+            <p className="bp-muted">{tr("dashboard.subs.desc", "Track usage and refresh subscriptions in one place.")}</p>
+          </div>
+
+          <div className="bp-card bp-dashboard-card">
+            <div className="bp-card-header">
+              <div>
+                <p className="bp-card-kicker">{tr("dashboard.kicker.topology", "Topology")}</p>
+                <h2 className="bp-card-title">{tr("nav.nodes", "Nodes")}</h2>
+              </div>
+              <Link to="/nodes" className="bp-link-pill">
+                {tr("dashboard.view_all", "View All")}
+              </Link>
+            </div>
+            <div className="bp-stat">
+              <span className="bp-stat-value">{nodes?.length ?? 0}</span>
+              <span className="bp-stat-label">{tr("dashboard.nodes.total", "Nodes configured")}</span>
+            </div>
+            <p className="bp-muted">
+              {tr("dashboard.nodes.selected", "Forwarding selected")}: {forwardingSummary?.selected_nodes_count ?? 0}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="bp-dashboard-section">
+        <div className="bp-dashboard-section-head">
+          <h2 className="bp-dashboard-section-title">{tr("dashboard.section.diagnostics.title", "Diagnostics")}</h2>
+          <p className="bp-dashboard-section-desc">
+            {tr("dashboard.section.diagnostics.desc", "Detailed checks and traces for troubleshooting when needed.")}
+          </p>
+        </div>
+        <div className="bp-dashboard-grid">
+          <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
+            <div className="bp-card-header">
+              <div>
+                <p className="bp-card-kicker">{tr("dashboard.kicker.diagnostics", "Diagnostics")}</p>
+                <h2 className="bp-card-title">{tr("dashboard.proxy_check.title", "Proxy Chain Check")}</h2>
+              </div>
+              {proxyCheckResult?.checked_at ? (
+                <span className="bp-metric-subtle">{formatDateTime(proxyCheckResult.checked_at)}</span>
+              ) : (
+                <span className="bp-metric-subtle bp-metric-subtle-hidden">--</span>
+              )}
+            </div>
+            <div className="bp-proxy-check-toolbar">
+              <Input
+                className="bp-input"
+                value={proxyCheckTarget}
+                onChange={(e) => setProxyCheckTarget(e.target.value)}
+                placeholder={tr("dashboard.proxy_check.target.placeholder", "https://www.gstatic.com/generate_204")}
+              />
+              <Button
+                type="primary"
+                className="bp-btn-fixed"
+                loading={proxyCheck.isPending}
+                onClick={() =>
+                  proxyCheck.mutate({
+                    target_url: proxyCheckTarget.trim() || undefined,
+                  })
+                }
+              >
+                {tr("dashboard.proxy_check.run", "Run Check")}
+              </Button>
+            </div>
+            <div className="bp-proxy-check-grid">
+              <ProxyCheckRow
+                label="HTTP"
+                result={proxyCheckResult?.http}
+                emptyText={tr("dashboard.proxy_check.empty", "Run a check to see proxy chain status.")}
+                labels={{
+                  pass: tr("dashboard.proxy_check.pass", "PASS"),
+                  fail: tr("dashboard.proxy_check.fail", "FAIL"),
+                  disabled: tr("dashboard.proxy_check.disabled", "DISABLED"),
+                  tls_ok: tr("dashboard.proxy_check.tls_ok", "TLS OK"),
+                  tls_na: tr("dashboard.proxy_check.tls_na", "TLS -"),
+                  egress: tr("dashboard.proxy_check.egress", "Egress"),
+                }}
+              />
+              <ProxyCheckRow
+                label="SOCKS5"
+                result={proxyCheckResult?.socks}
+                emptyText={tr("dashboard.proxy_check.empty", "Run a check to see proxy chain status.")}
+                labels={{
+                  pass: tr("dashboard.proxy_check.pass", "PASS"),
+                  fail: tr("dashboard.proxy_check.fail", "FAIL"),
+                  disabled: tr("dashboard.proxy_check.disabled", "DISABLED"),
+                  tls_ok: tr("dashboard.proxy_check.tls_ok", "TLS OK"),
+                  tls_na: tr("dashboard.proxy_check.tls_na", "TLS -"),
+                  egress: tr("dashboard.proxy_check.egress", "Egress"),
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
+            <div className="bp-card-header">
+              <div>
+                <p className="bp-card-kicker">{tr("dashboard.kicker.diagnostics", "Diagnostics")}</p>
+                <h2 className="bp-card-title">{tr("dashboard.logs.title", "Runtime Logs")}</h2>
+              </div>
+              <div className="bp-card-header-meta">
+                <span className="bp-metric-pill bp-metric-pill-neutral">
+                  {tr("dashboard.logs.showing", "Showing {shown}/{total}", {
+                    shown: recentLogs.length,
+                    total: recentLogsTotal,
+                  })}
+                </span>
+                <span className={logsFetching ? "bp-sync-indicator bp-sync-indicator-fetching" : "bp-sync-indicator"}>
+                  <span className="bp-sync-indicator-dot" />
+                  {tr("dashboard.sync", "Sync")}
+                </span>
+                <Button size="small" onClick={() => setLogsModalOpen(true)}>
+                  {tr("dashboard.logs.more", "View More")}
+                </Button>
+              </div>
+            </div>
+            {recentLogs.length ? (
+              <div className="bp-log-list bp-log-list-compact">
+                {recentLogs.map((item) => (
+                  <div
+                    key={`${item.timestamp}-${item.level}-${item.source}-${item.message}`}
+                    className="bp-log-item"
+                  >
+                    <div className="bp-log-head">
+                      <span className="bp-table-mono">{formatDateTime(item.timestamp)}</span>
+                      <Tag color={item.level === "error" ? "error" : item.level === "warn" ? "warning" : "processing"}>
+                        {item.level.toUpperCase()}
+                      </Tag>
+                    </div>
+                    <p className="bp-log-message">
+                      <span className="bp-table-mono">[{item.source}]</span> {item.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="bp-muted">{logsFetching ? tr("dashboard.logs.loading", "Loading runtime logs...") : tr("dashboard.logs.empty", "No runtime logs yet.")}</p>
+            )}
+          </div>
+
+          <div className="bp-card bp-dashboard-card bp-dashboard-card--wide">
+            <div className="bp-card-header">
+              <div>
+                <p className="bp-card-kicker">{tr("dashboard.kicker.diagnostics", "Diagnostics")}</p>
+                <h2 className="bp-card-title">{tr("dashboard.connections.title", "Connections")}</h2>
+              </div>
+              <div className="bp-card-header-meta">
+                <span className="bp-metric-pill bp-metric-pill-active">
+                  {tr("dashboard.connections.active", "Active {count}", {
+                    count: connectionsData?.active_count ?? 0,
+                  })}
+                </span>
+                <span className="bp-metric-pill bp-metric-pill-neutral">
+                  {tr("dashboard.connections.total", "Total {count}", {
+                    count: connections.length,
+                  })}
+                </span>
+                <span className="bp-metric-pill bp-metric-pill-neutral">
+                  {tr("dashboard.connections.errors", "Errors {count}", {
+                    count: connectionErrorCount,
+                  })}
+                </span>
+                <span className={connectionsFetching ? "bp-sync-indicator bp-sync-indicator-fetching" : "bp-sync-indicator"}>
+                  <span className="bp-sync-indicator-dot" />
+                  {tr("dashboard.sync", "Sync")}
+                </span>
+              </div>
+            </div>
+            {connections.length ? (
+              <div className="bp-connection-preview-list">
+                {connections.slice(0, 4).map((item) => (
+                  <div key={item.id} className="bp-connection-preview-item">
+                    <span className="bp-table-mono">{item.target}</span>
+                    <Tag color={(item.status || "").toLowerCase() === "error" ? "error" : "processing"}>
+                      {(item.status || "unknown").toUpperCase()}
+                    </Tag>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="bp-muted">
+                {connectionsLoading ? tr("common.loading", "Loading...") : tr("dashboard.connections.empty", "No active connections.")}
+              </p>
+            )}
+            <div className="bp-page-actions bp-settings-actions">
+              <Button size="small" onClick={() => setConnectionsModalOpen(true)}>
+                {tr("dashboard.connections.more", "View Details")}
               </Button>
             </div>
           </div>
-          {recentLogs.length ? (
-            <div className="bp-log-list">
-              {recentLogs.map((item) => (
-                <div
-                  key={`${item.timestamp}-${item.level}-${item.source}-${item.message}`}
-                  className="bp-log-item"
-                >
-                  <div className="bp-log-head">
-                    <span className="bp-table-mono">{formatDateTime(item.timestamp)}</span>
-                    <Tag color={item.level === "error" ? "error" : item.level === "warn" ? "warning" : "processing"}>
-                      {item.level.toUpperCase()}
-                    </Tag>
-                  </div>
-                  <p className="bp-log-message">
-                    <span className="bp-table-mono">[{item.source}]</span> {item.message}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="bp-muted">{logsFetching ? tr("dashboard.logs.loading", "Loading runtime logs...") : tr("dashboard.logs.empty", "No runtime logs yet.")}</p>
-          )}
         </div>
-
-        <div className="bp-card bp-dashboard-card bp-dashboard-card--full">
-          <div className="bp-card-header">
-            <div>
-              <p className="bp-card-kicker">{tr("dashboard.kicker.diagnostics", "Diagnostics")}</p>
-              <h2 className="bp-card-title">{tr("dashboard.connections.title", "Connections")}</h2>
-            </div>
-            <div className="bp-card-header-meta">
-              <span className="bp-metric-pill bp-metric-pill-active">
-                {tr("dashboard.connections.active", "Active {count}", {
-                  count: connectionsData?.active_count ?? 0,
-                })}
-              </span>
-              <span className={connectionsFetching ? "bp-sync-indicator bp-sync-indicator-fetching" : "bp-sync-indicator"}>
-                <span className="bp-sync-indicator-dot" />
-                {tr("dashboard.sync", "Sync")}
-              </span>
-            </div>
-          </div>
-          <div className="bp-dashboard-table-toolbar">
-            <Input
-              className="bp-input bp-search-input"
-              value={connQuery}
-              onChange={(e) => setConnQuery(e.target.value)}
-              allowClear
-              prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
-              placeholder={tr("dashboard.connections.filter", "Filter connections by node/target/status")}
-            />
-          </div>
-          <Table<RuntimeConnection>
-            rowKey="id"
-            size="small"
-            loading={connectionsLoading}
-            dataSource={connections}
-            columns={connectionColumns}
-            pagination={{ pageSize: 5, showSizeChanger: false }}
-          />
-        </div>
-      </div>
+      </section>
       <Modal
         title={tr("dashboard.logs.title", "Runtime Logs")}
         open={logsModalOpen}
@@ -556,6 +605,36 @@ export default function Dashboard() {
             },
           ]}
           pagination={{ pageSize: 12, showSizeChanger: true }}
+        />
+      </Modal>
+      <Modal
+        title={tr("dashboard.connections.title", "Connections")}
+        open={connectionsModalOpen}
+        onCancel={() => {
+          setConnectionsModalOpen(false);
+          setConnQuery("");
+        }}
+        footer={null}
+        width={1100}
+        destroyOnClose
+      >
+        <div className="bp-dashboard-table-toolbar">
+          <Input
+            className="bp-input bp-search-input"
+            value={connQuery}
+            onChange={(e) => setConnQuery(e.target.value)}
+            allowClear
+            prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
+            placeholder={tr("dashboard.connections.filter", "Filter connections by node/target/status")}
+          />
+        </div>
+        <Table<RuntimeConnection>
+          rowKey="id"
+          size="small"
+          loading={connectionsLoading || connectionsFetching}
+          dataSource={filteredConnections}
+          columns={connectionColumns}
+          pagination={{ pageSize: 8, showSizeChanger: true }}
         />
       </Modal>
     </div>
