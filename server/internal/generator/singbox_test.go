@@ -221,6 +221,10 @@ func TestBuildConfigWithRuntime_BusinessGroups(t *testing.T) {
 			if d, _ := outbound["default"].(string); d != "node-b" {
 				t.Fatalf("expected manual selector default node-b, got %v", outbound["default"])
 			}
+			members, _ := outbound["outbounds"].([]any)
+			if len(members) != 3 || members[0] != "direct" || members[1] != "node-a" || members[2] != "node-b" {
+				t.Fatalf("manual selector should always include direct, got %v", outbound["outbounds"])
+			}
 		case tag == "biz-openai" && typ == "selector":
 			hasBiz = true
 			if d, _ := outbound["default"].(string); d != "biz-openai-auto" {

@@ -117,12 +117,26 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 			tags = append(tags, tag)
 		}
 	}
-	manualMembers := tags
-	switch len(manualMembers) {
-	case 0:
-		manualMembers = []string{"direct"}
+	manualMembers := make([]string, 0, len(tags)+1)
+	manualMembers = append(manualMembers, "direct")
+	manualSeen := map[string]struct{}{
+		"direct": {},
 	}
-	manualDefault := manualMembers[0]
+	for _, raw := range tags {
+		tag := strings.TrimSpace(raw)
+		if tag == "" || tag == "direct" || tag == "block" {
+			continue
+		}
+		if _, ok := manualSeen[tag]; ok {
+			continue
+		}
+		manualSeen[tag] = struct{}{}
+		manualMembers = append(manualMembers, tag)
+	}
+	manualDefault := "direct"
+	if len(manualMembers) > 1 {
+		manualDefault = manualMembers[1]
+	}
 	if selected, ok := extras.GroupSelections["manual"]; ok && containsString(manualMembers, selected) {
 		manualDefault = selected
 	}
