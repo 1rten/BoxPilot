@@ -318,6 +318,43 @@ rules:
 	}
 }
 
+func TestParseSubscriptionBundle_ClashBusinessGroupPreferExplicitMembersKeepDirectFromHelper(t *testing.T) {
+	payload := `
+proxies:
+  - name: node-1
+    type: vmess
+    server: a.example.com
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111111
+proxy-groups:
+  - name: Proxy
+    type: select
+    proxies: [node-1]
+  - name: 本地直连
+    type: select
+    proxies: [DIRECT]
+  - name: OpenAI
+    type: select
+    proxies: [Proxy, 本地直连, node-1]
+rules:
+  - DOMAIN-SUFFIX,openai.com,OpenAI
+`
+	parsed, err := ParseSubscriptionBundle([]byte(payload))
+	if err != nil {
+		t.Fatalf("ParseSubscriptionBundle returned error: %v", err)
+	}
+	if len(parsed.BusinessGroups) != 1 {
+		t.Fatalf("expected one business group mapping, got %+v", parsed.BusinessGroups)
+	}
+	group := parsed.BusinessGroups[0]
+	if group.TargetOutbound != "OpenAI" {
+		t.Fatalf("unexpected clash target outbound: %+v", group)
+	}
+	if len(group.NodeTags) != 2 || group.NodeTags[0] != "node-1" || group.NodeTags[1] != "direct" {
+		t.Fatalf("expected explicit node + direct from helper group, got %+v", group.NodeTags)
+	}
+}
+
 func assertHasType(t *testing.T, list []OutboundItem, typ string) {
 	t.Helper()
 	for _, item := range list {

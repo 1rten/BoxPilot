@@ -4,7 +4,7 @@ import Dashboard from "./pages/Dashboard";
 import Subscriptions from "./pages/Subscriptions";
 import Nodes from "./pages/Nodes";
 import Settings from "./pages/Settings";
-import type { ForwardingSummaryNode, RuntimeProxyCheckItem } from "./api/types";
+import type { RuntimeGroupItem, RuntimeProxyCheckItem } from "./api/types";
 import {
   useForwardingSummary,
   useStartForwardingRuntime,
@@ -12,13 +12,14 @@ import {
 } from "./hooks/useProxySettings";
 import { Button, Input, Popover, Tag } from "antd";
 import { useI18n } from "./i18n/context";
-import { useRuntimeProxyCheck } from "./hooks/useRuntime";
+import { useRuntimeGroups, useRuntimeProxyCheck } from "./hooks/useRuntime";
 import { formatDateTime } from "./utils/datetime";
 
 export default function App() {
   const { locale, setLocale, tr } = useI18n();
   const [localeOpen, setLocaleOpen] = useState(false);
   const { data: summary, refetch: refetchForwardingSummary } = useForwardingSummary();
+  const { data: runtimeGroups, refetch: refetchRuntimeGroups } = useRuntimeGroups();
   const startForwarding = useStartForwardingRuntime();
   const stopForwarding = useStopForwardingRuntime();
   const proxyCheck = useRuntimeProxyCheck();
@@ -27,7 +28,7 @@ export default function App() {
   const isRunning = !!summary?.running;
   const runtimeStatus = summary?.status ?? "stopped";
   const runtimeStatusLabel = tr(`app.proxy.runtime.${runtimeStatus}`, runtimeStatus.toUpperCase());
-  const nodeList = summary?.nodes ?? [];
+  const groups = (runtimeGroups?.items ?? []).filter((item) => item.tag === "manual" || item.tag.startsWith("biz-"));
   const proxyCheckResult = proxyCheck.data;
 
   return (
@@ -122,6 +123,7 @@ export default function App() {
               onOpenChange={(open) => {
                 if (open) {
                   void refetchForwardingSummary();
+                  void refetchRuntimeGroups();
                 }
               }}
               content={
@@ -136,29 +138,36 @@ export default function App() {
                   {summary?.error_message && (
                     <p className="bp-forwarding-popover-error">{summary.error_message}</p>
                   )}
-                  {nodeList.length > 0 ? (
+                  {groups.length > 0 ? (
                     <div className="bp-forwarding-popover-list">
-                      {nodeList.map((node: ForwardingSummaryNode) => (
-                        <div key={node.id} className="bp-forwarding-popover-item">
-                          <span className="bp-forwarding-popover-name">{node.name || node.tag}</span>
-                          <div className="bp-forwarding-popover-side">
-                            <span>{node.type.toUpperCase()}</span>
-                            {node.last_status ? (
-                              <span className={`bp-forwarding-popover-status bp-forwarding-popover-status-${node.last_status.toLowerCase()}`}>
-                                {node.last_status.toUpperCase()}
+                      {groups.map((group: RuntimeGroupItem) => {
+                        const selected = group.runtime_selected_outbound ?? group.default;
+                        const effective = group.runtime_effective_outbound;
+                        const isAuto = !!group.auto_outbound && selected === group.auto_outbound;
+                        return (
+                          <div key={group.tag} className="bp-forwarding-popover-item">
+                            <span className="bp-forwarding-popover-name">{formatRuntimeGroupLabel(group.tag)}</span>
+                            <div className="bp-forwarding-popover-side">
+                              <Tag color={isAuto ? "processing" : "default"}>
+                                {isAuto
+                                  ? tr("app.proxy.group.mode_auto", "AUTO")
+                                  : tr("app.proxy.group.mode_manual", "MANUAL")}
+                              </Tag>
+                              <span className="bp-table-mono">
+                                {tr("app.proxy.group.selected", "Selected")}: {selected}
                               </span>
-                            ) : (
-                              <span className="bp-forwarding-popover-status">{tr("app.proxy.untested", "UNTESTED")}</span>
-                            )}
-                            {node.last_latency_ms !== null && node.last_latency_ms !== undefined
-                              ? <span>{node.last_latency_ms}ms</span>
-                              : null}
+                              {effective && effective !== selected ? (
+                                <span className="bp-table-mono">
+                                  {tr("app.proxy.group.effective", "Effective")}: {effective}
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
-                    <p className="bp-forwarding-popover-empty">{tr("app.proxy.empty", "No forwarding nodes selected.")}</p>
+                    <p className="bp-forwarding-popover-empty">{tr("app.proxy.groups.empty", "No business routing groups.")}</p>
                   )}
                   <div className="bp-forwarding-popover-section">
                     <div className="bp-forwarding-popover-head">
@@ -265,6 +274,20 @@ export default function App() {
       </div>
     </BrowserRouter>
   );
+}
+
+function formatRuntimeGroupLabel(tag: string): string {
+  if (tag === "manual") {
+    return "Manual";
+  }
+  if (tag.startsWith("biz-")) {
+    const body = tag.slice(4).replace(/-/g, " ").trim();
+    if (!body) {
+      return tag;
+    }
+    return body.replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  return tag;
 }
 
 function ProxyMiniResult({

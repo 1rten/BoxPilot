@@ -450,6 +450,13 @@ func resolveBusinessNodeTags(
 	groupRefs map[string][]string,
 	alias map[string]string,
 ) []string {
+	appendNode := func(name string, seen map[string]struct{}, out *[]string) {
+		if _, done := seen[name]; done {
+			return
+		}
+		seen[name] = struct{}{}
+		*out = append(*out, name)
+	}
 	isConcreteOutbound := func(name string) bool {
 		if name == "" {
 			return false
@@ -489,6 +496,32 @@ func resolveBusinessNodeTags(
 	visitedGroup := map[string]bool{}
 	seenNode := map[string]struct{}{}
 	out := []string{}
+	var collectSpecialConcrete func(name string, visited map[string]bool)
+	collectSpecialConcrete = func(name string, visited map[string]bool) {
+		current := canonical(name)
+		if current == "" {
+			return
+		}
+		if current == "direct" || current == "block" {
+			appendNode(current, seenNode, &out)
+			return
+		}
+		if _, ok := nodeSet[current]; ok {
+			return
+		}
+		refs, ok := groupRefs[current]
+		if !ok {
+			return
+		}
+		if visited[current] {
+			return
+		}
+		visited[current] = true
+		for _, child := range refs {
+			collectSpecialConcrete(child, visited)
+		}
+		visited[current] = false
+	}
 	var walk func(name string)
 	walk = func(name string) {
 		current := canonical(name)
@@ -496,11 +529,7 @@ func resolveBusinessNodeTags(
 			return
 		}
 		if isConcreteOutbound(current) {
-			if _, done := seenNode[current]; done {
-				return
-			}
-			seenNode[current] = struct{}{}
-			out = append(out, current)
+			appendNode(current, seenNode, &out)
 			return
 		}
 		refs, ok := groupRefs[current]
@@ -524,11 +553,11 @@ func resolveBusinessNodeTags(
 		}
 		if len(directConcrete) > 0 {
 			for _, child := range directConcrete {
-				if _, done := seenNode[child]; done {
-					continue
-				}
-				seenNode[child] = struct{}{}
-				out = append(out, child)
+				appendNode(child, seenNode, &out)
+			}
+			// Keep direct/block reachable via helper groups even when explicit nodes exist.
+			for _, child := range refs {
+				collectSpecialConcrete(child, map[string]bool{})
 			}
 			visitedGroup[current] = false
 			return
