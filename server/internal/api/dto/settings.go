@@ -69,6 +69,8 @@ type RoutingSummaryData struct {
 	BypassDomainsCount   int      `json:"bypass_domains_count"`
 	BypassCIDRsCount     int      `json:"bypass_cidrs_count"`
 	UpdatedAt            string   `json:"updated_at,omitempty"`
+	GeoIPStatus          string   `json:"geoip_status,omitempty"`
+	GeoSiteStatus        string   `json:"geosite_status,omitempty"`
 	Notes                []string `json:"notes"`
 }
 

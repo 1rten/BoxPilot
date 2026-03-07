@@ -89,7 +89,7 @@ export default function Settings() {
         <RoutingSettingsCard data={routingData} />
       </div>
       <div style={{ marginTop: 16 }}>
-        <RuntimeGroupsCard items={runtimeGroups?.items} />
+        <RuntimeGroupsCard items={runtimeGroups?.items} autoIntervalSec={forwardingPolicy?.biz_auto_interval_sec} />
       </div>
       {(isLoading || routingLoading || forwardingPolicyLoading || runtimeGroupsLoading) && (
         <p className="bp-muted" style={{ marginTop: 12 }}>
@@ -102,9 +102,10 @@ export default function Settings() {
 
 interface RuntimeGroupsCardProps {
   items?: RuntimeGroupItem[];
+  autoIntervalSec?: number;
 }
 
-function RuntimeGroupsCard({ items }: RuntimeGroupsCardProps) {
+function RuntimeGroupsCard({ items, autoIntervalSec }: RuntimeGroupsCardProps) {
   const { tr } = useI18n();
   const updateGroup = useSelectRuntimeGroup();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -136,6 +137,19 @@ function RuntimeGroupsCard({ items }: RuntimeGroupsCardProps) {
           "Each business group supports auto toggle: on = trigger urltest now and then by configured interval, off = manual node pick in that business pool."
         )}
       </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 8 }}>
+        <span className="bp-muted">
+          {tr("settings.groups.auto_interval_value", "Current auto interval: {value}", {
+            value: formatSecondsInterval(autoIntervalSec),
+          })}
+        </span>
+        <Button
+          size="small"
+          onClick={() => document.getElementById("forwarding-policy-card")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        >
+          {tr("settings.groups.go_policy", "Go to Forwarding Policy")}
+        </Button>
+      </div>
       <Alert
         type="info"
         showIcon
@@ -348,6 +362,17 @@ function formatGroupLabel(tag: string): string {
     return body.replace(/\b\w/g, (c) => c.toUpperCase());
   }
   return tag;
+}
+
+function formatSecondsInterval(value?: number): string {
+  const sec = typeof value === "number" && value > 0 ? value : 1800;
+  if (sec % 3600 === 0) {
+    return `${sec / 3600}h`;
+  }
+  if (sec % 60 === 0) {
+    return `${sec / 60}m`;
+  }
+  return `${sec}s`;
 }
 
 function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {
@@ -587,6 +612,20 @@ function RoutingSettingsCard({ data }: RoutingCardProps) {
       <p className="bp-muted" style={{ marginTop: 0 }}>
         {tr("settings.routing.desc", "Matched domains and CIDRs will go direct instead of proxy.")}
       </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        <Tag color={data?.bypass_private_enabled ? "success" : "default"}>
+          {tr("settings.routing.private_direct", "Private/LAN Direct")}:{" "}
+          {data?.bypass_private_enabled ? tr("nodes.status.enabled", "Enabled") : tr("nodes.status.disabled", "Disabled")}
+        </Tag>
+        <Tag color={data?.bypass_private_enabled ? "success" : "default"}>
+          {tr("settings.routing.geosite_cn", "geosite-cn Direct")}:{" "}
+          {data?.bypass_private_enabled ? tr("nodes.status.enabled", "Enabled") : tr("nodes.status.disabled", "Disabled")}
+        </Tag>
+        <Tag color={data?.bypass_private_enabled ? "success" : "default"}>
+          {tr("settings.routing.geoip_cn", "geoip-cn Direct")}:{" "}
+          {data?.bypass_private_enabled ? tr("nodes.status.enabled", "Enabled") : tr("nodes.status.disabled", "Disabled")}
+        </Tag>
+      </div>
       <Form
         form={form}
         layout="vertical"
@@ -671,7 +710,7 @@ function ForwardingPolicyCard({ data }: ForwardingPolicyCardProps) {
   };
 
   return (
-    <Card className="bp-settings-card">
+    <Card id="forwarding-policy-card" className="bp-settings-card">
       <div className="bp-card-header">
         <div>
           <p className="bp-card-kicker">{tr("settings.forwarding.kicker", "Forwarding Policy")}</p>

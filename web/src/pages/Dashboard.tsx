@@ -374,6 +374,22 @@ export default function Dashboard() {
               <span className="bp-runtime-label">{tr("dashboard.routing.cidrs", "Bypass CIDRs")}</span>
               <span className="bp-runtime-value">{routingSummary?.bypass_cidrs_count ?? 0}</span>
             </div>
+            <div className="bp-runtime-item">
+              <span className="bp-runtime-label">{tr("dashboard.routing.geosite_cn", "geosite-cn Direct")}</span>
+              <span className="bp-runtime-value">
+                {(routingSummary?.geosite_status ?? (routingSummary?.bypass_private_enabled ? "enabled" : "disabled")) === "enabled"
+                  ? tr("nodes.status.enabled", "Enabled")
+                  : tr("nodes.status.disabled", "Disabled")}
+              </span>
+            </div>
+            <div className="bp-runtime-item">
+              <span className="bp-runtime-label">{tr("dashboard.routing.geoip_cn", "geoip-cn Direct")}</span>
+              <span className="bp-runtime-value">
+                {(routingSummary?.geoip_status ?? (routingSummary?.bypass_private_enabled ? "enabled" : "disabled")) === "enabled"
+                  ? tr("nodes.status.enabled", "Enabled")
+                  : tr("nodes.status.disabled", "Disabled")}
+              </span>
+            </div>
           </div>
           {routingSummary?.notes?.length ? (
             <div className="bp-list-compact" style={{ marginTop: 12 }}>

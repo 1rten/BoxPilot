@@ -195,10 +195,18 @@ func (h *Settings) RoutingSummary(c *gin.Context) {
 	notes := []string{
 		"Routing bypass is applied during runtime config build.",
 	}
+	geoSiteStatus := "disabled"
+	geoIPStatus := "disabled"
 	if settings.BypassPrivateEnabled {
 		notes = append(notes, "Private/local CIDR bypass is enabled.")
+		notes = append(notes, "geosite-cn direct is enabled.")
+		notes = append(notes, "geoip-cn direct is enabled.")
+		geoSiteStatus = "enabled"
+		geoIPStatus = "enabled"
 	} else {
 		notes = append(notes, "Private/local CIDR bypass is disabled.")
+		notes = append(notes, "geosite-cn direct is disabled.")
+		notes = append(notes, "geoip-cn direct is disabled.")
 	}
 
 	c.JSON(http.StatusOK, dto.RoutingSummaryResponse{
@@ -207,6 +215,8 @@ func (h *Settings) RoutingSummary(c *gin.Context) {
 			BypassDomainsCount:   len(settings.BypassDomains),
 			BypassCIDRsCount:     len(settings.BypassCIDRs),
 			UpdatedAt:            updatedAt,
+			GeoIPStatus:          geoIPStatus,
+			GeoSiteStatus:        geoSiteStatus,
 			Notes:                notes,
 		},
 	})
