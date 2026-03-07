@@ -136,6 +136,19 @@ function RuntimeGroupsCard({ items }: RuntimeGroupsCardProps) {
           "Each business group supports auto toggle: on = urltest best node (30m), off = manual node pick in that business pool."
         )}
       </p>
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 12 }}
+        message={tr(
+          "settings.groups.mapping_note",
+          "Business candidates come from explicit members in subscription business groups. Generic groups like manual/proxy are not expanded."
+        )}
+        description={tr(
+          "settings.groups.refresh_note",
+          "If subscription rules changed, refresh subscription first, then re-open this page."
+        )}
+      />
       {groups.length === 0 ? (
         <p className="bp-muted">{tr("settings.groups.empty", "No runtime groups available yet.")}</p>
       ) : (

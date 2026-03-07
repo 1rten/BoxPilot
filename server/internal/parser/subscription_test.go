@@ -238,6 +238,86 @@ func TestParseSubscriptionBundle_SingboxBusinessGroupMembers(t *testing.T) {
 	}
 }
 
+func TestParseSubscriptionBundle_SingboxBusinessGroupPreferExplicitMembers(t *testing.T) {
+	payload := `{
+	  "outbounds": [
+	    {"type":"vmess","tag":"node-1","server":"a.example.com","server_port":443,"uuid":"11111111-1111-1111-1111-111111111111"},
+	    {"type":"vmess","tag":"node-2","server":"b.example.com","server_port":443,"uuid":"22222222-2222-2222-2222-222222222222"},
+	    {"type":"vmess","tag":"node-3","server":"c.example.com","server_port":443,"uuid":"33333333-3333-3333-3333-333333333333"},
+	    {"type":"selector","tag":"Auto_Selector_Proxy","outbounds":["node-1","node-2","node-3"]},
+	    {"type":"selector","tag":"手动切换","outbounds":["Auto_Selector_Proxy","node-1","node-2","node-3"]},
+	    {"type":"selector","tag":"OpenAI","outbounds":["Auto_Selector_Proxy","手动切换","node-1","node-2"]}
+	  ],
+	  "route": {
+	    "rules": [
+	      {"domain_suffix":["openai.com"],"outbound":"OpenAI"}
+	    ]
+	  }
+	}`
+
+	parsed, err := ParseSubscriptionBundle([]byte(payload))
+	if err != nil {
+		t.Fatalf("ParseSubscriptionBundle returned error: %v", err)
+	}
+	if len(parsed.BusinessGroups) != 1 {
+		t.Fatalf("expected one business group mapping, got %+v", parsed.BusinessGroups)
+	}
+	group := parsed.BusinessGroups[0]
+	if group.TargetOutbound != "OpenAI" {
+		t.Fatalf("unexpected target outbound: %+v", group)
+	}
+	if len(group.NodeTags) != 2 || group.NodeTags[0] != "node-1" || group.NodeTags[1] != "node-2" {
+		t.Fatalf("expected only explicit OpenAI nodes, got %+v", group.NodeTags)
+	}
+}
+
+func TestParseSubscriptionBundle_ClashBusinessGroupPreferExplicitMembers(t *testing.T) {
+	payload := `
+proxies:
+  - name: node-1
+    type: vmess
+    server: a.example.com
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111111
+  - name: node-2
+    type: vmess
+    server: b.example.com
+    port: 443
+    uuid: 22222222-2222-2222-2222-222222222222
+  - name: node-3
+    type: vmess
+    server: c.example.com
+    port: 443
+    uuid: 33333333-3333-3333-3333-333333333333
+proxy-groups:
+  - name: Proxy
+    type: select
+    proxies: [node-1, node-2, node-3]
+  - name: 手动切换
+    type: select
+    proxies: [Proxy, node-1, node-2, node-3]
+  - name: OpenAI
+    type: select
+    proxies: [Proxy, 手动切换, node-1, node-2]
+rules:
+  - DOMAIN-SUFFIX,openai.com,OpenAI
+`
+	parsed, err := ParseSubscriptionBundle([]byte(payload))
+	if err != nil {
+		t.Fatalf("ParseSubscriptionBundle returned error: %v", err)
+	}
+	if len(parsed.BusinessGroups) != 1 {
+		t.Fatalf("expected one business group mapping, got %+v", parsed.BusinessGroups)
+	}
+	group := parsed.BusinessGroups[0]
+	if group.TargetOutbound != "OpenAI" {
+		t.Fatalf("unexpected clash target outbound: %+v", group)
+	}
+	if len(group.NodeTags) != 2 || group.NodeTags[0] != "node-1" || group.NodeTags[1] != "node-2" {
+		t.Fatalf("expected only explicit OpenAI nodes, got %+v", group.NodeTags)
+	}
+}
+
 func assertHasType(t *testing.T, list []OutboundItem, typ string) {
 	t.Helper()
 	for _, item := range list {

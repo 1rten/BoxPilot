@@ -450,7 +450,29 @@ func resolveBusinessNodeTags(
 	groupRefs map[string][]string,
 	alias map[string]string,
 ) []string {
+	isConcreteOutbound := func(name string) bool {
+		if name == "" {
+			return false
+		}
+		if _, ok := nodeSet[name]; ok {
+			return true
+		}
+		return name == "direct" || name == "block"
+	}
+	normalizeSpecial := func(raw string) string {
+		switch strings.ToLower(strings.TrimSpace(raw)) {
+		case "direct", "bypass":
+			return "direct"
+		case "reject", "block", "blackhole":
+			return "block"
+		default:
+			return ""
+		}
+	}
 	canonical := func(raw string) string {
+		if special := normalizeSpecial(raw); special != "" {
+			return special
+		}
 		name := strings.TrimSpace(raw)
 		if name == "" || alias == nil {
 			return name
@@ -473,7 +495,7 @@ func resolveBusinessNodeTags(
 		if current == "" {
 			return
 		}
-		if _, ok := nodeSet[current]; ok {
+		if isConcreteOutbound(current) {
 			if _, done := seenNode[current]; done {
 				return
 			}
@@ -489,6 +511,28 @@ func resolveBusinessNodeTags(
 			return
 		}
 		visitedGroup[current] = true
+
+		// If a business group has explicit concrete members, prefer them directly.
+		// This avoids pulling huge generic pools via helper groups like "manual/proxy".
+		directConcrete := make([]string, 0, len(refs))
+		for _, child := range refs {
+			c := canonical(child)
+			if !isConcreteOutbound(c) {
+				continue
+			}
+			directConcrete = append(directConcrete, c)
+		}
+		if len(directConcrete) > 0 {
+			for _, child := range directConcrete {
+				if _, done := seenNode[child]; done {
+					continue
+				}
+				seenNode[child] = struct{}{}
+				out = append(out, child)
+			}
+			visitedGroup[current] = false
+			return
+		}
 		for _, child := range refs {
 			walk(child)
 		}

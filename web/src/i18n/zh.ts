@@ -68,6 +68,8 @@ const zh = {
   "settings.groups.kicker": "运行时分组",
   "settings.groups.title": "业务路由分组",
   "settings.groups.desc": "每个业务组支持自动开关：开启=30分钟 urltest 选最优，关闭=在该业务节点池手动选节点。",
+  "settings.groups.mapping_note": "业务候选节点来源于订阅中该业务组的显式成员，不会展开手动切换/Proxy 等泛化大组。",
+  "settings.groups.refresh_note": "若订阅规则有变更，请先刷新订阅，再回到本页查看。",
   "settings.groups.empty": "暂无可用运行时分组。",
   "settings.groups.apply": "应用该分组选择",
   "settings.groups.auto_toggle": "自动最优节点",

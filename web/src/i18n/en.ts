@@ -68,6 +68,8 @@ const en = {
   "settings.groups.kicker": "Runtime Groups",
   "settings.groups.title": "Business Routing Groups",
   "settings.groups.desc": "Each business group supports auto toggle: on = urltest best node (30m), off = manual node pick in that business pool.",
+  "settings.groups.mapping_note": "Business candidates come from explicit members in subscription business groups. Generic groups like manual/proxy are not expanded.",
+  "settings.groups.refresh_note": "If subscription rules changed, refresh subscription first, then re-open this page.",
   "settings.groups.empty": "No runtime groups available yet.",
   "settings.groups.apply": "Apply Group Choice",
   "settings.groups.auto_toggle": "Auto Best Node",
