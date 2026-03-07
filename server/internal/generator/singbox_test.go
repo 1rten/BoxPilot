@@ -354,11 +354,11 @@ func TestBuildConfigWithRuntime_BusinessGroupsDefaultNodeWhenToggleOff(t *testin
 		tag, _ := outbound["tag"].(string)
 		typ, _ := outbound["type"].(string)
 		if tag == "biz-apple" && typ == "selector" {
-			if d, _ := outbound["default"].(string); d != "node-a" {
-				t.Fatalf("expected biz default node-a when toggle off, got %v", outbound["default"])
+			if d, _ := outbound["default"].(string); d != "manual" {
+				t.Fatalf("expected biz default manual when toggle off, got %v", outbound["default"])
 			}
 			members, _ := outbound["outbounds"].([]any)
-			if len(members) != 3 || members[0] != "biz-apple-auto" || members[1] != "node-a" || members[2] != "node-b" {
+			if len(members) != 4 || members[0] != "biz-apple-auto" || members[1] != "manual" || members[2] != "node-a" || members[3] != "node-b" {
 				t.Fatalf("unexpected biz members: %v", outbound["outbounds"])
 			}
 			return
@@ -419,7 +419,7 @@ func TestBuildConfigWithRuntime_BusinessGroupsKeepDirectInManualCandidates(t *te
 		}
 		if tag == "biz-apple" && typ == "selector" {
 			members, _ := outbound["outbounds"].([]any)
-			if len(members) != 3 || members[0] != "biz-apple-auto" || members[1] != "direct" || members[2] != "node-a" {
+			if len(members) != 4 || members[0] != "biz-apple-auto" || members[1] != "manual" || members[2] != "direct" || members[3] != "node-a" {
 				t.Fatalf("selector should keep direct in manual candidates, got %v", outbound["outbounds"])
 			}
 			return

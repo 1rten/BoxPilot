@@ -53,6 +53,8 @@ func BuildConfigFromDB(db *sql.DB, httpProxy, socksProxy generator.ProxyInbound,
 		Rules:             make([]generator.RouteRule, 0, len(ruleRows)),
 		GroupSelections:   map[string]string{},
 		BusinessNodePools: map[string][]string{},
+		AutoTestURL:       generator.DefaultAutoTestURL,
+		AutoTestInterval:  BizAutoIntervalDuration(policy.BizAutoIntervalSec),
 	}
 	for _, rs := range ruleSetRows {
 		extras.RuleSets = append(extras.RuleSets, generator.RouteRuleSetRef{

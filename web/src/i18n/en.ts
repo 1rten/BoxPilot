@@ -67,9 +67,11 @@ const en = {
   "settings.routing.cidrs": "Bypass CIDRs (one per line)",
   "settings.groups.kicker": "Runtime Groups",
   "settings.groups.title": "Business Routing Groups",
-  "settings.groups.desc": "Each business group supports auto toggle: on = urltest best node (30m), off = manual node pick in that business pool.",
+  "settings.groups.desc": "Each business group supports auto toggle: on = trigger urltest now and then by configured interval, off = manual node pick in that business pool.",
   "settings.groups.mapping_note": "Business candidates come from explicit members in subscription business groups. Generic groups like manual/proxy are not expanded.",
   "settings.groups.refresh_note": "If subscription rules changed, refresh subscription first, then re-open this page.",
+  "settings.groups.auto_probe_note": "When Auto is enabled and applied, runtime triggers a delay test on the auto group with https://www.gstatic.com/generate_204.",
+  "settings.groups.auto_interval_note": "Recurring auto test interval is configured in Forwarding Policy.",
   "settings.groups.empty": "No runtime groups available yet.",
   "settings.groups.apply": "Apply Group Choice",
   "settings.groups.auto_toggle": "Auto Best Node",
@@ -98,6 +100,9 @@ const en = {
   "settings.forwarding.test_concurrency": "Node test concurrency",
   "settings.forwarding.test_concurrency.required": "Please enter node test concurrency",
   "settings.forwarding.test_concurrency.range": "Concurrency must be between 1 and 64",
+  "settings.forwarding.biz_auto_interval": "Business auto test interval (sec)",
+  "settings.forwarding.biz_auto_interval.required": "Please enter auto test interval",
+  "settings.forwarding.biz_auto_interval.range": "Interval must be between 60 and 86400 sec",
   "settings.security.warning_title": "Public exposure without authentication",
   "settings.security.warning_desc": "Current config listens on 0.0.0.0 with auth_mode=none. Anyone who can access this port may use your proxy.",
   "settings.security.confirm_title": "Confirm public unauthenticated proxy",
@@ -304,6 +309,10 @@ const en = {
   "toast.runtime.proxy_check_ok": "Proxy chain check completed",
   "toast.runtime.proxy_check_failed": "Proxy chain check failed: {message}",
   "toast.runtime.group_selected": "Routing group selection applied",
+  "toast.runtime.group_selected_auto": "Auto tested candidates. Current best node: {outbound}",
+  "toast.runtime.group_selected_auto_probe_failed":
+    "Auto mode enabled, but immediate probe failed ({message}). Runtime will continue periodic checks.",
+  "toast.runtime.group_selected_auto_pending": "Auto mode enabled. Candidate test was triggered; best node will update shortly.",
   "toast.runtime.group_select_failed": "Failed to update routing group: {message}",
 };
 

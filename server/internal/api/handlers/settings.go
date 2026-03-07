@@ -304,12 +304,17 @@ func (h *Settings) UpdateForwardingPolicy(c *gin.Context) {
 		writeError(c, errorx.New(errorx.REQInvalidField, "node_test_concurrency must be between 1 and 64"))
 		return
 	}
+	if req.BizAutoIntervalSec < 60 || req.BizAutoIntervalSec > 86400 {
+		writeError(c, errorx.New(errorx.REQInvalidField, "biz_auto_interval_sec must be between 60 and 86400"))
+		return
+	}
 	policy, err := service.SaveForwardingPolicy(h.DB, service.ForwardingPolicy{
 		HealthyOnlyEnabled:  *req.HealthyOnlyEnabled,
 		MaxLatencyMs:        req.MaxLatencyMs,
 		AllowUntested:       *req.AllowUntested,
 		NodeTestTimeoutMs:   req.NodeTestTimeoutMs,
 		NodeTestConcurrency: req.NodeTestConcurrency,
+		BizAutoIntervalSec:  req.BizAutoIntervalSec,
 	})
 	if err != nil {
 		if appErr, ok := err.(*errorx.AppError); ok {
@@ -436,6 +441,7 @@ func forwardingPolicyToDTO(p service.ForwardingPolicy) dto.ForwardingPolicyData 
 		AllowUntested:       p.AllowUntested,
 		NodeTestTimeoutMs:   p.NodeTestTimeoutMs,
 		NodeTestConcurrency: p.NodeTestConcurrency,
+		BizAutoIntervalSec:  p.BizAutoIntervalSec,
 		UpdatedAt:           p.UpdatedAt,
 	}
 }

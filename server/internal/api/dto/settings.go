@@ -104,6 +104,7 @@ type ForwardingPolicyData struct {
 	AllowUntested       bool   `json:"allow_untested"`
 	NodeTestTimeoutMs   int    `json:"node_test_timeout_ms"`
 	NodeTestConcurrency int    `json:"node_test_concurrency"`
+	BizAutoIntervalSec  int    `json:"biz_auto_interval_sec"`
 	UpdatedAt           string `json:"updated_at,omitempty"`
 }
 
@@ -113,6 +114,7 @@ type UpdateForwardingPolicyRequest struct {
 	AllowUntested       *bool `json:"allow_untested"`
 	NodeTestTimeoutMs   int   `json:"node_test_timeout_ms"`
 	NodeTestConcurrency int   `json:"node_test_concurrency"`
+	BizAutoIntervalSec  int   `json:"biz_auto_interval_sec"`
 }
 
 type ForwardingSummaryNode struct {

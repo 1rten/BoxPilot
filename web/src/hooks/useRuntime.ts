@@ -139,12 +139,43 @@ export function useSelectRuntimeGroup() {
       );
       return data.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       q.invalidateQueries({ queryKey: ["runtime-groups"] });
       q.invalidateQueries({ queryKey: ["runtime-status"] });
       q.invalidateQueries({ queryKey: ["runtime-connections"] });
       q.invalidateQueries({ queryKey: ["runtime-logs"] });
       q.invalidateQueries({ queryKey: ["runtime-traffic"] });
+      const isAutoChoice = data.selected_is_auto;
+      if (isAutoChoice) {
+        if (data.auto_probe_error) {
+          addToast(
+            "info",
+            tr(
+              "toast.runtime.group_selected_auto_probe_failed",
+              "Auto mode enabled, but immediate probe failed ({message}). Runtime will continue periodic checks.",
+              { message: data.auto_probe_error }
+            )
+          );
+          return;
+        }
+        if (data.runtime_effective_outbound && data.runtime_effective_outbound !== data.selected_outbound) {
+          addToast(
+            "success",
+            tr("toast.runtime.group_selected_auto", "Auto tested candidates. Current best node: {outbound}", {
+              outbound: data.runtime_effective_outbound,
+            })
+          );
+          return;
+        }
+        addToast(
+          "success",
+          tr(
+            "toast.runtime.group_selected_auto_pending",
+            "Auto mode enabled. Candidate test was triggered; best node will update shortly."
+          )
+        );
+        return;
+      }
       addToast("success", tr("toast.runtime.group_selected", "Routing group selection applied"));
     },
     onError: (error: unknown) => {

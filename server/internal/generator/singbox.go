@@ -10,6 +10,11 @@ import (
 	"boxpilot/server/internal/util/errorx"
 )
 
+const (
+	DefaultAutoTestURL      = "https://www.gstatic.com/generate_204"
+	DefaultAutoTestInterval = "30m"
+)
+
 type ProxyInbound struct {
 	Type          string
 	ListenAddress string
@@ -52,6 +57,8 @@ type RoutingExtras struct {
 	Rules             []RouteRule
 	GroupSelections   map[string]string
 	BusinessNodePools map[string][]string
+	AutoTestURL       string
+	AutoTestInterval  string
 }
 
 func DefaultRoutingSettings() RoutingSettings {
@@ -164,7 +171,15 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 	}
 	routeRuleSets = append(routeRuleSets, buildRouteRuleSets(extras.RuleSets)...)
 
-	targetMap := buildBusinessGroups(&outbounds, tags, extras.Rules, extras.GroupSelections, extras.BusinessNodePools)
+	targetMap := buildBusinessGroups(
+		&outbounds,
+		tags,
+		extras.Rules,
+		extras.GroupSelections,
+		extras.BusinessNodePools,
+		extras.AutoTestURL,
+		extras.AutoTestInterval,
+	)
 	availableRuleSets := make(map[string]struct{}, len(routeRuleSets))
 	for _, rs := range routeRuleSets {
 		if tag, ok := rs["tag"].(string); ok && strings.TrimSpace(tag) != "" {
@@ -260,6 +275,8 @@ func buildBusinessGroups(
 	rules []RouteRule,
 	selections map[string]string,
 	businessNodePools map[string][]string,
+	autoTestURL string,
+	autoTestInterval string,
 ) map[string]string {
 	targets := map[string]struct{}{}
 	for _, r := range rules {
@@ -287,6 +304,14 @@ func buildBusinessGroups(
 		targetList = append(targetList, target)
 	}
 	sort.Strings(targetList)
+	autoURL := strings.TrimSpace(autoTestURL)
+	if autoURL == "" {
+		autoURL = DefaultAutoTestURL
+	}
+	autoInterval := strings.TrimSpace(autoTestInterval)
+	if autoInterval == "" {
+		autoInterval = DefaultAutoTestInterval
+	}
 	for _, target := range targetList {
 		selectorTag := resolveUniqueTag("biz-"+slugTag(target), used)
 		used[selectorTag] = struct{}{}
@@ -296,27 +321,35 @@ func buildBusinessGroups(
 		poolMembers := businessNodePools[target]
 		autoMembers := filterExistingNodeTags(nodeTags, poolMembers)
 		manualMembers := filterExistingGroupMembers(nodeTags, poolMembers)
-		selectorOutbounds := make([]string, 0, 1+len(manualMembers))
+		selectorOutbounds := make([]string, 0, 2+len(manualMembers))
+		selectorOutbounds = append(selectorOutbounds, "manual")
 		if len(autoMembers) > 0 && len(manualMembers) > 0 {
 			*outbounds = append(*outbounds, map[string]any{
 				"type":      "urltest",
 				"tag":       autoTag,
 				"outbounds": autoMembers,
-				"url":       "https://www.gstatic.com/generate_204",
-				"interval":  "30m",
+				"url":       autoURL,
+				"interval":  autoInterval,
 				"tolerance": 120,
 			})
-			selectorOutbounds = append(selectorOutbounds, autoTag)
+			selectorOutbounds = append([]string{autoTag}, selectorOutbounds...)
 		}
-		if len(manualMembers) > 0 {
-			selectorOutbounds = append(selectorOutbounds, manualMembers...)
-		} else {
-			selectorOutbounds = append(selectorOutbounds, "manual")
+		seenMember := map[string]struct{}{}
+		for _, existing := range selectorOutbounds {
+			seenMember[existing] = struct{}{}
 		}
-		selectedDefault := selectorOutbounds[0]
-		if len(manualMembers) > 0 {
-			selectedDefault = manualMembers[0]
+		for _, member := range manualMembers {
+			tag := strings.TrimSpace(member)
+			if tag == "" {
+				continue
+			}
+			if _, ok := seenMember[tag]; ok {
+				continue
+			}
+			seenMember[tag] = struct{}{}
+			selectorOutbounds = append(selectorOutbounds, tag)
 		}
+		selectedDefault := "manual"
 		if selected, ok := selections[selectorTag]; ok && containsString(selectorOutbounds, selected) {
 			selectedDefault = selected
 		}

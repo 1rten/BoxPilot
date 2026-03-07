@@ -13,14 +13,15 @@ type ForwardingPolicyRow struct {
 	AllowUntested       int
 	NodeTestTimeoutMs   int
 	NodeTestConcurrency int
+	BizAutoIntervalSec  int
 	UpdatedAt           string
 }
 
 func GetForwardingPolicy(db *sql.DB) (*ForwardingPolicyRow, error) {
 	var r ForwardingPolicyRow
 	err := db.QueryRow(
-		"SELECT id, healthy_only_enabled, max_latency_ms, allow_untested, node_test_timeout_ms, node_test_concurrency, updated_at FROM forwarding_policy WHERE id = 'global'",
-	).Scan(&r.ID, &r.HealthyOnlyEnabled, &r.MaxLatencyMs, &r.AllowUntested, &r.NodeTestTimeoutMs, &r.NodeTestConcurrency, &r.UpdatedAt)
+		"SELECT id, healthy_only_enabled, max_latency_ms, allow_untested, node_test_timeout_ms, node_test_concurrency, biz_auto_interval_sec, updated_at FROM forwarding_policy WHERE id = 'global'",
+	).Scan(&r.ID, &r.HealthyOnlyEnabled, &r.MaxLatencyMs, &r.AllowUntested, &r.NodeTestTimeoutMs, &r.NodeTestConcurrency, &r.BizAutoIntervalSec, &r.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -38,16 +39,17 @@ func UpsertForwardingPolicy(db *sql.DB, r ForwardingPolicyRow) error {
 		r.UpdatedAt = util.NowRFC3339()
 	}
 	_, err := db.Exec(
-		`INSERT INTO forwarding_policy (id, healthy_only_enabled, max_latency_ms, allow_untested, node_test_timeout_ms, node_test_concurrency, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO forwarding_policy (id, healthy_only_enabled, max_latency_ms, allow_untested, node_test_timeout_ms, node_test_concurrency, biz_auto_interval_sec, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(id) DO UPDATE SET
 		   healthy_only_enabled = excluded.healthy_only_enabled,
 		   max_latency_ms = excluded.max_latency_ms,
 		   allow_untested = excluded.allow_untested,
 		   node_test_timeout_ms = excluded.node_test_timeout_ms,
 		   node_test_concurrency = excluded.node_test_concurrency,
+		   biz_auto_interval_sec = excluded.biz_auto_interval_sec,
 		   updated_at = excluded.updated_at`,
-		r.ID, r.HealthyOnlyEnabled, r.MaxLatencyMs, r.AllowUntested, r.NodeTestTimeoutMs, r.NodeTestConcurrency, r.UpdatedAt,
+		r.ID, r.HealthyOnlyEnabled, r.MaxLatencyMs, r.AllowUntested, r.NodeTestTimeoutMs, r.NodeTestConcurrency, r.BizAutoIntervalSec, r.UpdatedAt,
 	)
 	return err
 }

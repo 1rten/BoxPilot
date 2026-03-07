@@ -123,13 +123,14 @@ CREATE TABLE IF NOT EXISTS forwarding_policy (
   allow_untested INTEGER NOT NULL DEFAULT 0,
   node_test_timeout_ms INTEGER NOT NULL DEFAULT 3000,
   node_test_concurrency INTEGER NOT NULL DEFAULT 8,
+  biz_auto_interval_sec INTEGER NOT NULL DEFAULT 1800,
   updated_at TEXT NOT NULL DEFAULT ''
 );
 
 INSERT OR IGNORE INTO forwarding_policy (
-  id, healthy_only_enabled, max_latency_ms, allow_untested, node_test_timeout_ms, node_test_concurrency, updated_at
+  id, healthy_only_enabled, max_latency_ms, allow_untested, node_test_timeout_ms, node_test_concurrency, biz_auto_interval_sec, updated_at
 )
-VALUES ('global', 1, 1200, 0, 3000, 8, '');
+VALUES ('global', 1, 1200, 0, 3000, 8, 1800, '');
 
 CREATE TABLE IF NOT EXISTS subscription_rule_sets (
   id TEXT PRIMARY KEY,

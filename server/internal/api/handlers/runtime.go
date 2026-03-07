@@ -55,6 +55,14 @@ type clashProxyState struct {
 
 var trafficSnapshot runtimeTrafficSnapshot
 
+const (
+	autoProbeTimeoutMS  = 5000
+	autoProbeAttempts   = 8
+	autoProbeInterval   = 350 * time.Millisecond
+	manualProbeAttempts = 3
+	manualProbeInterval = 250 * time.Millisecond
+)
+
 func (h *Runtime) Status(c *gin.Context) {
 	row, err := repo.GetRuntimeState(h.DB)
 	if err != nil {
@@ -453,6 +461,10 @@ func (h *Runtime) SelectGroup(c *gin.Context) {
 		}))
 		return
 	}
+	selectedIsAuto := false
+	if group.AutoOutbound != nil && strings.TrimSpace(*group.AutoOutbound) == selected {
+		selectedIsAuto = true
+	}
 
 	now := util.NowRFC3339()
 	if err := repo.UpsertRuntimeGroupSelection(h.DB, groupTag, selected, now); err != nil {
@@ -469,14 +481,29 @@ func (h *Runtime) SelectGroup(c *gin.Context) {
 		writeError(c, errorx.New(errorx.RTRestartFailed, reloadErr.Error()))
 		return
 	}
+	policy, policyErr := service.LoadForwardingPolicy(h.DB)
+	probeTimeout := autoProbeTimeoutMS
+	if policyErr == nil && policy.NodeTestTimeoutMs > 0 {
+		probeTimeout = policy.NodeTestTimeoutMs
+	}
+	runtimeSelected, runtimeEffective, autoProbeError := resolveRuntimeSelectionAfterGroupSelect(
+		c.Request.Context(),
+		group,
+		selected,
+		probeTimeout,
+	)
 
 	c.JSON(http.StatusOK, dto.RuntimeGroupSelectResponse{
 		Data: dto.RuntimeGroupSelectData{
-			GroupTag:         groupTag,
-			SelectedOutbound: selected,
-			UpdatedAt:        now,
-			ConfigVersion:    version,
-			ConfigHash:       hash,
+			GroupTag:                 groupTag,
+			SelectedOutbound:         selected,
+			SelectedIsAuto:           selectedIsAuto,
+			UpdatedAt:                now,
+			ConfigVersion:            version,
+			ConfigHash:               hash,
+			RuntimeSelectedOutbound:  optionalString(runtimeSelected),
+			RuntimeEffectiveOutbound: optionalString(runtimeEffective),
+			AutoProbeError:           optionalString(autoProbeError),
 		},
 	})
 }
@@ -617,11 +644,11 @@ func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool) ([]byte, []strin
 	if err != nil {
 		return nil, nil, errorx.New(errorx.DBError, "list nodes for runtime config")
 	}
+	policy, policyErr := service.LoadForwardingPolicy(h.DB)
+	if policyErr != nil {
+		return nil, nil, errorx.New(errorx.DBError, "get forwarding policy")
+	}
 	if !includeDisabledNodes {
-		policy, policyErr := service.LoadForwardingPolicy(h.DB)
-		if policyErr != nil {
-			return nil, nil, errorx.New(errorx.DBError, "get forwarding policy")
-		}
 		nodes = service.FilterForwardingNodes(nodes, policy)
 	}
 
@@ -666,6 +693,8 @@ func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool) ([]byte, []strin
 		Rules:             make([]generator.RouteRule, 0, len(ruleRows)),
 		GroupSelections:   map[string]string{},
 		BusinessNodePools: map[string][]string{},
+		AutoTestURL:       generator.DefaultAutoTestURL,
+		AutoTestInterval:  service.BizAutoIntervalDuration(policy.BizAutoIntervalSec),
 	}
 	for _, rs := range ruleSetRows {
 		extras.RuleSets = append(extras.RuleSets, generator.RouteRuleSetRef{
@@ -1035,6 +1064,136 @@ func fetchClashProxyState(parent context.Context) (*clashProxyState, error) {
 	return &clashProxyState{nowByTag: nowByTag}, nil
 }
 
+func resolveRuntimeSelectionAfterGroupSelect(parent context.Context, group *dto.RuntimeGroupItem, selected string, probeTimeoutMS int) (string, string, string) {
+	if group == nil {
+		return "", "", ""
+	}
+	selected = strings.TrimSpace(selected)
+	groupTag := strings.TrimSpace(group.Tag)
+	if selected == "" || groupTag == "" {
+		return "", "", ""
+	}
+
+	autoSelected := false
+	probeError := ""
+	autoCandidateSet := map[string]struct{}{}
+	if group.AutoOutbound != nil {
+		autoTag := strings.TrimSpace(*group.AutoOutbound)
+		if autoTag != "" && autoTag == selected {
+			autoSelected = true
+			if err := triggerClashProxyDelayTest(parent, autoTag, generator.DefaultAutoTestURL, probeTimeoutMS); err != nil {
+				probeError = err.Error()
+			}
+			for _, candidate := range group.AutoCandidates {
+				tag := strings.TrimSpace(candidate)
+				if tag != "" {
+					autoCandidateSet[tag] = struct{}{}
+				}
+			}
+		}
+	}
+
+	attempts := manualProbeAttempts
+	interval := manualProbeInterval
+	if autoSelected {
+		attempts = autoProbeAttempts
+		interval = autoProbeInterval
+	}
+
+	lastSelected := ""
+	lastEffective := ""
+	for i := 0; i < attempts; i++ {
+		state, err := fetchClashProxyState(parent)
+		if err == nil {
+			currentSelected, currentEffective := runtimeSelectionFromClashState(groupTag, state)
+			if currentSelected != "" {
+				lastSelected = currentSelected
+				lastEffective = currentEffective
+			}
+			if currentSelected == selected {
+				if !autoSelected {
+					return currentSelected, currentEffective, ""
+				}
+				if currentEffective != "" {
+					if len(autoCandidateSet) == 0 {
+						return currentSelected, currentEffective, probeError
+					}
+					if _, ok := autoCandidateSet[currentEffective]; ok {
+						return currentSelected, currentEffective, probeError
+					}
+				}
+			}
+		}
+		if i+1 >= attempts {
+			break
+		}
+		timer := time.NewTimer(interval)
+		select {
+		case <-parent.Done():
+			timer.Stop()
+			return lastSelected, lastEffective, probeError
+		case <-timer.C:
+		}
+	}
+	return lastSelected, lastEffective, probeError
+}
+
+func triggerClashProxyDelayTest(parent context.Context, proxyTag, targetURL string, timeoutMS int) error {
+	proxyTag = strings.TrimSpace(proxyTag)
+	if proxyTag == "" {
+		return fmt.Errorf("empty proxy tag")
+	}
+	baseURL, enabled := resolveClashAPIBaseURL()
+	if !enabled {
+		return fmt.Errorf("clash api disabled")
+	}
+	if timeoutMS <= 0 {
+		timeoutMS = autoProbeTimeoutMS
+	}
+	targetURL = strings.TrimSpace(targetURL)
+	if targetURL == "" {
+		targetURL = generator.DefaultAutoTestURL
+	}
+	requestURL := fmt.Sprintf(
+		"%s/proxies/%s/delay?url=%s&timeout=%d",
+		baseURL,
+		url.PathEscape(proxyTag),
+		url.QueryEscape(targetURL),
+		timeoutMS,
+	)
+	ctx, cancel := context.WithTimeout(parent, time.Duration(timeoutMS+2000)*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	if err != nil {
+		return err
+	}
+	if secret := strings.TrimSpace(os.Getenv("SINGBOX_CLASH_API_SECRET")); secret != "" {
+		req.Header.Set("Authorization", "Bearer "+secret)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("clash api delay status %d", resp.StatusCode)
+	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
+	return nil
+}
+
+func runtimeSelectionFromClashState(groupTag string, state *clashProxyState) (string, string) {
+	if state == nil || state.nowByTag == nil {
+		return "", ""
+	}
+	selected := strings.TrimSpace(state.nowByTag[groupTag])
+	if selected == "" {
+		return "", ""
+	}
+	effective := resolveEffectiveOutbound(selected, state.nowByTag)
+	return selected, effective
+}
+
 func resolveEffectiveOutbound(outbound string, nowByTag map[string]string) string {
 	current := strings.TrimSpace(outbound)
 	if current == "" || nowByTag == nil {
@@ -1052,6 +1211,14 @@ func resolveEffectiveOutbound(outbound string, nowByTag map[string]string) strin
 		}
 		current = next
 	}
+}
+
+func optionalString(value string) *string {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return nil
+	}
+	return &v
 }
 
 func resolveClashAPIBaseURL() (string, bool) {

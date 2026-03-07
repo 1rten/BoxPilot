@@ -65,6 +65,7 @@ export interface UpdateForwardingPolicyBody {
   allow_untested: boolean;
   node_test_timeout_ms: number;
   node_test_concurrency: number;
+  biz_auto_interval_sec: number;
 }
 
 export async function updateForwardingPolicy(

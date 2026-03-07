@@ -2,6 +2,7 @@ package service
 
 import (
 	"database/sql"
+	"strconv"
 
 	"boxpilot/server/internal/store/repo"
 	"boxpilot/server/internal/util"
@@ -14,6 +15,7 @@ type ForwardingPolicy struct {
 	AllowUntested       bool
 	NodeTestTimeoutMs   int
 	NodeTestConcurrency int
+	BizAutoIntervalSec  int
 	UpdatedAt           string
 }
 
@@ -21,6 +23,7 @@ const (
 	defaultMaxLatencyMs        = 1200
 	defaultNodeTestTimeoutMs   = 3000
 	defaultNodeTestConcurrency = 8
+	defaultBizAutoIntervalSec  = 1800
 )
 
 func LoadForwardingPolicy(db *sql.DB) (ForwardingPolicy, error) {
@@ -35,6 +38,7 @@ func LoadForwardingPolicy(db *sql.DB) (ForwardingPolicy, error) {
 			AllowUntested:       false,
 			NodeTestTimeoutMs:   defaultNodeTestTimeoutMs,
 			NodeTestConcurrency: defaultNodeTestConcurrency,
+			BizAutoIntervalSec:  defaultBizAutoIntervalSec,
 			UpdatedAt:           "",
 		}, nil
 	}
@@ -44,6 +48,7 @@ func LoadForwardingPolicy(db *sql.DB) (ForwardingPolicy, error) {
 		AllowUntested:       row.AllowUntested == 1,
 		NodeTestTimeoutMs:   row.NodeTestTimeoutMs,
 		NodeTestConcurrency: row.NodeTestConcurrency,
+		BizAutoIntervalSec:  row.BizAutoIntervalSec,
 		UpdatedAt:           row.UpdatedAt,
 	}
 	if p.MaxLatencyMs <= 0 {
@@ -54,6 +59,9 @@ func LoadForwardingPolicy(db *sql.DB) (ForwardingPolicy, error) {
 	}
 	if p.NodeTestConcurrency <= 0 {
 		p.NodeTestConcurrency = defaultNodeTestConcurrency
+	}
+	if p.BizAutoIntervalSec <= 0 {
+		p.BizAutoIntervalSec = defaultBizAutoIntervalSec
 	}
 	return p, nil
 }
@@ -68,6 +76,9 @@ func SaveForwardingPolicy(db *sql.DB, p ForwardingPolicy) (ForwardingPolicy, err
 	if p.NodeTestConcurrency < 1 || p.NodeTestConcurrency > 64 {
 		return ForwardingPolicy{}, errorx.New(errorx.REQInvalidField, "node_test_concurrency must be between 1 and 64")
 	}
+	if p.BizAutoIntervalSec < 60 || p.BizAutoIntervalSec > 86400 {
+		return ForwardingPolicy{}, errorx.New(errorx.REQInvalidField, "biz_auto_interval_sec must be between 60 and 86400")
+	}
 	row := repo.ForwardingPolicyRow{
 		ID:                  "global",
 		HealthyOnlyEnabled:  boolToInt(p.HealthyOnlyEnabled),
@@ -75,6 +86,7 @@ func SaveForwardingPolicy(db *sql.DB, p ForwardingPolicy) (ForwardingPolicy, err
 		AllowUntested:       boolToInt(p.AllowUntested),
 		NodeTestTimeoutMs:   p.NodeTestTimeoutMs,
 		NodeTestConcurrency: p.NodeTestConcurrency,
+		BizAutoIntervalSec:  p.BizAutoIntervalSec,
 		UpdatedAt:           util.NowRFC3339(),
 	}
 	if err := repo.UpsertForwardingPolicy(db, row); err != nil {
@@ -82,4 +94,17 @@ func SaveForwardingPolicy(db *sql.DB, p ForwardingPolicy) (ForwardingPolicy, err
 	}
 	p.UpdatedAt = row.UpdatedAt
 	return p, nil
+}
+
+func BizAutoIntervalDuration(sec int) string {
+	if sec <= 0 {
+		sec = defaultBizAutoIntervalSec
+	}
+	if sec%3600 == 0 {
+		return strconv.Itoa(sec/3600) + "h"
+	}
+	if sec%60 == 0 {
+		return strconv.Itoa(sec/60) + "m"
+	}
+	return strconv.Itoa(sec) + "s"
 }

@@ -133,7 +133,7 @@ function RuntimeGroupsCard({ items }: RuntimeGroupsCardProps) {
       <p className="bp-muted" style={{ marginTop: 0 }}>
         {tr(
           "settings.groups.desc",
-          "Each business group supports auto toggle: on = urltest best node (30m), off = manual node pick in that business pool."
+          "Each business group supports auto toggle: on = trigger urltest now and then by configured interval, off = manual node pick in that business pool."
         )}
       </p>
       <Alert
@@ -147,6 +147,17 @@ function RuntimeGroupsCard({ items }: RuntimeGroupsCardProps) {
         description={tr(
           "settings.groups.refresh_note",
           "If subscription rules changed, refresh subscription first, then re-open this page."
+        ).concat(
+          " ",
+          tr(
+            "settings.groups.auto_probe_note",
+            "When Auto is enabled and applied, runtime triggers a delay test on the auto group with https://www.gstatic.com/generate_204."
+          ),
+          " ",
+          tr(
+            "settings.groups.auto_interval_note",
+            "Recurring auto test interval is configured in Forwarding Policy."
+          )
         )}
       />
       {groups.length === 0 ? (
@@ -247,6 +258,10 @@ function RuntimeGroupsCard({ items }: RuntimeGroupsCardProps) {
                             return next;
                           }
                           if (!checked) {
+                            if (nodeCandidates.includes("manual")) {
+                              next[group.tag] = "manual";
+                              return next;
+                            }
                             if (draftValue && draftValue !== autoOutbound && nodeCandidates.includes(draftValue)) {
                               next[group.tag] = draftValue;
                             } else if (
@@ -618,6 +633,7 @@ interface ForwardingPolicyCardProps {
     allow_untested: boolean;
     node_test_timeout_ms: number;
     node_test_concurrency: number;
+    biz_auto_interval_sec: number;
     updated_at?: string;
   };
 }
@@ -638,6 +654,7 @@ function ForwardingPolicyCard({ data }: ForwardingPolicyCardProps) {
       allow_untested: data.allow_untested,
       node_test_timeout_ms: data.node_test_timeout_ms,
       node_test_concurrency: data.node_test_concurrency,
+      biz_auto_interval_sec: data.biz_auto_interval_sec,
     });
   }, [data, form]);
 
@@ -649,6 +666,7 @@ function ForwardingPolicyCard({ data }: ForwardingPolicyCardProps) {
       allow_untested: values.allow_untested,
       node_test_timeout_ms: values.node_test_timeout_ms,
       node_test_concurrency: values.node_test_concurrency,
+      biz_auto_interval_sec: values.biz_auto_interval_sec,
     });
   };
 
@@ -678,6 +696,7 @@ function ForwardingPolicyCard({ data }: ForwardingPolicyCardProps) {
           allow_untested: false,
           node_test_timeout_ms: 3000,
           node_test_concurrency: 8,
+          biz_auto_interval_sec: 1800,
         }}
       >
         <Form.Item
@@ -738,6 +757,24 @@ function ForwardingPolicyCard({ data }: ForwardingPolicyCardProps) {
           ]}
         >
           <InputNumber min={1} max={64} step={1} style={{ width: "100%" }} />
+        </Form.Item>
+        <Form.Item
+          name="biz_auto_interval_sec"
+          label={tr("settings.forwarding.biz_auto_interval", "Business auto test interval (sec)")}
+          rules={[
+            {
+              required: true,
+              message: tr("settings.forwarding.biz_auto_interval.required", "Please enter auto test interval"),
+            },
+            {
+              type: "number",
+              min: 60,
+              max: 86400,
+              message: tr("settings.forwarding.biz_auto_interval.range", "Interval must be between 60 and 86400 sec"),
+            },
+          ]}
+        >
+          <InputNumber min={60} max={86400} step={60} style={{ width: "100%" }} />
         </Form.Item>
       </Form>
       <div className="bp-page-actions bp-settings-actions">

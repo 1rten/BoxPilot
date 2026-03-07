@@ -75,6 +75,7 @@ export type ForwardingPolicyData = {
   allow_untested: boolean;
   node_test_timeout_ms: number;
   node_test_concurrency: number;
+  biz_auto_interval_sec: number;
   updated_at?: string;
 };
 
@@ -138,9 +139,13 @@ export type RuntimeGroupSummaryData = {
 export type RuntimeGroupSelectData = {
   group_tag: string;
   selected_outbound: string;
+  selected_is_auto: boolean;
   updated_at: string;
   config_version: number;
   config_hash: string;
+  runtime_selected_outbound?: string;
+  runtime_effective_outbound?: string;
+  auto_probe_error?: string;
 };
 
 export type RoutingSummaryData = {

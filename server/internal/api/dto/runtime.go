@@ -160,9 +160,13 @@ type RuntimeGroupSelectResponse struct {
 }
 
 type RuntimeGroupSelectData struct {
-	GroupTag         string `json:"group_tag"`
-	SelectedOutbound string `json:"selected_outbound"`
-	UpdatedAt        string `json:"updated_at"`
-	ConfigVersion    int    `json:"config_version"`
-	ConfigHash       string `json:"config_hash"`
+	GroupTag                 string  `json:"group_tag"`
+	SelectedOutbound         string  `json:"selected_outbound"`
+	SelectedIsAuto           bool    `json:"selected_is_auto"`
+	UpdatedAt                string  `json:"updated_at"`
+	ConfigVersion            int     `json:"config_version"`
+	ConfigHash               string  `json:"config_hash"`
+	RuntimeSelectedOutbound  *string `json:"runtime_selected_outbound,omitempty"`
+	RuntimeEffectiveOutbound *string `json:"runtime_effective_outbound,omitempty"`
+	AutoProbeError           *string `json:"auto_probe_error,omitempty"`
 }
