@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type {
   RuntimeConnectionsData,
+  RuntimeGroupSelectData,
+  RuntimeGroupSummaryData,
   RuntimeLogsData,
   RuntimeProxyCheckData,
   RuntimeStatusData,
@@ -107,6 +109,53 @@ export function useRuntimeConnections(query?: string) {
     refetchOnWindowFocus: true,
     refetchInterval: 3000,
     refetchIntervalInBackground: true,
+  });
+}
+
+export function useRuntimeGroups() {
+  return useQuery({
+    queryKey: ["runtime-groups"],
+    queryFn: async () => {
+      const { data } = await api.get<{ data: RuntimeGroupSummaryData }>("/runtime/groups");
+      return data.data;
+    },
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
+  });
+}
+
+export function useSelectRuntimeGroup() {
+  const { tr } = useI18n();
+  const q = useQueryClient();
+  const { addToast } = useToast();
+  return useMutation({
+    mutationFn: async (body: { group_tag: string; selected_outbound: string }) => {
+      const { data } = await api.post<{ data: RuntimeGroupSelectData }>(
+        `/runtime/groups/${encodeURIComponent(body.group_tag)}/select`,
+        { selected_outbound: body.selected_outbound }
+      );
+      return data.data;
+    },
+    onSuccess: () => {
+      q.invalidateQueries({ queryKey: ["runtime-groups"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
+      addToast("success", tr("toast.runtime.group_selected", "Routing group selection applied"));
+    },
+    onError: (error: unknown) => {
+      const anyErr = error as any;
+      const message =
+        anyErr?.appError?.message ||
+        anyErr?.response?.data?.error?.message ||
+        anyErr?.message ||
+        tr("toast.unknown", "Unknown error");
+      addToast("error", tr("toast.runtime.group_select_failed", "Failed to update routing group: {message}", { message }));
+    },
   });
 }
 

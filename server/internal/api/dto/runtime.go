@@ -128,3 +128,36 @@ type RuntimeLogItem struct {
 	Source    string `json:"source"`
 	Message   string `json:"message"`
 }
+
+type RuntimeGroupSummaryResponse struct {
+	Data RuntimeGroupSummaryData `json:"data"`
+}
+
+type RuntimeGroupSummaryData struct {
+	Items []RuntimeGroupItem `json:"items"`
+}
+
+type RuntimeGroupItem struct {
+	Tag                       string   `json:"tag"`
+	Type                      string   `json:"type"`
+	Outbounds                 []string `json:"outbounds"`
+	Default                   string   `json:"default"`
+	PersistedSelectedOutbound *string  `json:"persisted_selected_outbound,omitempty"`
+	PersistedUpdatedAt        *string  `json:"persisted_updated_at,omitempty"`
+}
+
+type RuntimeGroupSelectRequest struct {
+	SelectedOutbound string `json:"selected_outbound"`
+}
+
+type RuntimeGroupSelectResponse struct {
+	Data RuntimeGroupSelectData `json:"data"`
+}
+
+type RuntimeGroupSelectData struct {
+	GroupTag         string `json:"group_tag"`
+	SelectedOutbound string `json:"selected_outbound"`
+	UpdatedAt        string `json:"updated_at"`
+	ConfigVersion    int    `json:"config_version"`
+	ConfigHash       string `json:"config_hash"`
+}

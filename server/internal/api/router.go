@@ -48,6 +48,8 @@ func Router(db *sql.DB) *gin.Engine {
 		v1.POST("/runtime/proxy/check", rt.ProxyCheck)
 		v1.POST("/runtime/plan", rt.Plan)
 		v1.POST("/runtime/reload", rt.Reload)
+		v1.GET("/runtime/groups", rt.Groups)
+		v1.POST("/runtime/groups/:tag/select", rt.SelectGroup)
 
 		settings := &handlers.Settings{DB: db}
 		v1.GET("/settings/proxy", settings.GetProxySettings)

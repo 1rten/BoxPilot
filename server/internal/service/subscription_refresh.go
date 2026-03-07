@@ -47,7 +47,7 @@ func RefreshSubscription(db *sql.DB, subID string) (notModified bool, nodesTotal
 	if err != nil {
 		return false, 0, 0, err
 	}
-	outbounds, err := parser.ParseSubscription(body)
+	parsed, err := parser.ParseSubscriptionBundle(body)
 	if err != nil {
 		repo.SetSubscriptionFetchResult(db, row.ID, row.Etag, row.LastModified, err.Error(), false)
 		return false, 0, 0, err
@@ -56,8 +56,8 @@ func RefreshSubscription(db *sql.DB, subID string) (notModified bool, nodesTotal
 	if len(subShort) > 8 {
 		subShort = subShort[:8]
 	}
-	nodes := make([]repo.NodeRow, 0, len(outbounds))
-	for i, o := range outbounds {
+	nodes := make([]repo.NodeRow, 0, len(parsed.Outbounds))
+	for i, o := range parsed.Outbounds {
 		tag := o.Tag
 		if tag == "" {
 			tag = subShort + "-" + strconv.Itoa(i) + "-node"
@@ -69,6 +69,36 @@ func RefreshSubscription(db *sql.DB, subID string) (notModified bool, nodesTotal
 	}
 	if err := repo.ReplaceNodesForSubscription(db, row.ID, nodes); err != nil {
 		return false, 0, 0, errorx.New(errorx.SUBReplaceNodesFailed, "replace nodes").WithDetails(map[string]any{"id": subID})
+	}
+	ruleSets := make([]repo.SubscriptionRuleSetRow, 0, len(parsed.RuleSets))
+	for _, rs := range parsed.RuleSets {
+		ruleSets = append(ruleSets, repo.SubscriptionRuleSetRow{
+			ID:         util.NewID(),
+			SubID:      row.ID,
+			Tag:        rs.Tag,
+			SourceType: rs.SourceType,
+			Format:     rs.Format,
+			URL:        rs.URL,
+			Path:       rs.Path,
+			CreatedAt:  util.NowRFC3339(),
+		})
+	}
+	rules := make([]repo.SubscriptionRuleRow, 0, len(parsed.Rules))
+	for _, rule := range parsed.Rules {
+		rules = append(rules, repo.SubscriptionRuleRow{
+			ID:             util.NewID(),
+			SubID:          row.ID,
+			SourceKind:     rule.SourceKind,
+			Priority:       rule.Priority,
+			RuleOrder:      rule.RuleOrder,
+			MatcherType:    rule.MatcherType,
+			MatcherValue:   rule.MatcherValue,
+			TargetOutbound: rule.TargetOutbound,
+			CreatedAt:      util.NowRFC3339(),
+		})
+	}
+	if err := repo.ReplaceSubscriptionRouting(db, row.ID, ruleSets, rules); err != nil {
+		return false, 0, 0, errorx.New(errorx.DBError, "replace subscription routing").WithDetails(map[string]any{"id": subID})
 	}
 	etag := resp.Header.Get("Etag")
 	lastMod := resp.Header.Get("Last-Modified")

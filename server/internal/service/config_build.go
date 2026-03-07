@@ -36,7 +36,45 @@ func BuildConfigFromDB(db *sql.DB, httpProxy, socksProxy generator.ProxyInbound,
 		})
 		tags = append(tags, n.Tag)
 	}
-	cfg, err := generator.BuildConfigWithNodes(httpProxy, socksProxy, routing, outbounds)
+	ruleSetRows, err := repo.ListEnabledSubscriptionRuleSets(db)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	ruleRows, err := repo.ListEnabledSubscriptionRules(db)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	extras := generator.RoutingExtras{
+		RuleSets:        make([]generator.RouteRuleSetRef, 0, len(ruleSetRows)),
+		Rules:           make([]generator.RouteRule, 0, len(ruleRows)),
+		GroupSelections: map[string]string{},
+	}
+	for _, rs := range ruleSetRows {
+		extras.RuleSets = append(extras.RuleSets, generator.RouteRuleSetRef{
+			Tag:        rs.Tag,
+			SourceType: rs.SourceType,
+			Format:     rs.Format,
+			URL:        rs.URL,
+			Path:       rs.Path,
+		})
+	}
+	for _, r := range ruleRows {
+		extras.Rules = append(extras.Rules, generator.RouteRule{
+			Priority:       r.Priority,
+			RuleOrder:      r.RuleOrder,
+			MatcherType:    r.MatcherType,
+			MatcherValue:   r.MatcherValue,
+			TargetOutbound: r.TargetOutbound,
+		})
+	}
+	selectionRows, err := repo.ListRuntimeGroupSelections(db)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	for _, s := range selectionRows {
+		extras.GroupSelections[s.GroupTag] = s.SelectedOutbound
+	}
+	cfg, err := generator.BuildConfigWithRuntime(httpProxy, socksProxy, routing, outbounds, extras)
 	if err != nil {
 		return nil, nil, "", err
 	}

@@ -65,6 +65,13 @@ const en = {
   "settings.routing.enable": "Enable bypass rules",
   "settings.routing.domains": "Bypass domains (one per line)",
   "settings.routing.cidrs": "Bypass CIDRs (one per line)",
+  "settings.groups.kicker": "Runtime Groups",
+  "settings.groups.title": "Business Routing Groups",
+  "settings.groups.desc": "Each business group defaults to manual; you can switch to auto urltest (30m) per group.",
+  "settings.groups.empty": "No runtime groups available yet.",
+  "settings.groups.apply": "Apply Group Choice",
+  "settings.groups.persisted": "Saved: {outbound}",
+  "settings.groups.persisted_at": "Updated {time}",
   "settings.forwarding.kicker": "Forwarding Policy",
   "settings.forwarding.title": "Node Eligibility Gate",
   "settings.forwarding.updated": "Updated {time}",
@@ -285,6 +292,8 @@ const en = {
   "toast.runtime.reload_failed": "Runtime reload failed: {message}",
   "toast.runtime.proxy_check_ok": "Proxy chain check completed",
   "toast.runtime.proxy_check_failed": "Proxy chain check failed: {message}",
+  "toast.runtime.group_selected": "Routing group selection applied",
+  "toast.runtime.group_select_failed": "Failed to update routing group: {message}",
 };
 
 export default en;

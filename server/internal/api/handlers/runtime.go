@@ -355,71 +355,123 @@ func (h *Runtime) Plan(c *gin.Context) {
 		}
 	}
 
-	settings, err := repo.GetProxySettings(h.DB)
+	cfg, tags, err := h.buildRuntimeConfig(req.IncludeDisabledNodes)
 	if err != nil {
-		writeError(c, errorx.New(errorx.DBError, "get proxy settings"))
-		return
-	}
-	httpProxy, socksProxy := runtimeProxyRowsToInbounds(settings["http"], settings["socks"])
-
-	row, err := repo.GetRuntimeState(h.DB)
-	if err != nil {
-		writeError(c, errorx.New(errorx.DBError, "get runtime state"))
-		return
-	}
-	forwardingRunning := row != nil && row.ForwardingRunning == 1
-	if !forwardingRunning {
-		httpProxy.Enabled = false
-		socksProxy.Enabled = false
-	}
-
-	nodes := []repo.NodeRow{}
-	if req.IncludeDisabledNodes {
-		nodes, err = repo.ListNodes(h.DB, "", nil)
-	} else {
-		nodes, err = repo.ListEnabledForwardingNodes(h.DB)
-	}
-	if err != nil {
-		writeError(c, errorx.New(errorx.DBError, "list nodes for plan"))
-		return
-	}
-	if !req.IncludeDisabledNodes {
-		policy, policyErr := service.LoadForwardingPolicy(h.DB)
-		if policyErr != nil {
-			writeError(c, errorx.New(errorx.DBError, "get forwarding policy"))
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
 			return
 		}
-		nodes = service.FilterForwardingNodes(nodes, policy)
-	}
-
-	if forwardingRunning && (httpProxy.Enabled || socksProxy.Enabled) && len(nodes) == 0 {
-		writeError(c, errorx.New(errorx.CFGNoEnabledNodes, "no forwarding nodes enabled"))
-		return
-	}
-
-	routing, _, err := service.LoadRoutingSettings(h.DB)
-	if err != nil {
-		writeError(c, errorx.New(errorx.DBError, "get routing settings"))
-		return
-	}
-
-	jsons := make([]string, 0, len(nodes))
-	tags := make([]string, 0, len(nodes))
-	for _, node := range nodes {
-		jsons = append(jsons, node.OutboundJSON)
-		tags = append(tags, node.Tag)
-	}
-	cfg, err := generator.BuildConfig(httpProxy, socksProxy, routing, jsons)
-	if err != nil {
 		writeError(c, errorx.New(errorx.CFGBuildFailed, "build plan config"))
 		return
 	}
 
 	c.JSON(http.StatusOK, dto.RuntimePlanResponse{
 		Data: dto.RuntimePlanData{
-			NodesIncluded: len(nodes),
+			NodesIncluded: len(tags),
 			Tags:          tags,
 			ConfigHash:    util.JSONHash(cfg),
+		},
+	})
+}
+
+func (h *Runtime) Groups(c *gin.Context) {
+	cfg, _, err := h.buildRuntimeConfig(false)
+	if err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.CFGBuildFailed, "build runtime groups"))
+		return
+	}
+	selectionRows, err := repo.ListRuntimeGroupSelections(h.DB)
+	if err != nil {
+		writeError(c, errorx.New(errorx.DBError, "list runtime group selections"))
+		return
+	}
+	selectionByTag := map[string]repo.RuntimeGroupSelectionRow{}
+	for _, row := range selectionRows {
+		selectionByTag[row.GroupTag] = row
+	}
+	groups, err := parseSelectorGroups(cfg, selectionByTag)
+	if err != nil {
+		writeError(c, errorx.New(errorx.CFGJSONInvalid, "parse runtime groups"))
+		return
+	}
+	c.JSON(http.StatusOK, dto.RuntimeGroupSummaryResponse{
+		Data: dto.RuntimeGroupSummaryData{
+			Items: groups,
+		},
+	})
+}
+
+func (h *Runtime) SelectGroup(c *gin.Context) {
+	groupTag := strings.TrimSpace(c.Param("tag"))
+	if groupTag == "" {
+		writeError(c, errorx.New(errorx.REQInvalidField, "missing group tag"))
+		return
+	}
+	var req dto.RuntimeGroupSelectRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, errorx.New(errorx.REQValidationFailed, "invalid body"))
+		return
+	}
+	selected := strings.TrimSpace(req.SelectedOutbound)
+	if selected == "" {
+		writeError(c, errorx.New(errorx.REQMissingField, "selected_outbound required"))
+		return
+	}
+
+	cfg, _, err := h.buildRuntimeConfig(false)
+	if err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.CFGBuildFailed, "build runtime groups"))
+		return
+	}
+	groups, err := parseSelectorGroups(cfg, nil)
+	if err != nil {
+		writeError(c, errorx.New(errorx.CFGJSONInvalid, "parse runtime groups"))
+		return
+	}
+	group := findGroup(groups, groupTag)
+	if group == nil {
+		writeError(c, errorx.New(errorx.REQInvalidField, "group not found").WithDetails(map[string]any{"group_tag": groupTag}))
+		return
+	}
+	if !containsString(group.Outbounds, selected) {
+		writeError(c, errorx.New(errorx.REQInvalidField, "selected outbound not allowed").WithDetails(map[string]any{
+			"group_tag":         groupTag,
+			"selected_outbound": selected,
+		}))
+		return
+	}
+
+	now := util.NowRFC3339()
+	if err := repo.UpsertRuntimeGroupSelection(h.DB, groupTag, selected, now); err != nil {
+		writeError(c, errorx.New(errorx.DBError, "save runtime group selection"))
+		return
+	}
+	configPath := service.ResolveConfigPath()
+	version, hash, _, reloadErr := service.Reload(c.Request.Context(), h.DB, configPath)
+	if reloadErr != nil {
+		if appErr, ok := reloadErr.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.RTRestartFailed, reloadErr.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.RuntimeGroupSelectResponse{
+		Data: dto.RuntimeGroupSelectData{
+			GroupTag:         groupTag,
+			SelectedOutbound: selected,
+			UpdatedAt:        now,
+			ConfigVersion:    version,
+			ConfigHash:       hash,
 		},
 	})
 }
@@ -532,6 +584,174 @@ func runtimeProxyRowsToInbounds(httpRow, socksRow repo.ProxySettingsRow) (genera
 		socksProxy.Port = 7891
 	}
 	return httpProxy, socksProxy
+}
+
+func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool) ([]byte, []string, error) {
+	settings, err := repo.GetProxySettings(h.DB)
+	if err != nil {
+		return nil, nil, errorx.New(errorx.DBError, "get proxy settings")
+	}
+	httpProxy, socksProxy := runtimeProxyRowsToInbounds(settings["http"], settings["socks"])
+
+	row, err := repo.GetRuntimeState(h.DB)
+	if err != nil {
+		return nil, nil, errorx.New(errorx.DBError, "get runtime state")
+	}
+	forwardingRunning := row != nil && row.ForwardingRunning == 1
+	if !forwardingRunning {
+		httpProxy.Enabled = false
+		socksProxy.Enabled = false
+	}
+
+	nodes := []repo.NodeRow{}
+	if includeDisabledNodes {
+		nodes, err = repo.ListNodes(h.DB, "", nil)
+	} else {
+		nodes, err = repo.ListEnabledForwardingNodes(h.DB)
+	}
+	if err != nil {
+		return nil, nil, errorx.New(errorx.DBError, "list nodes for runtime config")
+	}
+	if !includeDisabledNodes {
+		policy, policyErr := service.LoadForwardingPolicy(h.DB)
+		if policyErr != nil {
+			return nil, nil, errorx.New(errorx.DBError, "get forwarding policy")
+		}
+		nodes = service.FilterForwardingNodes(nodes, policy)
+	}
+
+	if forwardingRunning && (httpProxy.Enabled || socksProxy.Enabled) && len(nodes) == 0 {
+		return nil, nil, errorx.New(errorx.CFGNoEnabledNodes, "no forwarding nodes enabled")
+	}
+
+	routing, _, err := service.LoadRoutingSettings(h.DB)
+	if err != nil {
+		return nil, nil, errorx.New(errorx.DBError, "get routing settings")
+	}
+
+	outbounds := make([]generator.NodeOutbound, 0, len(nodes))
+	tags := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		outbounds = append(outbounds, generator.NodeOutbound{
+			Tag:     node.Tag,
+			RawJSON: node.OutboundJSON,
+		})
+		tags = append(tags, node.Tag)
+	}
+
+	ruleSetRows, err := repo.ListEnabledSubscriptionRuleSets(h.DB)
+	if err != nil {
+		return nil, nil, errorx.New(errorx.DBError, "list subscription rule sets")
+	}
+	ruleRows, err := repo.ListEnabledSubscriptionRules(h.DB)
+	if err != nil {
+		return nil, nil, errorx.New(errorx.DBError, "list subscription rules")
+	}
+	selectionRows, err := repo.ListRuntimeGroupSelections(h.DB)
+	if err != nil {
+		return nil, nil, errorx.New(errorx.DBError, "list runtime group selections")
+	}
+
+	extras := generator.RoutingExtras{
+		RuleSets:        make([]generator.RouteRuleSetRef, 0, len(ruleSetRows)),
+		Rules:           make([]generator.RouteRule, 0, len(ruleRows)),
+		GroupSelections: map[string]string{},
+	}
+	for _, rs := range ruleSetRows {
+		extras.RuleSets = append(extras.RuleSets, generator.RouteRuleSetRef{
+			Tag:        rs.Tag,
+			SourceType: rs.SourceType,
+			Format:     rs.Format,
+			URL:        rs.URL,
+			Path:       rs.Path,
+		})
+	}
+	for _, r := range ruleRows {
+		extras.Rules = append(extras.Rules, generator.RouteRule{
+			Priority:       r.Priority,
+			RuleOrder:      r.RuleOrder,
+			MatcherType:    r.MatcherType,
+			MatcherValue:   r.MatcherValue,
+			TargetOutbound: r.TargetOutbound,
+		})
+	}
+	for _, s := range selectionRows {
+		extras.GroupSelections[s.GroupTag] = s.SelectedOutbound
+	}
+
+	cfg, err := generator.BuildConfigWithRuntime(httpProxy, socksProxy, routing, outbounds, extras)
+	if err != nil {
+		return nil, nil, errorx.New(errorx.CFGBuildFailed, "build runtime config")
+	}
+	return cfg, tags, nil
+}
+
+func parseSelectorGroups(cfg []byte, persisted map[string]repo.RuntimeGroupSelectionRow) ([]dto.RuntimeGroupItem, error) {
+	var parsed struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	if err := json.Unmarshal(cfg, &parsed); err != nil {
+		return nil, err
+	}
+	items := make([]dto.RuntimeGroupItem, 0, len(parsed.Outbounds))
+	for _, outbound := range parsed.Outbounds {
+		typ := strings.TrimSpace(fmt.Sprintf("%v", outbound["type"]))
+		if typ != "selector" {
+			continue
+		}
+		tag := strings.TrimSpace(fmt.Sprintf("%v", outbound["tag"]))
+		if tag == "" {
+			continue
+		}
+		defaultOutbound := strings.TrimSpace(fmt.Sprintf("%v", outbound["default"]))
+		memberAny, _ := outbound["outbounds"].([]any)
+		members := make([]string, 0, len(memberAny))
+		for _, m := range memberAny {
+			member := strings.TrimSpace(fmt.Sprintf("%v", m))
+			if member != "" {
+				members = append(members, member)
+			}
+		}
+		item := dto.RuntimeGroupItem{
+			Tag:       tag,
+			Type:      typ,
+			Outbounds: members,
+			Default:   defaultOutbound,
+		}
+		if persisted != nil {
+			if row, ok := persisted[tag]; ok {
+				selected := strings.TrimSpace(row.SelectedOutbound)
+				if selected != "" {
+					item.PersistedSelectedOutbound = &selected
+				}
+				updatedAt := strings.TrimSpace(row.UpdatedAt)
+				if updatedAt != "" {
+					item.PersistedUpdatedAt = &updatedAt
+				}
+			}
+		}
+		items = append(items, item)
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].Tag < items[j].Tag })
+	return items, nil
+}
+
+func findGroup(items []dto.RuntimeGroupItem, tag string) *dto.RuntimeGroupItem {
+	for i := range items {
+		if items[i].Tag == tag {
+			return &items[i]
+		}
+	}
+	return nil
+}
+
+func containsString(items []string, candidate string) bool {
+	for _, v := range items {
+		if v == candidate {
+			return true
+		}
+	}
+	return false
 }
 
 func probeProxyEndpoint(target *url.URL, proxyType string, row repo.ProxySettingsRow, timeout time.Duration) dto.RuntimeProxyCheckItem {

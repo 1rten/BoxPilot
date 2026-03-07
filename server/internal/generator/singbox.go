@@ -3,6 +3,8 @@ package generator
 import (
 	"encoding/json"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 
 	"boxpilot/server/internal/util/errorx"
@@ -29,6 +31,28 @@ type NodeOutbound struct {
 	RawJSON string
 }
 
+type RouteRuleSetRef struct {
+	Tag        string
+	SourceType string
+	Format     string
+	URL        string
+	Path       string
+}
+
+type RouteRule struct {
+	Priority       int
+	RuleOrder      int
+	MatcherType    string
+	MatcherValue   string
+	TargetOutbound string
+}
+
+type RoutingExtras struct {
+	RuleSets        []RouteRuleSetRef
+	Rules           []RouteRule
+	GroupSelections map[string]string
+}
+
 func DefaultRoutingSettings() RoutingSettings {
 	return RoutingSettings{
 		BypassPrivateEnabled: true,
@@ -51,10 +75,14 @@ func BuildConfig(httpProxy ProxyInbound, socksProxy ProxyInbound, routing Routin
 	for _, raw := range nodeOutboundJSONs {
 		nodes = append(nodes, NodeOutbound{RawJSON: raw})
 	}
-	return BuildConfigWithNodes(httpProxy, socksProxy, routing, nodes)
+	return BuildConfigWithRuntime(httpProxy, socksProxy, routing, nodes, RoutingExtras{})
 }
 
 func BuildConfigWithNodes(httpProxy ProxyInbound, socksProxy ProxyInbound, routing RoutingSettings, nodes []NodeOutbound) ([]byte, error) {
+	return BuildConfigWithRuntime(httpProxy, socksProxy, routing, nodes, RoutingExtras{})
+}
+
+func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, routing RoutingSettings, nodes []NodeOutbound, extras RoutingExtras) ([]byte, error) {
 	inbounds := []map[string]any{}
 	if httpProxy.Enabled {
 		inbounds = append(inbounds, buildInbound("http", "http-in", httpProxy))
@@ -81,60 +109,99 @@ func BuildConfigWithNodes(httpProxy ProxyInbound, socksProxy ProxyInbound, routi
 			tags = append(tags, tag)
 		}
 	}
-	switch len(tags) {
+	manualMembers := tags
+	switch len(manualMembers) {
 	case 0:
-		outbounds = append(outbounds, map[string]any{
-			"type":      "selector",
-			"tag":       "proxy",
-			"outbounds": []string{"direct"},
-			"default":   "direct",
-		})
-	case 1:
-		outbounds = append(outbounds, map[string]any{
-			"type":      "selector",
-			"tag":       "proxy",
-			"outbounds": tags,
-			"default":   tags[0],
-		})
-	default:
-		outbounds = append(outbounds, map[string]any{
-			"type":      "urltest",
-			"tag":       "proxy-auto",
-			"outbounds": tags,
-			"url":       "https://www.gstatic.com/generate_204",
-			"interval":  "3m",
-			"tolerance": 120,
-		})
-		choices := make([]string, 0, len(tags)+1)
-		choices = append(choices, "proxy-auto")
-		choices = append(choices, tags...)
-		outbounds = append(outbounds, map[string]any{
-			"type":      "selector",
-			"tag":       "proxy",
-			"outbounds": choices,
-			"default":   "proxy-auto",
-		})
+		manualMembers = []string{"direct"}
 	}
+	manualDefault := manualMembers[0]
+	if selected, ok := extras.GroupSelections["manual"]; ok && containsString(manualMembers, selected) {
+		manualDefault = selected
+	}
+	outbounds = append(outbounds, map[string]any{
+		"type":      "selector",
+		"tag":       "manual",
+		"outbounds": manualMembers,
+		"default":   manualDefault,
+	})
 	route := map[string]any{
-		"final": "proxy",
+		"final": "manual",
 	}
+	routeRuleSets := make([]map[string]any, 0, 2+len(extras.RuleSets))
+	routeRules := make([]map[string]any, 0, 4+len(extras.Rules))
 	if routing.BypassPrivateEnabled {
-		rules := make([]map[string]any, 0, 2)
 		if len(routing.BypassDomains) > 0 {
-			rules = append(rules, map[string]any{
+			routeRules = append(routeRules, map[string]any{
 				"domain_suffix": routing.BypassDomains,
 				"outbound":      "direct",
 			})
 		}
 		if len(routing.BypassCIDRs) > 0 {
-			rules = append(rules, map[string]any{
+			routeRules = append(routeRules, map[string]any{
 				"ip_cidr":  routing.BypassCIDRs,
 				"outbound": "direct",
 			})
 		}
-		if len(rules) > 0 {
-			route["rules"] = rules
+		routeRuleSets = append(routeRuleSets,
+			map[string]any{
+				"tag":    "geosite-cn",
+				"type":   "remote",
+				"format": "binary",
+				"url":    "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/cn.srs",
+			},
+			map[string]any{
+				"tag":    "geoip-cn",
+				"type":   "remote",
+				"format": "binary",
+				"url":    "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/cn.srs",
+			},
+		)
+		routeRules = append(routeRules, map[string]any{
+			"rule_set": []string{"geosite-cn", "geoip-cn"},
+			"outbound": "direct",
+		})
+	}
+	routeRuleSets = append(routeRuleSets, buildRouteRuleSets(extras.RuleSets)...)
+
+	targetMap := buildBusinessGroups(&outbounds, tags, extras.Rules, extras.GroupSelections)
+	availableRuleSets := make(map[string]struct{}, len(routeRuleSets))
+	for _, rs := range routeRuleSets {
+		if tag, ok := rs["tag"].(string); ok && strings.TrimSpace(tag) != "" {
+			availableRuleSets[strings.TrimSpace(tag)] = struct{}{}
 		}
+	}
+	for _, r := range extras.Rules {
+		targetTag, ok := targetMap[r.TargetOutbound]
+		if !ok {
+			continue
+		}
+		item := map[string]any{
+			"outbound": targetTag,
+		}
+		switch r.MatcherType {
+		case "domain":
+			item["domain"] = []string{r.MatcherValue}
+		case "domain_suffix":
+			item["domain_suffix"] = []string{r.MatcherValue}
+		case "domain_keyword":
+			item["domain_keyword"] = []string{r.MatcherValue}
+		case "ip_cidr":
+			item["ip_cidr"] = []string{r.MatcherValue}
+		case "rule_set":
+			if _, ok := availableRuleSets[r.MatcherValue]; !ok {
+				continue
+			}
+			item["rule_set"] = r.MatcherValue
+		default:
+			continue
+		}
+		routeRules = append(routeRules, item)
+	}
+	if len(routeRuleSets) > 0 {
+		route["rule_set"] = routeRuleSets
+	}
+	if len(routeRules) > 0 {
+		route["rules"] = routeRules
 	}
 
 	cfg := map[string]any{
@@ -148,6 +215,162 @@ func BuildConfigWithNodes(httpProxy ProxyInbound, socksProxy ProxyInbound, routi
 		return nil, errorx.New(errorx.CFGJSONInvalid, "marshal config")
 	}
 	return b, nil
+}
+
+func buildRouteRuleSets(extras []RouteRuleSetRef) []map[string]any {
+	if len(extras) == 0 {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(extras))
+	seen := map[string]struct{}{}
+	for _, rs := range extras {
+		tag := strings.TrimSpace(rs.Tag)
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		item := map[string]any{
+			"tag":    tag,
+			"type":   defaultString(strings.TrimSpace(rs.SourceType), "remote"),
+			"format": defaultString(strings.TrimSpace(rs.Format), "binary"),
+		}
+		if u := strings.TrimSpace(rs.URL); u != "" {
+			item["url"] = u
+		}
+		if p := strings.TrimSpace(rs.Path); p != "" {
+			item["path"] = p
+		}
+		if _, hasURL := item["url"]; !hasURL {
+			if _, hasPath := item["path"]; !hasPath {
+				continue
+			}
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func buildBusinessGroups(outbounds *[]any, nodeTags []string, rules []RouteRule, selections map[string]string) map[string]string {
+	targets := map[string]struct{}{}
+	for _, r := range rules {
+		target := strings.TrimSpace(r.TargetOutbound)
+		if target == "" {
+			continue
+		}
+		targets[target] = struct{}{}
+	}
+	result := map[string]string{}
+	if len(targets) == 0 {
+		return result
+	}
+	used := map[string]struct{}{
+		"direct": {},
+		"block":  {},
+		"manual": {},
+		"dns":    {},
+	}
+	for _, tag := range nodeTags {
+		used[tag] = struct{}{}
+	}
+	targetList := make([]string, 0, len(targets))
+	for target := range targets {
+		targetList = append(targetList, target)
+	}
+	sort.Strings(targetList)
+	for _, target := range targetList {
+		selectorTag := resolveUniqueTag("biz-"+slugTag(target), used)
+		used[selectorTag] = struct{}{}
+		autoTag := resolveUniqueTag(selectorTag+"-auto", used)
+		used[autoTag] = struct{}{}
+		result[target] = selectorTag
+		selectorOutbounds := []string{"manual"}
+		if len(nodeTags) > 0 {
+			*outbounds = append(*outbounds, map[string]any{
+				"type":      "urltest",
+				"tag":       autoTag,
+				"outbounds": nodeTags,
+				"url":       "https://www.gstatic.com/generate_204",
+				"interval":  "30m",
+				"tolerance": 120,
+			})
+			selectorOutbounds = append(selectorOutbounds, autoTag)
+		}
+		selectedDefault := "manual"
+		if selected, ok := selections[selectorTag]; ok && containsString(selectorOutbounds, selected) {
+			selectedDefault = selected
+		}
+		*outbounds = append(*outbounds, map[string]any{
+			"type":      "selector",
+			"tag":       selectorTag,
+			"outbounds": selectorOutbounds,
+			"default":   selectedDefault,
+		})
+	}
+	return result
+}
+
+func containsString(items []string, candidate string) bool {
+	for _, v := range items {
+		if v == candidate {
+			return true
+		}
+	}
+	return false
+}
+
+func slugTag(raw string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	if s == "" {
+		return "group"
+	}
+	var b strings.Builder
+	lastDash := false
+	for _, r := range s {
+		isAZ := r >= 'a' && r <= 'z'
+		is09 := r >= '0' && r <= '9'
+		if isAZ || is09 {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			b.WriteRune('-')
+			lastDash = true
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		return "group"
+	}
+	return out
+}
+
+func resolveUniqueTag(base string, used map[string]struct{}) string {
+	tag := strings.TrimSpace(base)
+	if tag == "" {
+		tag = "biz"
+	}
+	if _, exists := used[tag]; !exists {
+		return tag
+	}
+	i := 2
+	for {
+		candidate := tag + "-" + strconv.Itoa(i)
+		if _, exists := used[candidate]; !exists {
+			return candidate
+		}
+		i++
+	}
+}
+
+func defaultString(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }
 
 func parseTagFromOutbound(raw string) string {

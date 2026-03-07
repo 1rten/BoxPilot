@@ -123,6 +123,71 @@ func TestParseSubscription_TraditionalBase64WholePayload(t *testing.T) {
 	}
 }
 
+func TestParseSubscriptionBundle_SingboxBusinessRules(t *testing.T) {
+	payload := `{
+	  "outbounds": [
+	    {"type":"vmess","tag":"node-a","server":"example.com","server_port":443,"uuid":"11111111-1111-1111-1111-111111111111"}
+	  ],
+	  "route": {
+	    "rule_set": [
+	      {"tag":"geosite-openai","type":"remote","format":"binary","url":"https://example.com/openai.srs"},
+	      {"tag":"geosite-cn","type":"remote","format":"binary","url":"https://example.com/cn.srs"}
+	    ],
+	    "rules": [
+	      {"rule_set":"geosite-openai","outbound":"OpenAI"},
+	      {"rule_set":"geosite-cn","outbound":"direct"}
+	    ]
+	  }
+	}`
+
+	parsed, err := ParseSubscriptionBundle([]byte(payload))
+	if err != nil {
+		t.Fatalf("ParseSubscriptionBundle returned error: %v", err)
+	}
+	if len(parsed.Outbounds) != 1 {
+		t.Fatalf("expected 1 outbound, got %d", len(parsed.Outbounds))
+	}
+	if len(parsed.Rules) != 1 {
+		t.Fatalf("expected 1 business rule, got %d", len(parsed.Rules))
+	}
+	if parsed.Rules[0].MatcherType != "rule_set" || parsed.Rules[0].MatcherValue != "geosite-openai" {
+		t.Fatalf("unexpected parsed rule: %+v", parsed.Rules[0])
+	}
+	if len(parsed.RuleSets) != 1 || parsed.RuleSets[0].Tag != "geosite-openai" {
+		t.Fatalf("expected only openai rule_set retained, got %+v", parsed.RuleSets)
+	}
+}
+
+func TestParseSubscriptionBundle_ClashBusinessRules(t *testing.T) {
+	payload := `
+proxies:
+  - name: vmess-hk
+    type: vmess
+    server: hk.example.com
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111111
+rules:
+  - DOMAIN-SUFFIX,openai.com,openAI
+  - GEOIP,CN,DIRECT
+  - RULE-SET,openai_rule,openAI
+rule-providers:
+  openai_rule:
+    type: http
+    behavior: domain
+    url: https://example.com/openai.yaml
+`
+	parsed, err := ParseSubscriptionBundle([]byte(payload))
+	if err != nil {
+		t.Fatalf("ParseSubscriptionBundle returned error: %v", err)
+	}
+	if len(parsed.Rules) != 2 {
+		t.Fatalf("expected 2 business rules, got %d", len(parsed.Rules))
+	}
+	if len(parsed.RuleSets) != 1 || parsed.RuleSets[0].Tag != "openai_rule" {
+		t.Fatalf("expected one rule_set provider, got %+v", parsed.RuleSets)
+	}
+}
+
 func assertHasType(t *testing.T, list []OutboundItem, typ string) {
 	t.Helper()
 	for _, item := range list {

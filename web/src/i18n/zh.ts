@@ -65,6 +65,13 @@ const zh = {
   "settings.routing.enable": "启用绕行规则",
   "settings.routing.domains": "绕行域名（每行一个）",
   "settings.routing.cidrs": "绕行 CIDR（每行一个）",
+  "settings.groups.kicker": "运行时分组",
+  "settings.groups.title": "业务路由分组",
+  "settings.groups.desc": "每个业务组默认手动切换；可按组切到自动 urltest（30 分钟）。",
+  "settings.groups.empty": "暂无可用运行时分组。",
+  "settings.groups.apply": "应用该分组选择",
+  "settings.groups.persisted": "已保存：{outbound}",
+  "settings.groups.persisted_at": "更新时间：{time}",
   "settings.forwarding.kicker": "转发策略",
   "settings.forwarding.title": "节点可用性门控",
   "settings.forwarding.updated": "更新时间：{time}",
@@ -285,6 +292,8 @@ const zh = {
   "toast.runtime.reload_failed": "运行时重载失败：{message}",
   "toast.runtime.proxy_check_ok": "代理链路检查完成",
   "toast.runtime.proxy_check_failed": "代理链路检查失败：{message}",
+  "toast.runtime.group_selected": "分组选择已应用",
+  "toast.runtime.group_select_failed": "更新分组失败：{message}",
 };
 
 export default zh;

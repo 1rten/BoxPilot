@@ -117,6 +117,27 @@ export type RuntimeLogsData = {
   items: RuntimeLogItem[];
 };
 
+export type RuntimeGroupItem = {
+  tag: string;
+  type: string;
+  outbounds: string[];
+  default: string;
+  persisted_selected_outbound?: string;
+  persisted_updated_at?: string;
+};
+
+export type RuntimeGroupSummaryData = {
+  items: RuntimeGroupItem[];
+};
+
+export type RuntimeGroupSelectData = {
+  group_tag: string;
+  selected_outbound: string;
+  updated_at: string;
+  config_version: number;
+  config_hash: string;
+};
+
 export type RoutingSummaryData = {
   bypass_private_enabled: boolean;
   bypass_domains_count: number;

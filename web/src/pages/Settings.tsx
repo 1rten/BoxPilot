@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Form, Input, InputNumber, Modal, Select, Switch, Tag } from "antd";
-import type { ProxyConfig, ProxyType, RoutingSettingsData } from "../api/types";
+import type { ProxyConfig, ProxyType, RoutingSettingsData, RuntimeGroupItem } from "../api/types";
 import { buildProxyUrl, resolveProxyClientHost } from "../api/settings";
 import {
   useProxySettings,
@@ -11,6 +11,7 @@ import {
   useForwardingPolicy,
   useUpdateForwardingPolicy,
 } from "../hooks/useProxySettings";
+import { useRuntimeGroups, useSelectRuntimeGroup } from "../hooks/useRuntime";
 import { useToast } from "../components/common/ToastContext";
 import { useI18n } from "../i18n/context";
 
@@ -40,12 +41,18 @@ export default function Settings() {
     isFetching: forwardingPolicyFetching,
     refetch: refetchForwardingPolicy,
   } = useForwardingPolicy();
+  const {
+    data: runtimeGroups,
+    isLoading: runtimeGroupsLoading,
+    isFetching: runtimeGroupsFetching,
+    refetch: refetchRuntimeGroups,
+  } = useRuntimeGroups();
   const applyAll = useApplyProxySettings();
 
-  const refreshing = proxyFetching || routingFetching || forwardingPolicyFetching;
+  const refreshing = proxyFetching || routingFetching || forwardingPolicyFetching || runtimeGroupsFetching;
 
   const onRefreshAll = async () => {
-    await Promise.all([refetchProxySettings(), refetchRoutingSettings(), refetchForwardingPolicy()]);
+    await Promise.all([refetchProxySettings(), refetchRoutingSettings(), refetchForwardingPolicy(), refetchRuntimeGroups()]);
   };
 
   return (
@@ -81,13 +88,126 @@ export default function Settings() {
       <div style={{ marginTop: 16 }}>
         <RoutingSettingsCard data={routingData} />
       </div>
-      {(isLoading || routingLoading || forwardingPolicyLoading) && (
+      <div style={{ marginTop: 16 }}>
+        <RuntimeGroupsCard items={runtimeGroups?.items} />
+      </div>
+      {(isLoading || routingLoading || forwardingPolicyLoading || runtimeGroupsLoading) && (
         <p className="bp-muted" style={{ marginTop: 12 }}>
           {tr("common.loading", "Loading...")}
         </p>
       )}
     </div>
   );
+}
+
+interface RuntimeGroupsCardProps {
+  items?: RuntimeGroupItem[];
+}
+
+function RuntimeGroupsCard({ items }: RuntimeGroupsCardProps) {
+  const { tr } = useI18n();
+  const updateGroup = useSelectRuntimeGroup();
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+  const groups = useMemo(
+    () => (items ?? []).filter((item) => item.tag === "manual" || item.tag.startsWith("biz-")),
+    [items]
+  );
+
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const item of groups) {
+      next[item.tag] = item.default;
+    }
+    setDrafts(next);
+  }, [groups]);
+
+  return (
+    <Card className="bp-settings-card">
+      <div className="bp-card-header">
+        <div>
+          <p className="bp-card-kicker">{tr("settings.groups.kicker", "Runtime Groups")}</p>
+          <h2 className="bp-card-title">{tr("settings.groups.title", "Business Routing Groups")}</h2>
+        </div>
+      </div>
+      <p className="bp-muted" style={{ marginTop: 0 }}>
+        {tr("settings.groups.desc", "Each business group defaults to manual; you can switch to auto urltest (30m) per group.")}
+      </p>
+      {groups.length === 0 ? (
+        <p className="bp-muted">{tr("settings.groups.empty", "No runtime groups available yet.")}</p>
+      ) : (
+        <div style={{ display: "grid", gap: 12 }}>
+          {groups.map((group) => (
+            <div
+              key={group.tag}
+              style={{
+                border: "1px solid var(--bp-border)",
+                borderRadius: 12,
+                padding: 12,
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <strong>{formatGroupLabel(group.tag)}</strong>
+                <Tag>{group.tag}</Tag>
+              </div>
+              {group.persisted_selected_outbound ? (
+                <p className="bp-muted" style={{ margin: 0 }}>
+                  {tr("settings.groups.persisted", "Saved: {outbound}", {
+                    outbound: group.persisted_selected_outbound,
+                  })}
+                  {group.persisted_updated_at
+                    ? ` · ${tr("settings.groups.persisted_at", "Updated {time}", { time: group.persisted_updated_at })}`
+                    : ""}
+                </p>
+              ) : null}
+              <Select
+                value={drafts[group.tag] ?? group.default}
+                options={group.outbounds.map((value) => ({ value, label: value }))}
+                onChange={(value) =>
+                  setDrafts((prev) => ({
+                    ...prev,
+                    [group.tag]: value,
+                  }))
+                }
+              />
+              <div className="bp-page-actions bp-settings-actions">
+                <Button
+                  className="bp-btn-fixed"
+                  type="primary"
+                  loading={updateGroup.isPending}
+                  disabled={!drafts[group.tag] || drafts[group.tag] === group.default}
+                  onClick={() =>
+                    updateGroup.mutate({
+                      group_tag: group.tag,
+                      selected_outbound: drafts[group.tag] ?? group.default,
+                    })
+                  }
+                >
+                  {tr("settings.groups.apply", "Apply Group Choice")}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function formatGroupLabel(tag: string): string {
+  if (tag === "manual") {
+    return "Manual";
+  }
+  if (tag.startsWith("biz-")) {
+    const body = tag.slice(4).replace(/-/g, " ").trim();
+    if (!body) {
+      return tag;
+    }
+    return body.replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  return tag;
 }
 
 function ProxySettingsCard({ title, proxyType, data }: ProxyCardProps) {

@@ -20,6 +20,29 @@ type OutboundItem struct {
 	Raw  json.RawMessage
 }
 
+type RuleSetItem struct {
+	Tag        string
+	SourceType string
+	Format     string
+	URL        string
+	Path       string
+}
+
+type RoutingRuleItem struct {
+	Priority       int
+	RuleOrder      int
+	MatcherType    string
+	MatcherValue   string
+	TargetOutbound string
+	SourceKind     string
+}
+
+type ParsedSubscription struct {
+	Outbounds []OutboundItem
+	RuleSets  []RuleSetItem
+	Rules     []RoutingRuleItem
+}
+
 var filterTypes = map[string]bool{
 	"direct": true, "block": true, "dns": true, "selector": true, "urltest": true,
 }
@@ -27,46 +50,68 @@ var filterTypes = map[string]bool{
 // ParseSubscription auto-detects the payload format and converts supported subscriptions
 // into sing-box outbounds.
 func ParseSubscription(body []byte) ([]OutboundItem, error) {
+	parsed, err := ParseSubscriptionBundle(body)
+	if err != nil {
+		return nil, err
+	}
+	return parsed.Outbounds, nil
+}
+
+// ParseSubscriptionBundle parses nodes and routing metadata from subscription payload.
+func ParseSubscriptionBundle(body []byte) (ParsedSubscription, error) {
 	trimmed := bytes.TrimSpace(body)
 	if len(trimmed) == 0 {
-		return nil, errorx.New(errorx.SUBParseFailed, "empty subscription body")
+		return ParsedSubscription{}, errorx.New(errorx.SUBParseFailed, "empty subscription body")
 	}
 
 	if out, ok, err := parseSingboxJSON(trimmed); ok {
-		return finalizeParsed(out, err, "singbox_json")
+		return finalizeParsedBundle(out, parseSingboxRouting(trimmed), err, "singbox_json")
 	}
 	if out, ok, err := parseClashYAML(trimmed); ok {
-		return finalizeParsed(out, err, "clash_yaml")
+		return finalizeParsedBundle(out, parseClashRouting(trimmed), err, "clash_yaml")
 	}
 	if out, ok, err := parseTraditionalURIList(trimmed); ok {
-		return finalizeParsed(out, err, "traditional_uri")
+		return finalizeParsedBundle(out, nil, err, "traditional_uri")
 	}
 
 	if decoded, ok := decodeBase64Payload(trimmed); ok {
 		if out, parsed, err := parseSingboxJSON(decoded); parsed {
-			return finalizeParsed(out, err, "singbox_base64")
+			return finalizeParsedBundle(out, parseSingboxRouting(decoded), err, "singbox_base64")
 		}
 		if out, parsed, err := parseClashYAML(decoded); parsed {
-			return finalizeParsed(out, err, "clash_base64")
+			return finalizeParsedBundle(out, parseClashRouting(decoded), err, "clash_base64")
 		}
 		if out, parsed, err := parseTraditionalURIList(decoded); parsed {
-			return finalizeParsed(out, err, "traditional_base64")
+			return finalizeParsedBundle(out, nil, err, "traditional_base64")
 		}
 	}
 
-	return nil, errorx.New(errorx.SUBFormatUnsupported, "subscription format unsupported")
+	return ParsedSubscription{}, errorx.New(errorx.SUBFormatUnsupported, "subscription format unsupported")
 }
 
 func finalizeParsed(out []OutboundItem, parseErr error, format string) ([]OutboundItem, error) {
+	bundle, err := finalizeParsedBundle(out, nil, parseErr, format)
+	if err != nil {
+		return nil, err
+	}
+	return bundle.Outbounds, nil
+}
+
+func finalizeParsedBundle(out []OutboundItem, routeParsed *ParsedSubscription, parseErr error, format string) (ParsedSubscription, error) {
 	if parseErr != nil {
-		return nil, parseErr
+		return ParsedSubscription{}, parseErr
 	}
 	if len(out) == 0 {
-		return nil, errorx.New(errorx.SUBEmptyOutbounds, "no supported outbounds found").WithDetails(map[string]any{
+		return ParsedSubscription{}, errorx.New(errorx.SUBEmptyOutbounds, "no supported outbounds found").WithDetails(map[string]any{
 			"format": format,
 		})
 	}
-	return out, nil
+	result := ParsedSubscription{Outbounds: out}
+	if routeParsed != nil {
+		result.RuleSets = routeParsed.RuleSets
+		result.Rules = routeParsed.Rules
+	}
+	return result, nil
 }
 
 func parseSingboxJSON(payload []byte) ([]OutboundItem, bool, error) {
@@ -105,6 +150,275 @@ func parseSingboxArray(arr []json.RawMessage) ([]OutboundItem, error) {
 		out = append(out, OutboundItem{Tag: tag, Type: t, Raw: b})
 	}
 	return out, nil
+}
+
+func parseSingboxRouting(payload []byte) *ParsedSubscription {
+	var doc struct {
+		Route struct {
+			RuleSet []json.RawMessage `json:"rule_set"`
+			Rules   []json.RawMessage `json:"rules"`
+		} `json:"route"`
+	}
+	if err := json.Unmarshal(payload, &doc); err != nil {
+		return nil
+	}
+
+	result := &ParsedSubscription{
+		RuleSets: make([]RuleSetItem, 0, len(doc.Route.RuleSet)),
+		Rules:    make([]RoutingRuleItem, 0, len(doc.Route.Rules)),
+	}
+
+	for idx, raw := range doc.Route.Rules {
+		var m map[string]any
+		if err := json.Unmarshal(raw, &m); err != nil {
+			continue
+		}
+		target := strings.TrimSpace(toString(m["outbound"]))
+		if !isBusinessTargetTag(target) {
+			continue
+		}
+		result.Rules = append(result.Rules, explodeRuleMatchers(
+			m, target, "singbox", 200, idx,
+		)...)
+	}
+
+	usedRuleSetTags := map[string]struct{}{}
+	for _, r := range result.Rules {
+		if r.MatcherType == "rule_set" {
+			usedRuleSetTags[r.MatcherValue] = struct{}{}
+		}
+	}
+
+	for _, raw := range doc.Route.RuleSet {
+		var m map[string]any
+		if err := json.Unmarshal(raw, &m); err != nil {
+			continue
+		}
+		tag := strings.TrimSpace(toString(m["tag"]))
+		if tag == "" {
+			continue
+		}
+		if len(usedRuleSetTags) > 0 {
+			if _, ok := usedRuleSetTags[tag]; !ok {
+				continue
+			}
+		}
+		sourceType := strings.ToLower(strings.TrimSpace(toString(m["type"])))
+		if sourceType == "" {
+			sourceType = "remote"
+		}
+		format := strings.ToLower(strings.TrimSpace(toString(m["format"])))
+		if format == "" {
+			format = "binary"
+		}
+		item := RuleSetItem{
+			Tag:        tag,
+			SourceType: sourceType,
+			Format:     format,
+			URL:        strings.TrimSpace(toString(m["url"])),
+			Path:       strings.TrimSpace(toString(m["path"])),
+		}
+		if item.URL == "" && item.Path == "" {
+			continue
+		}
+		result.RuleSets = append(result.RuleSets, item)
+	}
+
+	return result
+}
+
+func parseClashRouting(payload []byte) *ParsedSubscription {
+	var doc struct {
+		Rules         []string                  `yaml:"rules"`
+		RuleProviders map[string]map[string]any `yaml:"rule-providers"`
+	}
+	if err := yaml.Unmarshal(payload, &doc); err != nil {
+		return nil
+	}
+
+	result := &ParsedSubscription{
+		RuleSets: []RuleSetItem{},
+		Rules:    []RoutingRuleItem{},
+	}
+	usedProviders := map[string]struct{}{}
+
+	for idx, line := range doc.Rules {
+		parts := splitClashRuleLine(line)
+		if len(parts) < 3 {
+			continue
+		}
+		ruleType := strings.ToUpper(parts[0])
+		matcherValue := strings.TrimSpace(parts[1])
+		target := strings.TrimSpace(parts[2])
+		if !isBusinessTargetTag(target) {
+			continue
+		}
+
+		var matcherType string
+		switch ruleType {
+		case "DOMAIN":
+			matcherType = "domain"
+		case "DOMAIN-SUFFIX":
+			matcherType = "domain_suffix"
+		case "DOMAIN-KEYWORD":
+			matcherType = "domain_keyword"
+		case "IP-CIDR", "IP-CIDR6":
+			matcherType = "ip_cidr"
+		case "RULE-SET", "RULESET":
+			matcherType = "rule_set"
+			usedProviders[matcherValue] = struct{}{}
+		default:
+			continue
+		}
+
+		matcherValue = normalizeMatcherValue(matcherType, matcherValue)
+		if matcherValue == "" {
+			continue
+		}
+
+		result.Rules = append(result.Rules, RoutingRuleItem{
+			Priority:       200,
+			RuleOrder:      idx,
+			MatcherType:    matcherType,
+			MatcherValue:   matcherValue,
+			TargetOutbound: target,
+			SourceKind:     "clash",
+		})
+	}
+
+	for tag, provider := range doc.RuleProviders {
+		if len(usedProviders) > 0 {
+			if _, ok := usedProviders[tag]; !ok {
+				continue
+			}
+		}
+		urlValue := strings.TrimSpace(toString(provider["url"]))
+		pathValue := strings.TrimSpace(toString(provider["path"]))
+		if urlValue == "" && pathValue == "" {
+			continue
+		}
+		sourceType := "remote"
+		if pathValue != "" && urlValue == "" {
+			sourceType = "local"
+		}
+		format := strings.ToLower(strings.TrimSpace(toString(provider["format"])))
+		if format == "" {
+			format = "source"
+		}
+		result.RuleSets = append(result.RuleSets, RuleSetItem{
+			Tag:        tag,
+			SourceType: sourceType,
+			Format:     format,
+			URL:        urlValue,
+			Path:       pathValue,
+		})
+	}
+	return result
+}
+
+func explodeRuleMatchers(rule map[string]any, target, sourceKind string, priority, ruleOrder int) []RoutingRuleItem {
+	type matcherDef struct {
+		key         string
+		matcherType string
+	}
+	matchers := []matcherDef{
+		{key: "domain", matcherType: "domain"},
+		{key: "domain_suffix", matcherType: "domain_suffix"},
+		{key: "domain_keyword", matcherType: "domain_keyword"},
+		{key: "ip_cidr", matcherType: "ip_cidr"},
+		{key: "rule_set", matcherType: "rule_set"},
+	}
+	out := make([]RoutingRuleItem, 0, len(matchers))
+	for _, m := range matchers {
+		values := explodeMatcherValues(rule[m.key])
+		for _, value := range values {
+			normalized := normalizeMatcherValue(m.matcherType, value)
+			if normalized == "" {
+				continue
+			}
+			out = append(out, RoutingRuleItem{
+				Priority:       priority,
+				RuleOrder:      ruleOrder,
+				MatcherType:    m.matcherType,
+				MatcherValue:   normalized,
+				TargetOutbound: target,
+				SourceKind:     sourceKind,
+			})
+		}
+	}
+	return out
+}
+
+func explodeMatcherValues(v any) []string {
+	switch x := v.(type) {
+	case string:
+		s := strings.TrimSpace(x)
+		if s == "" {
+			return nil
+		}
+		return []string{s}
+	case []any:
+		out := make([]string, 0, len(x))
+		for _, item := range x {
+			if s := strings.TrimSpace(toString(item)); s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func splitClashRuleLine(line string) []string {
+	raw := strings.TrimSpace(line)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		out = append(out, strings.TrimSpace(p))
+	}
+	return out
+}
+
+func normalizeMatcherValue(matcherType, raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return ""
+	}
+	switch matcherType {
+	case "domain", "domain_suffix", "domain_keyword":
+		return strings.TrimSuffix(strings.ToLower(value), ".")
+	case "ip_cidr":
+		if _, n, err := net.ParseCIDR(value); err == nil && n != nil {
+			return n.String()
+		}
+		return value
+	default:
+		return value
+	}
+}
+
+func isBusinessTargetTag(tag string) bool {
+	raw := strings.TrimSpace(tag)
+	if raw == "" {
+		return false
+	}
+	lower := strings.ToLower(raw)
+	switch lower {
+	case "direct", "block", "reject", "dns", "manual", "proxy", "proxy-auto":
+		return false
+	}
+	if strings.Contains(lower, "直连") ||
+		strings.Contains(lower, "manual") ||
+		strings.Contains(lower, "手动切换") ||
+		strings.Contains(lower, "漏网之鱼") ||
+		strings.Contains(lower, "节点选择") {
+		return false
+	}
+	return true
 }
 
 func parseClashYAML(payload []byte) ([]OutboundItem, bool, error) {

@@ -29,13 +29,13 @@ func TestBuildConfig_WithBypassRules(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing route section")
 	}
-	if got := route["final"]; got != "proxy" {
-		t.Fatalf("expected route.final=proxy, got %v", got)
+	if got := route["final"]; got != "manual" {
+		t.Fatalf("expected route.final=manual, got %v", got)
 	}
 
 	rules, ok := route["rules"].([]any)
-	if !ok || len(rules) != 2 {
-		t.Fatalf("expected 2 route rules, got %v", route["rules"])
+	if !ok || len(rules) != 3 {
+		t.Fatalf("expected 3 route rules, got %v", route["rules"])
 	}
 
 	domainRule, ok := rules[0].(map[string]any)
@@ -60,6 +60,22 @@ func TestBuildConfig_WithBypassRules(t *testing.T) {
 	ipCIDRs, ok := cidrRule["ip_cidr"].([]any)
 	if !ok || len(ipCIDRs) != 2 {
 		t.Fatalf("expected 2 ip_cidr values, got %v", cidrRule["ip_cidr"])
+	}
+
+	cnRule, ok := rules[2].(map[string]any)
+	if !ok {
+		t.Fatalf("invalid cn rule type")
+	}
+	if got := cnRule["outbound"]; got != "direct" {
+		t.Fatalf("expected cn rule outbound direct, got %v", got)
+	}
+	if _, ok := cnRule["rule_set"].([]any); !ok {
+		t.Fatalf("expected rule_set list in cn rule")
+	}
+
+	ruleSets, ok := route["rule_set"].([]any)
+	if !ok || len(ruleSets) != 2 {
+		t.Fatalf("expected 2 route.rule_set entries, got %v", route["rule_set"])
 	}
 }
 
@@ -120,7 +136,101 @@ func TestBuildConfigWithNodes_UsesProvidedTags(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing outbounds")
 	}
-	if len(outbounds) < 5 {
-		t.Fatalf("expected at least 5 outbounds, got %d", len(outbounds))
+	if len(outbounds) < 4 {
+		t.Fatalf("expected at least 4 outbounds, got %d", len(outbounds))
+	}
+	for _, item := range outbounds {
+		outbound, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if typ, _ := outbound["type"].(string); typ == "urltest" {
+			t.Fatalf("did not expect global urltest outbound, got %v", outbound["tag"])
+		}
+	}
+}
+
+func TestBuildConfigWithRuntime_BusinessGroups(t *testing.T) {
+	cfg, err := BuildConfigWithRuntime(
+		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		RoutingSettings{BypassPrivateEnabled: true},
+		[]NodeOutbound{
+			{
+				Tag:     "node-a",
+				RawJSON: `{"type":"trojan","tag":"node-a","server":"example.com","server_port":443,"password":"p"}`,
+			},
+			{
+				Tag:     "node-b",
+				RawJSON: `{"type":"trojan","tag":"node-b","server":"example.org","server_port":443,"password":"p"}`,
+			},
+		},
+		RoutingExtras{
+			RuleSets: []RouteRuleSetRef{
+				{
+					Tag:        "geosite-openai",
+					SourceType: "remote",
+					Format:     "binary",
+					URL:        "https://example.com/openai.srs",
+				},
+			},
+			Rules: []RouteRule{
+				{
+					Priority:       200,
+					RuleOrder:      1,
+					MatcherType:    "rule_set",
+					MatcherValue:   "geosite-openai",
+					TargetOutbound: "OpenAI",
+				},
+			},
+			GroupSelections: map[string]string{
+				"manual":     "node-b",
+				"biz-openai": "biz-openai-auto",
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("BuildConfigWithRuntime returned error: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(cfg, &parsed); err != nil {
+		t.Fatalf("unmarshal config: %v", err)
+	}
+
+	outbounds, ok := parsed["outbounds"].([]any)
+	if !ok {
+		t.Fatalf("missing outbounds")
+	}
+	hasManual := false
+	hasBiz := false
+	hasBizAuto := false
+	for _, item := range outbounds {
+		outbound, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		tag, _ := outbound["tag"].(string)
+		typ, _ := outbound["type"].(string)
+		switch {
+		case tag == "manual" && typ == "selector":
+			hasManual = true
+			if d, _ := outbound["default"].(string); d != "node-b" {
+				t.Fatalf("expected manual selector default node-b, got %v", outbound["default"])
+			}
+		case tag == "biz-openai" && typ == "selector":
+			hasBiz = true
+			if d, _ := outbound["default"].(string); d != "biz-openai-auto" {
+				t.Fatalf("expected biz selector default biz-openai-auto, got %v", outbound["default"])
+			}
+		case typ == "urltest" && tag == "biz-openai-auto":
+			hasBizAuto = true
+			if interval, _ := outbound["interval"].(string); interval != "30m" {
+				t.Fatalf("expected business urltest interval 30m, got %v", outbound["interval"])
+			}
+		}
+	}
+	if !hasManual || !hasBiz || !hasBizAuto {
+		t.Fatalf("expected manual+biz+biz-auto outbounds, got %#v", outbounds)
 	}
 }
