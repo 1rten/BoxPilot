@@ -120,7 +120,12 @@ func RefreshSubscription(db *sql.DB, subID string) (notModified bool, nodesTotal
 			if mapped, ok := sourceToFinalTag[tag]; ok {
 				tag = mapped
 			}
-			if _, ok := availableTags[tag]; !ok {
+			if !isSpecialBusinessMemberTag(tag) {
+				if _, ok := availableTags[tag]; !ok {
+					continue
+				}
+			}
+			if tag == "" {
 				continue
 			}
 			key := target + "\x00" + tag
@@ -207,4 +212,13 @@ func parseNonNegativeInt64(raw string) (int64, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+func isSpecialBusinessMemberTag(tag string) bool {
+	switch strings.ToLower(strings.TrimSpace(tag)) {
+	case "direct", "block":
+		return true
+	default:
+		return false
+	}
 }

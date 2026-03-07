@@ -48,3 +48,22 @@ func TestParseSubscriptionUsageMeta_EmptyHeaders(t *testing.T) {
 		t.Fatalf("expected profile fields nil, got %+v", meta)
 	}
 }
+
+func TestIsSpecialBusinessMemberTag(t *testing.T) {
+	cases := []struct {
+		tag  string
+		want bool
+	}{
+		{tag: "direct", want: true},
+		{tag: "DIRECT", want: true},
+		{tag: "block", want: true},
+		{tag: "node-a", want: false},
+		{tag: "", want: false},
+	}
+	for _, tc := range cases {
+		got := isSpecialBusinessMemberTag(tc.tag)
+		if got != tc.want {
+			t.Fatalf("tag=%q expected %v got %v", tc.tag, tc.want, got)
+		}
+	}
+}
