@@ -1,55 +1,40 @@
 # BoxPilot
 
-BoxPilot is a self-hosted control plane for sing-box, focused on one scope:
-**provide HTTP/SOCKS inbounds and manage node outbounds safely**.
+[中文文档](./README.zh-CN.md)
 
-Tech stack: Go + Gin + SQLite + React + Vite.
+BoxPilot is a self-hosted control plane for `sing-box`. It manages subscriptions, nodes, forwarding policy, and runtime config generation in one repo.
 
-## Current Scope
+Current stack:
 
-- Manage subscriptions and nodes
-- Parse subscription formats:
-  - traditional URI list
-  - sing-box JSON
-  - Clash YAML
-  - base64 variants of the above
-- Node forwarding selection (`forwarding_enabled`)
-- Node testing (`http` / `ping`)
-- Global proxy settings (HTTP + SOCKS5)
-- Routing bypass settings (domains + CIDRs)
-- Forwarding start/stop with runtime status
-- Config apply with preflight + rollback safety
+- Backend: Go + Gin + SQLite
+- Frontend: React 18 + Vite + Ant Design
+- Runtime model: process mode only; BoxPilot generates `sing-box.json` and applies it through `SINGBOX_RESTART_CMD`
 
-## Runtime Model
+## Features
 
-BoxPilot uses **process mode only**.
+- Subscription management: create, update, delete, manual refresh, auto refresh
+- Subscription parsing: URI lists, sing-box JSON, Clash YAML, and base64 variants
+- Node management: enable/disable, forwarding toggle, batch actions, HTTP/PING tests
+- Runtime observability: status, traffic, connections, logs, proxy chain check
+- Proxy settings: HTTP / SOCKS5 listen address, port, auth
+- Routing settings: private bypass, custom domain/CIDR bypass
+- Forwarding policy: health filter, latency threshold, untested-node policy, test concurrency
+- Business groups: derive `biz-*` runtime groups from subscription rules and rule sets
+- Safe apply flow: preflight check, atomic write, rollback, debounced auto reload
 
-- BoxPilot generates `sing-box.json`
-- Runs preflight: `sing-box check -c "$SINGBOX_CONFIG"`
-- Restarts sing-box with `SINGBOX_RESTART_CMD`
-- If restart fails, rolls back to last known good config
+## Pages
 
-Single-container dual-process deployment is supported and is the default Docker path in this repo.
-
-```mermaid
-flowchart LR
-  Browser -->|HTTP :8080| BoxPilot
-  BoxPilot --> SQLite
-  BoxPilot -->|write config| /data/sing-box.json
-  BoxPilot -->|exec restart cmd| sing-box
-  sing-box -->|HTTP/SOCKS proxy| Clients
-```
-
-## UI Overview
-
-- Main tabs: `Dashboard`, `Subscriptions`, `Nodes`
-- Right side actions: `Proxy` runtime toggle + `Settings` icon
-- Dashboard: runtime summary, diagnostics, connections/logs snapshots
-- Settings: HTTP/SOCKS config + forwarding policy + routing bypass
+- `Dashboard`: runtime overview, traffic, connections, logs, routing summary
+- `Subscriptions`: subscription list, auto refresh settings, sync health
+- `Nodes`: node filtering, batch forwarding, connectivity tests, detail drawer
+- `Settings`
+  - `Access`: global HTTP / SOCKS5 inbound settings
+  - `Routing`: bypass rules and forwarding policy
+  - `Runtime`: `manual` and `biz-*` runtime group selection
 
 ## Quick Start
 
-### Option A (recommended): prebuilt flow
+### Option 1: prebuilt flow
 
 ```bash
 git clone <repo-url>
@@ -59,24 +44,30 @@ make up-prebuilt
 
 Open `http://localhost:8080`.
 
-If needed, choose build architecture explicitly:
+If needed:
 
 ```bash
 make PREBUILT_GOARCH=amd64 up-prebuilt
 ```
 
-### Option B: standard compose build
+### Option 2: standard Docker build
 
 ```bash
 docker compose up --build
 ```
 
-Bind only localhost:
+Bind to localhost only:
 
 ```bash
 export BIND_IP=127.0.0.1
 docker compose up --build
 ```
+
+Default exposed ports:
+
+- `8080`: Web UI + API
+- `7890`: HTTP proxy
+- `7891`: SOCKS5 proxy
 
 ## Local Development
 
@@ -99,81 +90,93 @@ npm ci
 npm run dev
 ```
 
-For SPA static serving from backend, set `WEB_ROOT` to built assets (`web/dist`).
-
-## Make Targets
+To serve the built SPA from the backend, build the frontend first and set:
 
 ```bash
-make build             # web + server
-make build-prebuilt    # web + linux static server binary
-make image-prebuilt    # build prebuilt runtime image
-make up-prebuilt       # compose up with prebuilt flow
-make test              # go test ./...
-make migrate-gen       # generate OpenAPI types + restore compat layer
-make diagnose          # API + proxy smoke diagnostics
+WEB_ROOT=../web/dist
 ```
 
-## Forwarding Workflow (Important)
+## Commands
 
-`Start Forwarding` needs eligible nodes. Default policy is strict (`healthy_only=true`, `allow_untested=false`).
+```bash
+make build
+make build-prebuilt
+make image-prebuilt
+make up-prebuilt
+make test
+make migrate-gen
+make diagnose
+```
+
+## Runtime Model
+
+BoxPilot uses process mode only:
+
+1. Load subscriptions, nodes, routing, and policy from SQLite
+2. Generate runtime `sing-box` config
+3. Write to `SINGBOX_CONFIG`
+4. Run `SINGBOX_CHECK_CMD`
+5. Run `SINGBOX_RESTART_CMD`
+6. Roll back on restart failure
+
+When forwarding is already running, these changes trigger debounced auto reload:
+
+- node forwarding state changes
+- subscription refresh changing node sets
+- runtime group selection changes
+
+## Recommended Workflow
+
+Under the default strict policy, `Start Forwarding` needs eligible nodes.
 
 Typical flow:
 
-1. Import/refresh subscriptions
-2. Enable forwarding on selected nodes
-3. Run node tests (`Test All Nodes` or selected)
-4. Start forwarding
+1. import or refresh subscriptions
+2. enable forwarding on selected nodes
+3. run node tests
+4. start forwarding from the Proxy control or Settings page
 
-If step 3 is skipped under strict policy, you may get `CFG_NO_ENABLED_NODES`.
-
-When forwarding is already running, changing node forwarding flags or refreshing/deleting subscriptions will trigger an automatic debounced runtime reload (rapid updates are coalesced).
+If no node passes the policy filter, the common error is `CFG_NO_ENABLED_NODES`.
 
 ## Environment Variables
 
-| Variable | Default | Required | Description |
-|---|---|---|---|
-| `ADDR` | `:8080` | no | Server listen address |
-| `DB_PATH` | auto (`/data/app.db` if `/data` exists; else `data/app.db`) | no | SQLite file path |
-| `WEB_ROOT` | unset | no | Static web root for SPA |
-| `SINGBOX_CONFIG` | auto (`/data/sing-box.json` or `data/sing-box.json`) | yes for apply/restart | Runtime config path |
-| `SINGBOX_RESTART_CMD` | unset | yes for apply/restart | Restart command (process mode contract) |
-| `SINGBOX_CHECK_CMD` | `sing-box check -c "$SINGBOX_CONFIG"` | no | Preflight check command |
-| `SINGBOX_CLASH_API_ADDR` | `127.0.0.1:9090` | no | Runtime traffic source (`off` to disable) |
-| `SINGBOX_CLASH_API_SECRET` | unset | no | Optional auth token for Clash API |
-| `HTTP_PROXY_PORT` | unset | no | Optional bootstrap HTTP inbound port |
-| `SOCKS_PROXY_PORT` | unset | no | Optional bootstrap SOCKS inbound port |
-| `BACKUP_KEEP` | unset | no | Config backup retention for runtime apply |
+| Variable | Default | Description |
+|---|---|---|
+| `ADDR` | `:8080` | HTTP listen address |
+| `DB_PATH` | auto-detected | SQLite file path |
+| `WEB_ROOT` | unset | frontend static asset directory |
+| `SINGBOX_CONFIG` | auto-detected | runtime config path |
+| `SINGBOX_RESTART_CMD` | unset | restart/reload command |
+| `SINGBOX_CHECK_CMD` | `sing-box check -c "$SINGBOX_CONFIG"` | preflight check command |
+| `SINGBOX_CLASH_API_ADDR` | `127.0.0.1:9090` | runtime traffic / probe source |
+| `SINGBOX_CLASH_API_SECRET` | unset | Clash API secret |
+| `HTTP_PROXY_PORT` | compose-provided in container mode | bootstrap HTTP port hint |
+| `SOCKS_PROXY_PORT` | compose-provided in container mode | bootstrap SOCKS port hint |
+| `BACKUP_KEEP` | reserved | reserved backup retention setting |
 
-Container helper vars: `SINGBOX_LOG`, `SINGBOX_PID_FILE`.
+Auto-detection:
 
-## API Groups
+- `DB_PATH`: `/data/app.db` if `/data` exists, otherwise `data/app.db`
+- `SINGBOX_CONFIG`: `/data/sing-box.json` if `/data` exists, otherwise `data/sing-box.json`
+
+## API Overview
 
 Base path: `/api/v1`
 
-- Subscriptions: list/create/update/delete/refresh
-- Nodes: list/update/test/batch-forwarding/restart-forwarding
-- Runtime: status/traffic/connections/logs/proxy-check/plan/reload
-- Settings: proxy/routing/forwarding policy + forwarding start/stop
+- `subscriptions`: list, create, update, delete, refresh
+- `nodes`: list, update, test, batch forwarding, restart forwarding
+- `runtime`: status, traffic, connections, logs, proxy check, reload, groups
+- `settings`: proxy settings, routing settings, forwarding policy, start/stop forwarding
 
-Reference: [docs/api.openapi.yaml](docs/api.openapi.yaml)
+Reference: [docs/api.openapi.yaml](/Users/1rten/Documents/workspace/BoxPilot/docs/api.openapi.yaml)
 
-## Frontend Type Generation
-
-`web/src/api/types.ts` is not pure generated output.
+## Frontend Types
 
 - generated: `web/src/api/types.gen.ts`
 - compatibility layer: `web/src/api/types.compat.ts`
 - app import target: `web/src/api/types.ts`
 
-Use:
-
-```bash
-cd web
-npm run gen:types
-npm run prepare:types
-```
-
-or:
+Update with:
 
 ```bash
 make migrate-gen
@@ -181,27 +184,29 @@ make migrate-gen
 
 ## Troubleshooting
 
-### `404 page not found` when opening `/nodes` directly
+### Direct SPA routes return 404
 
-- ensure `WEB_ROOT` is set
-- ensure `web/dist` exists in runtime image/container
+- set `WEB_ROOT`
+- make sure `web/dist/index.html` exists
+- make sure built assets are included in the runtime image
 
 ### `CFG_NO_ENABLED_NODES`
 
-No eligible nodes passed policy filters. Check:
+Check:
 
 ```bash
 curl --noproxy '*' http://127.0.0.1:8080/api/v1/settings/forwarding/summary
 curl --noproxy '*' http://127.0.0.1:8080/api/v1/settings/forwarding/policy
 ```
 
-### Verify proxy forwarding quickly
+### Quick proxy checks
 
 ```bash
 curl --noproxy '' --proxy http://127.0.0.1:7890 https://ipinfo.io/json
+curl --noproxy '' --socks5-hostname 127.0.0.1:7891 https://ipinfo.io/json
 ```
 
-### Run built-in diagnostics
+### Built-in diagnostics
 
 ```bash
 make diagnose
@@ -209,32 +214,20 @@ make diagnose
 
 ## Security Notes
 
-- Do not expose open proxy ports directly to public Internet.
+- Do not expose proxy ports directly to the public Internet.
 - If listening on `0.0.0.0`, enable auth and use firewall restrictions.
-- Do not commit subscription URLs/tokens.
-- Restrict `SINGBOX_RESTART_CMD` to trusted scripts/paths only.
-
-## Project Structure
-
-```text
-BoxPilot/
-  docs/
-  docker/
-  scripts/
-  server/
-  web/
-  docker-compose.yml
-  docker-compose.prebuilt.yml
-  Dockerfile
-```
+- Do not commit subscription URLs or tokens.
+- Restrict `SINGBOX_RESTART_CMD` to trusted scripts or fixed commands.
 
 ## Docs
 
-- [Architecture](docs/architecture.md)
-- [OpenAPI](docs/api.openapi.yaml)
-- [Error Codes](docs/error-codes.md)
-- [Migrations](docs/migrations.md)
-
+- [Chinese README](./README.zh-CN.md)
+- [Architecture](/Users/1rten/Documents/workspace/BoxPilot/docs/architecture.md)
+- [Frontend Architecture](/Users/1rten/Documents/workspace/BoxPilot/docs/frontend-architecture.md)
+- [Error Codes](/Users/1rten/Documents/workspace/BoxPilot/docs/error-codes.md)
+- [Migration Guide](/Users/1rten/Documents/workspace/BoxPilot/docs/migrations.md)
+- [UI Notes](/Users/1rten/Documents/workspace/BoxPilot/docs/ui-design.md)
+- [中文架构文档](/Users/1rten/Documents/workspace/BoxPilot/docs/zh-CN/architecture.md)
 
 ## License
 
