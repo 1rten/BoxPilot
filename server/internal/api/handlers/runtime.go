@@ -367,7 +367,7 @@ func (h *Runtime) Plan(c *gin.Context) {
 		}
 	}
 
-	cfg, tags, err := h.buildRuntimeConfig(req.IncludeDisabledNodes)
+	cfg, tags, err := h.buildRuntimeConfig(req.IncludeDisabledNodes, true, true)
 	if err != nil {
 		if appErr, ok := err.(*errorx.AppError); ok {
 			writeError(c, appErr)
@@ -387,7 +387,7 @@ func (h *Runtime) Plan(c *gin.Context) {
 }
 
 func (h *Runtime) Groups(c *gin.Context) {
-	cfg, _, err := h.buildRuntimeConfig(false)
+	cfg, _, err := h.buildRuntimeConfig(false, false, false)
 	if err != nil {
 		if appErr, ok := err.(*errorx.AppError); ok {
 			writeError(c, appErr)
@@ -435,7 +435,7 @@ func (h *Runtime) SelectGroup(c *gin.Context) {
 		return
 	}
 
-	cfg, _, err := h.buildRuntimeConfig(false)
+	cfg, _, err := h.buildRuntimeConfig(false, false, false)
 	if err != nil {
 		if appErr, ok := err.(*errorx.AppError); ok {
 			writeError(c, appErr)
@@ -618,7 +618,7 @@ func runtimeProxyRowsToInbounds(httpRow, socksRow repo.ProxySettingsRow) (genera
 	return httpProxy, socksProxy
 }
 
-func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool) ([]byte, []string, error) {
+func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool, applyForwardingPolicy bool, requireForwardingNodes bool) ([]byte, []string, error) {
 	settings, err := repo.GetProxySettings(h.DB)
 	if err != nil {
 		return nil, nil, errorx.New(errorx.DBError, "get proxy settings")
@@ -648,11 +648,11 @@ func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool) ([]byte, []strin
 	if policyErr != nil {
 		return nil, nil, errorx.New(errorx.DBError, "get forwarding policy")
 	}
-	if !includeDisabledNodes {
+	if !includeDisabledNodes && applyForwardingPolicy {
 		nodes = service.FilterForwardingNodes(nodes, policy)
 	}
 
-	if forwardingRunning && (httpProxy.Enabled || socksProxy.Enabled) && len(nodes) == 0 {
+	if requireForwardingNodes && forwardingRunning && (httpProxy.Enabled || socksProxy.Enabled) && len(nodes) == 0 {
 		return nil, nil, errorx.New(errorx.CFGNoEnabledNodes, "no forwarding nodes enabled")
 	}
 

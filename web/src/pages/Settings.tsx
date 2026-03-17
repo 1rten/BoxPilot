@@ -174,7 +174,6 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [dirtyTags, setDirtyTags] = useState<Record<string, boolean>>({});
   const [applyingTag, setApplyingTag] = useState("");
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   const groups = useMemo(
     () => (items ?? []).filter((item) => item.tag === "manual" || item.tag.startsWith("biz-")),
@@ -211,25 +210,9 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
     });
   }, [groups]);
 
-  useEffect(() => {
-    setOpenGroups((prev) => {
-      const next: Record<string, boolean> = {};
-      for (const item of businessGroups) {
-        if (prev[item.tag]) {
-          next[item.tag] = true;
-        }
-      }
-      return next;
-    });
-  }, [businessGroups]);
-
   const updateDraft = (tag: string, value: string) => {
     setDrafts((prev) => ({ ...prev, [tag]: value }));
     setDirtyTags((prev) => ({ ...prev, [tag]: true }));
-  };
-
-  const toggleGroupOpen = (tag: string) => {
-    setOpenGroups((prev) => ({ ...prev, [tag]: !prev[tag] }));
   };
 
   const applyGroupChoice = async (groupTag: string, selectedOutbound: string) => {
@@ -363,7 +346,6 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
               <Select
                 value={draftValue}
                 options={manualGroup.outbounds.map((value) => ({ value, label: value }))}
-                getPopupContainer={(node) => node.parentElement ?? node}
                 onChange={(value) => updateDraft(manualGroup.tag, value)}
               />
               <div className="bp-page-actions bp-settings-actions">
@@ -394,13 +376,9 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                 const autoOutbound = group.auto_outbound;
                 const autoEnabled = Boolean(autoOutbound && draftValue === autoOutbound);
                 const nodeCandidates = group.node_candidates ?? group.outbounds.filter((v) => v !== autoOutbound);
-                const isOpen = !!openGroups[group.tag];
                 return (
-                  <div key={group.tag}>
-                    <button
-                      type="button"
-                      aria-expanded={isOpen}
-                      onClick={() => toggleGroupOpen(group.tag)}
+                  <details key={group.tag}>
+                    <summary
                       style={{
                         cursor: "pointer",
                         border: "1px solid var(--bp-border)",
@@ -410,10 +388,6 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                         justifyContent: "space-between",
                         alignItems: "center",
                         gap: 8,
-                        width: "100%",
-                        background: "var(--bp-surface)",
-                        color: "inherit",
-                        textAlign: "left",
                       }}
                     >
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -430,8 +404,7 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                           })}
                         </Tag>
                       ) : null}
-                    </button>
-                    {isOpen ? (
+                    </summary>
                     <div
                       style={{
                         marginTop: 8,
@@ -528,7 +501,6 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                             placeholder={tr("settings.groups.node_pick", "Choose Node")}
                             disabled={autoEnabled}
                             options={nodeCandidates.map((value) => ({ value, label: value }))}
-                            getPopupContainer={(node) => node.parentElement ?? node}
                             onChange={(value) => updateDraft(group.tag, value)}
                           />
                         ) : (
@@ -553,8 +525,7 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                         </Button>
                       </div>
                     </div>
-                    ) : null}
-                  </div>
+                  </details>
                 );
               })}
             </div>
