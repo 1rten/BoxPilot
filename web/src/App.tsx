@@ -12,12 +12,13 @@ import {
 } from "./hooks/useProxySettings";
 import { Button, Input, Popover, Tag } from "antd";
 import { useI18n } from "./i18n/context";
+import LocaleSwitcher from "./components/common/LocaleSwitcher";
 import { useRuntimeGroups, useRuntimeProxyCheck } from "./hooks/useRuntime";
 import { formatDateTime } from "./utils/datetime";
 
 export default function App() {
-  const { locale, setLocale, tr } = useI18n();
-  const [localeOpen, setLocaleOpen] = useState(false);
+  const { tr } = useI18n();
+
   const { data: summary, refetch: refetchForwardingSummary } = useForwardingSummary();
   const { data: runtimeGroups, refetch: refetchRuntimeGroups } = useRuntimeGroups();
   const startForwarding = useStartForwardingRuntime();
@@ -71,54 +72,8 @@ export default function App() {
             </div>
           </div>
           <div className="bp-nav-right">
-            <Popover
-              placement="bottomRight"
-              trigger={["click"]}
-              open={localeOpen}
-              onOpenChange={setLocaleOpen}
-              getPopupContainer={() => document.body}
-              overlayClassName="bp-ant-overlay-fix"
-              content={
-                <div className="bp-locale-menu">
-                  <button
-                    type="button"
-                    className={locale === "zh" ? "bp-locale-option bp-locale-option-active" : "bp-locale-option"}
-                    onClick={() => {
-                      setLocale("zh");
-                      setLocaleOpen(false);
-                    }}
-                  >
-                    <span>{tr("nav.language.zh", "中文")}</span>
-                    {locale === "zh" ? <span>✓</span> : null}
-                  </button>
-                  <button
-                    type="button"
-                    className={locale === "en" ? "bp-locale-option bp-locale-option-active" : "bp-locale-option"}
-                    onClick={() => {
-                      setLocale("en");
-                      setLocaleOpen(false);
-                    }}
-                  >
-                    <span>{tr("nav.language.en", "English")}</span>
-                    {locale === "en" ? <span>✓</span> : null}
-                  </button>
-                </div>
-              }
-            >
-              <button
-                type="button"
-                className="bp-locale-trigger"
-                aria-label={tr("nav.language", "Language")}
-                title={tr("nav.language", "Language")}
-                aria-haspopup="menu"
-                aria-expanded={localeOpen}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.94 9h-3.03a15.3 15.3 0 0 0-1.2-5.03A8.02 8.02 0 0 1 18.94 11Zm-6.94-7a13.3 13.3 0 0 1 1.95 7h-3.9A13.3 13.3 0 0 1 12 4ZM4.06 13h3.03c.14 1.78.55 3.51 1.2 5.03A8.02 8.02 0 0 1 4.06 13Zm3.03-2H4.06a8.02 8.02 0 0 1 4.23-5.03A15.3 15.3 0 0 0 7.09 11Zm4.91 9a13.3 13.3 0 0 1-1.95-7h3.9A13.3 13.3 0 0 1 12 20Zm.71-2.97A15.3 15.3 0 0 0 15.91 13h3.03a8.02 8.02 0 0 1-4.23 4.03Z" />
-                </svg>
-                <span>{locale.toUpperCase()}</span>
-              </button>
-            </Popover>
+            <LocaleSwitcher />
+
             <Popover
               placement="bottomRight"
               trigger={["hover", "click"]}

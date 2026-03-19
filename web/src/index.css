@@ -177,10 +177,27 @@ a {
   background: #f7f9ff;
 }
 
+.bp-locale-trigger-open {
+  border-color: #1f5eff;
+  background: #eef3ff;
+  color: #1f5eff;
+}
+
 .bp-locale-menu {
   min-width: 140px;
   display: grid;
   gap: 4px;
+}
+
+/* Custom fixed-position language dropdown (fallback when AntD overlay breaks) */
+.bp-locale-menu-pop {
+  position: fixed;
+  z-index: 2000;
+  background: #ffffff;
+  border: 1px solid #e3e8f2;
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: var(--bp-shadow);
 }
 
 .bp-locale-option {
@@ -1737,6 +1754,7 @@ a {
    when our dropdown/popover is tagged with `.bp-ant-overlay-fix`. */
 .bp-ant-overlay-fix.ant-popover,
 .bp-ant-overlay-fix.ant-select-dropdown,
+.bp-ant-overlay-fix.ant-dropdown,
 .bp-ant-overlay-fix.ant-dropdown-menu,
 .bp-ant-overlay-fix.ant-tooltip {
   z-index: 2000 !important;
