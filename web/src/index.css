@@ -1742,18 +1742,6 @@ a {
   z-index: 2000 !important;
 }
 
-/* Select dropdown height/overflow guard:
-   Prevent "only first option visible" caused by clipped dropdown content. */
-.bp-ant-overlay-fix.ant-select-dropdown {
-  max-height: 320px !important;
-  overflow-y: auto !important;
-}
-
-.bp-ant-overlay-fix.ant-select-dropdown .ant-select-dropdown-content {
-  max-height: 320px !important;
-  overflow-y: auto !important;
-}
-
 .ant-table-wrapper .ant-table {
   background: var(--bp-surface);
   border-radius: 12px;
