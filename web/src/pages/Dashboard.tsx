@@ -554,6 +554,8 @@ export default function Dashboard() {
               { value: "warn", label: tr("dashboard.logs.level.warn", "Warn") },
               { value: "error", label: tr("dashboard.logs.level.error", "Error") },
             ]}
+            getPopupContainer={() => document.body}
+            dropdownClassName="bp-ant-overlay-fix"
           />
           <Input
             className="bp-input"

@@ -76,6 +76,8 @@ export default function App() {
               trigger={["click"]}
               open={localeOpen}
               onOpenChange={setLocaleOpen}
+              getPopupContainer={() => document.body}
+              overlayClassName="bp-ant-overlay-fix"
               content={
                 <div className="bp-locale-menu">
                   <button
@@ -120,6 +122,8 @@ export default function App() {
             <Popover
               placement="bottomRight"
               trigger={["hover", "click"]}
+              getPopupContainer={() => document.body}
+              overlayClassName="bp-ant-overlay-fix"
               onOpenChange={(open) => {
                 if (open) {
                   void refetchForwardingSummary();

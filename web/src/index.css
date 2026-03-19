@@ -1732,6 +1732,16 @@ a {
   padding: 2px 10px;
 }
 
+/* AntD overlay stacking fix:
+   Render Popover/Select dropdown to `document.body` and force a higher z-index
+   when our dropdown/popover is tagged with `.bp-ant-overlay-fix`. */
+.bp-ant-overlay-fix.ant-popover,
+.bp-ant-overlay-fix.ant-select-dropdown,
+.bp-ant-overlay-fix.ant-dropdown-menu,
+.bp-ant-overlay-fix.ant-tooltip {
+  z-index: 2000 !important;
+}
+
 .ant-table-wrapper .ant-table {
   background: var(--bp-surface);
   border-radius: 12px;

@@ -347,7 +347,8 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                 style={{ width: "100%" }}
                 value={draftValue}
                 virtual={false}
-                getPopupContainer={(trigger) => trigger.parentElement ?? document.body}
+                getPopupContainer={() => document.body}
+                dropdownClassName="bp-ant-overlay-fix"
                 options={manualGroup.outbounds.map((value) => ({ value, label: value }))}
                 onChange={(value) => updateDraft(manualGroup.tag, value)}
               />
@@ -505,7 +506,8 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                             placeholder={tr("settings.groups.node_pick", "Choose Node")}
                             disabled={autoEnabled}
                             virtual={false}
-                            getPopupContainer={(trigger) => trigger.parentElement ?? document.body}
+                            getPopupContainer={() => document.body}
+                            dropdownClassName="bp-ant-overlay-fix"
                             options={nodeCandidates.map((value) => ({ value, label: value }))}
                             onChange={(value) => updateDraft(group.tag, value)}
                           />
@@ -700,6 +702,8 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
               { value: "127.0.0.1", label: "127.0.0.1 (Localhost)" },
               { value: "0.0.0.0", label: "0.0.0.0 (All Interfaces)" },
             ]}
+            getPopupContainer={() => document.body}
+            dropdownClassName="bp-ant-overlay-fix"
           />
         </Form.Item>
         <Form.Item
@@ -718,6 +722,8 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
               { value: "none", label: tr("settings.proxy.auth.none", "None") },
               { value: "basic", label: tr("settings.proxy.auth.basic", "Basic") },
             ]}
+            getPopupContainer={() => document.body}
+            dropdownClassName="bp-ant-overlay-fix"
           />
         </Form.Item>
         {authMode === "basic" && (
