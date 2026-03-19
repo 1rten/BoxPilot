@@ -344,7 +344,10 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                 </div>
               ) : null}
               <Select
+                style={{ width: "100%" }}
                 value={draftValue}
+                virtual={false}
+                getPopupContainer={(trigger) => trigger.parentElement ?? document.body}
                 options={manualGroup.outbounds.map((value) => ({ value, label: value }))}
                 onChange={(value) => updateDraft(manualGroup.tag, value)}
               />
@@ -497,9 +500,12 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                         </div>
                         {nodeCandidates.length > 0 ? (
                           <Select
+                            style={{ width: "100%" }}
                             value={autoEnabled ? undefined : draftValue}
                             placeholder={tr("settings.groups.node_pick", "Choose Node")}
                             disabled={autoEnabled}
+                            virtual={false}
+                            getPopupContainer={(trigger) => trigger.parentElement ?? document.body}
                             options={nodeCandidates.map((value) => ({ value, label: value }))}
                             onChange={(value) => updateDraft(group.tag, value)}
                           />
