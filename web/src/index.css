@@ -1740,6 +1740,9 @@ a {
 .bp-ant-overlay-fix.ant-dropdown-menu,
 .bp-ant-overlay-fix.ant-tooltip {
   z-index: 2000 !important;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .ant-table-wrapper .ant-table {
