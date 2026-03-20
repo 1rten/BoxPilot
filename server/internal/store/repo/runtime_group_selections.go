@@ -20,6 +20,26 @@ func UpsertRuntimeGroupSelection(db *sql.DB, groupTag, selectedOutbound, updated
 	return err
 }
 
+func GetRuntimeGroupSelection(db *sql.DB, groupTag string) (RuntimeGroupSelectionRow, bool, error) {
+	var row RuntimeGroupSelectionRow
+	err := db.QueryRow(
+		"SELECT group_tag, selected_outbound, updated_at FROM runtime_group_selections WHERE group_tag = ?",
+		groupTag,
+	).Scan(&row.GroupTag, &row.SelectedOutbound, &row.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return RuntimeGroupSelectionRow{}, false, nil
+	}
+	if err != nil {
+		return RuntimeGroupSelectionRow{}, false, err
+	}
+	return row, true, nil
+}
+
+func DeleteRuntimeGroupSelection(db *sql.DB, groupTag string) error {
+	_, err := db.Exec("DELETE FROM runtime_group_selections WHERE group_tag = ?", groupTag)
+	return err
+}
+
 func ListRuntimeGroupSelections(db *sql.DB) ([]RuntimeGroupSelectionRow, error) {
 	rows, err := db.Query(
 		"SELECT group_tag, selected_outbound, updated_at FROM runtime_group_selections ORDER BY group_tag",

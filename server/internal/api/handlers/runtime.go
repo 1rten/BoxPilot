@@ -466,6 +466,12 @@ func (h *Runtime) SelectGroup(c *gin.Context) {
 		selectedIsAuto = true
 	}
 
+	prevSelection, hadPrevSelection, err := repo.GetRuntimeGroupSelection(h.DB, groupTag)
+	if err != nil {
+		writeError(c, errorx.New(errorx.DBError, "load previous runtime group selection"))
+		return
+	}
+
 	now := util.NowRFC3339()
 	if err := repo.UpsertRuntimeGroupSelection(h.DB, groupTag, selected, now); err != nil {
 		writeError(c, errorx.New(errorx.DBError, "save runtime group selection"))
@@ -474,11 +480,22 @@ func (h *Runtime) SelectGroup(c *gin.Context) {
 	configPath := service.ResolveConfigPath()
 	version, hash, _, reloadErr := service.Reload(c.Request.Context(), h.DB, configPath)
 	if reloadErr != nil {
+		rollbackErr := rollbackRuntimeGroupSelection(h.DB, groupTag, prevSelection, hadPrevSelection)
+		details := map[string]any{
+			"group_tag":         groupTag,
+			"selected_outbound": selected,
+		}
+		if rollbackErr != nil {
+			details["rollback_err"] = rollbackErr.Error()
+		}
 		if appErr, ok := reloadErr.(*errorx.AppError); ok {
-			writeError(c, appErr)
+			if len(appErr.Details) > 0 {
+				details["reload_details"] = appErr.Details
+			}
+			writeError(c, errorx.New(appErr.Code, appErr.Message).WithDetails(details))
 			return
 		}
-		writeError(c, errorx.New(errorx.RTRestartFailed, reloadErr.Error()))
+		writeError(c, errorx.New(errorx.RTRestartFailed, reloadErr.Error()).WithDetails(details))
 		return
 	}
 	policy, policyErr := service.LoadForwardingPolicy(h.DB)
@@ -1136,6 +1153,18 @@ func resolveRuntimeSelectionAfterGroupSelect(parent context.Context, group *dto.
 		}
 	}
 	return lastSelected, lastEffective, probeError
+}
+
+func rollbackRuntimeGroupSelection(
+	db *sql.DB,
+	groupTag string,
+	prev repo.RuntimeGroupSelectionRow,
+	hadPrev bool,
+) error {
+	if hadPrev {
+		return repo.UpsertRuntimeGroupSelection(db, prev.GroupTag, prev.SelectedOutbound, prev.UpdatedAt)
+	}
+	return repo.DeleteRuntimeGroupSelection(db, groupTag)
 }
 
 func triggerClashProxyDelayTest(parent context.Context, proxyTag, targetURL string, timeoutMS int) error {
