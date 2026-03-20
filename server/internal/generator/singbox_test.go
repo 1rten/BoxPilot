@@ -144,8 +144,16 @@ func TestBuildConfigWithNodes_UsesProvidedTags(t *testing.T) {
 		if !ok {
 			continue
 		}
-		if typ, _ := outbound["type"].(string); typ == "urltest" {
-			t.Fatalf("did not expect global urltest outbound, got %v", outbound["tag"])
+		tag, _ := outbound["tag"].(string)
+		typ, _ := outbound["type"].(string)
+		if typ == "urltest" && tag != "manual-auto" {
+			t.Fatalf("unexpected urltest outbound, got %v", outbound["tag"])
+		}
+		if typ == "urltest" && tag == "manual-auto" {
+			members, _ := outbound["outbounds"].([]any)
+			if len(members) != 2 || members[0] != "node-fast" || members[1] != "node-raw-only" {
+				t.Fatalf("expected manual-auto members [node-fast node-raw-only], got %v", outbound["outbounds"])
+			}
 		}
 	}
 }
@@ -206,6 +214,7 @@ func TestBuildConfigWithRuntime_BusinessGroups(t *testing.T) {
 		t.Fatalf("missing outbounds")
 	}
 	hasManual := false
+	hasManualAuto := false
 	hasBiz := false
 	hasBizAuto := false
 	for _, item := range outbounds {
@@ -222,8 +231,17 @@ func TestBuildConfigWithRuntime_BusinessGroups(t *testing.T) {
 				t.Fatalf("expected manual selector default node-b, got %v", outbound["default"])
 			}
 			members, _ := outbound["outbounds"].([]any)
-			if len(members) != 3 || members[0] != "direct" || members[1] != "node-a" || members[2] != "node-b" {
+			if len(members) != 4 || members[0] != "manual-auto" || members[1] != "direct" || members[2] != "node-a" || members[3] != "node-b" {
 				t.Fatalf("manual selector should always include direct, got %v", outbound["outbounds"])
+			}
+		case tag == "manual-auto" && typ == "urltest":
+			hasManualAuto = true
+			if interval, _ := outbound["interval"].(string); interval != "30m" {
+				t.Fatalf("expected manual urltest interval 30m, got %v", outbound["interval"])
+			}
+			members, _ := outbound["outbounds"].([]any)
+			if len(members) != 2 || members[0] != "node-a" || members[1] != "node-b" {
+				t.Fatalf("expected manual urltest members [node-a node-b], got %v", outbound["outbounds"])
 			}
 		case tag == "biz-openai" && typ == "selector":
 			hasBiz = true
@@ -241,8 +259,8 @@ func TestBuildConfigWithRuntime_BusinessGroups(t *testing.T) {
 			}
 		}
 	}
-	if !hasManual || !hasBiz || !hasBizAuto {
-		t.Fatalf("expected manual+biz+biz-auto outbounds, got %#v", outbounds)
+	if !hasManual || !hasManualAuto || !hasBiz || !hasBizAuto {
+		t.Fatalf("expected manual+manual-auto+biz+biz-auto outbounds, got %#v", outbounds)
 	}
 }
 

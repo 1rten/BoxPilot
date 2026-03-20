@@ -137,13 +137,47 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 	if len(manualMembers) > 1 {
 		manualDefault = manualMembers[1]
 	}
-	if selected, ok := extras.GroupSelections["manual"]; ok && containsString(manualMembers, selected) {
+
+	autoURL := strings.TrimSpace(extras.AutoTestURL)
+	if autoURL == "" {
+		autoURL = DefaultAutoTestURL
+	}
+	autoInterval := strings.TrimSpace(extras.AutoTestInterval)
+	if autoInterval == "" {
+		autoInterval = DefaultAutoTestInterval
+	}
+
+	manualSelectorOutbounds := append([]string{}, manualMembers...)
+	manualAutoMembers := filterExistingNodeTags(tags, manualMembers)
+	if len(manualAutoMembers) > 0 {
+		used := map[string]struct{}{
+			"direct": {},
+			"block":  {},
+			"manual": {},
+			"dns":    {},
+		}
+		for _, tag := range tags {
+			used[tag] = struct{}{}
+		}
+		manualAutoTag := resolveUniqueTag("manual-auto", used)
+		outbounds = append(outbounds, map[string]any{
+			"type":      "urltest",
+			"tag":       manualAutoTag,
+			"outbounds": manualAutoMembers,
+			"url":       autoURL,
+			"interval":  autoInterval,
+			"tolerance": 120,
+		})
+		manualSelectorOutbounds = append([]string{manualAutoTag}, manualSelectorOutbounds...)
+	}
+
+	if selected, ok := extras.GroupSelections["manual"]; ok && containsString(manualSelectorOutbounds, selected) {
 		manualDefault = selected
 	}
 	outbounds = append(outbounds, map[string]any{
 		"type":      "selector",
 		"tag":       "manual",
-		"outbounds": manualMembers,
+		"outbounds": manualSelectorOutbounds,
 		"default":   manualDefault,
 	})
 	route := map[string]any{

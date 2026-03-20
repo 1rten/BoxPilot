@@ -22,6 +22,10 @@ const en = {
   "app.proxy.runtime.stopped": "STOPPED",
   "app.proxy.runtime.error": "ERROR",
   "app.proxy.runtime.unknown": "UNKNOWN",
+  "app.proxy.summary.loading": "Loading forwarding summary...",
+  "app.proxy.summary_error": "Failed to load forwarding summary: {message}",
+  "app.proxy.groups.loading": "Loading runtime groups...",
+  "app.proxy.groups.error": "Failed to load runtime groups: {message}",
   "app.proxy.check.title": "Proxy Chain Check",
   "app.proxy.check.target.placeholder": "https://www.gstatic.com/generate_204",
   "app.proxy.check.run": "Check",
@@ -35,6 +39,7 @@ const en = {
   "common.cancel": "Cancel",
   "common.retry": "Retry",
   "common.loading": "Loading...",
+  "common.refreshing": "Refreshing...",
   "common.unknown": "unknown",
   "settings.title": "Settings",
   "settings.subtitle": "Configure global HTTP and SOCKS5 forwarding behavior.",
@@ -62,7 +67,8 @@ const en = {
   "settings.apply_all": "Apply Changes / Restart",
   "settings.pending_apply": "Pending restart to take effect",
   "settings.pending_apply_title": "Configuration saved",
-  "settings.pending_apply_desc": "Some changes are saved to DB and will take effect after applying runtime.",
+  "settings.pending_apply_desc":
+    "Some changes are saved to DB and will take effect after applying runtime.",
   "settings.section.access": "Access",
   "settings.section.routing": "Routing",
   "settings.section.runtime": "Runtime",
@@ -84,34 +90,55 @@ const en = {
   "settings.routing.geoip_cn": "geoip-cn Direct",
   "settings.groups.kicker": "Runtime Groups",
   "settings.groups.title": "Business Routing Groups",
-  "settings.groups.desc": "Each business group supports auto toggle: on = trigger urltest now and then by configured interval, off = manual node pick in that business pool.",
-  "settings.groups.mapping_note": "Business candidates come from explicit members in subscription business groups. Generic groups like manual/proxy are not expanded.",
-  "settings.groups.refresh_note": "If subscription rules changed, refresh subscription first, then re-open this page.",
-  "settings.groups.auto_probe_note": "When Auto is enabled and applied, runtime triggers a delay test on the auto group with https://www.gstatic.com/generate_204.",
-  "settings.groups.auto_interval_note": "Recurring auto test interval is configured in Forwarding Policy.",
+  "settings.groups.desc":
+    "Manual fallback and each business group support auto toggle: on = trigger urltest now and then by configured interval, off = manual node pick in that group pool.",
+  "settings.groups.mapping_note":
+    "Business candidates come from explicit members in subscription business groups. Generic groups like manual/proxy are not expanded.",
+  "settings.groups.refresh_note":
+    "If subscription rules changed, refresh subscription first, then re-open this page.",
+  "settings.groups.auto_probe_note":
+    "When Auto is enabled and applied, runtime triggers a delay test on the auto group with https://www.gstatic.com/generate_204.",
+  "settings.groups.auto_interval_note":
+    "Recurring auto test interval is configured in Forwarding Policy.",
   "settings.groups.auto_interval_value": "Current auto interval: {value}",
   "settings.groups.go_policy": "Go to Forwarding Policy",
   "settings.groups.empty": "No runtime groups available yet.",
+  "settings.groups.loading": "Loading runtime groups...",
+  "settings.groups.refreshing": "Refreshing runtime groups...",
+  "settings.groups.load_error": "Failed to load runtime groups",
   "settings.groups.apply": "Apply Group Choice",
   "settings.groups.manual_title": "Manual Fallback Group",
-  "settings.groups.manual_desc": "Shared manual fallback. Business groups can choose manual to follow this selection.",
+  "settings.groups.manual_desc":
+    "Shared manual fallback. Business groups can choose manual to follow this selection.",
+  "settings.groups.follow_manual": "Follow Manual Fallback",
   "settings.groups.auto_toggle": "Auto Best Node",
   "settings.groups.mode_auto": "AUTO",
   "settings.groups.mode_manual": "MANUAL",
   "settings.groups.node_pick": "Choose Node",
   "settings.groups.node_empty": "No business nodes available for manual selection.",
+  "settings.groups.manual_only":
+    "This group currently resolves to the shared manual fallback only.",
   "settings.groups.persisted": "Saved: {outbound}",
   "settings.groups.persisted_at": "Updated {time}",
   "settings.groups.runtime_selected": "Runtime selected: {outbound}",
   "settings.groups.runtime_effective": "Effective: {outbound}",
   "settings.groups.runtime_unavailable": "Runtime state unavailable (Clash API unreachable).",
+  "settings.groups.auto_active_title": "Auto mode is active",
+  "settings.groups.auto_active_desc":
+    "Runtime will keep following the auto-tested best node until you switch back to manual selection.",
+  "settings.groups.manual_auto_active_desc":
+    "Manual fallback now follows the auto-tested best node until you switch back to manual selection.",
+  "settings.groups.switch_manual": "Switch to Manual Selection",
+  "settings.groups.manual_node_empty": "No nodes available for manual selection.",
   "settings.groups.auto_candidates": "Auto candidates ({count}): {nodes}",
   "settings.groups.auto_candidates_toggle": "View auto candidates ({count})",
-  "settings.groups.auto_empty": "No business node pool was parsed for this group, so only manual is available.",
+  "settings.groups.auto_empty":
+    "No business node pool was parsed for this group, so only manual is available.",
   "settings.forwarding.kicker": "Forwarding Policy",
   "settings.forwarding.title": "Node Eligibility Gate",
   "settings.forwarding.updated": "Updated {time}",
-  "settings.forwarding.desc": "When enabled, only healthy nodes are included in runtime forwarding config.",
+  "settings.forwarding.desc":
+    "When enabled, only healthy nodes are included in runtime forwarding config.",
   "settings.forwarding.healthy_only": "Healthy nodes only",
   "settings.forwarding.max_latency": "Max latency (ms)",
   "settings.forwarding.max_latency.required": "Please enter max latency",
@@ -127,9 +154,11 @@ const en = {
   "settings.forwarding.biz_auto_interval.required": "Please enter auto test interval",
   "settings.forwarding.biz_auto_interval.range": "Interval must be between 60 and 86400 sec",
   "settings.security.warning_title": "Public exposure without authentication",
-  "settings.security.warning_desc": "Current config listens on 0.0.0.0 with auth_mode=none. Anyone who can access this port may use your proxy.",
+  "settings.security.warning_desc":
+    "Current config listens on 0.0.0.0 with auth_mode=none. Anyone who can access this port may use your proxy.",
   "settings.security.confirm_title": "Confirm public unauthenticated proxy",
-  "settings.security.confirm_desc": "This setting exposes proxy service on all interfaces without authentication. Continue only if this is intended.",
+  "settings.security.confirm_desc":
+    "This setting exposes proxy service on all interfaces without authentication. Continue only if this is intended.",
   "subs.title": "Subscriptions",
   "subs.subtitle": "Manage source feeds, refresh cadence, and sync health.",
   "subs.new": "New Subscription",
@@ -226,7 +255,8 @@ const en = {
   "dashboard.section.overview.title": "Overview",
   "dashboard.section.overview.desc": "Core runtime and routing signals for daily monitoring.",
   "dashboard.section.diagnostics.title": "Diagnostics",
-  "dashboard.section.diagnostics.desc": "Detailed checks and traces for troubleshooting when needed.",
+  "dashboard.section.diagnostics.desc":
+    "Detailed checks and traces for troubleshooting when needed.",
   "dashboard.runtime": "Runtime",
   "dashboard.runtime.state.loading": "Loading",
   "dashboard.runtime.state.offline": "Offline",
@@ -254,7 +284,8 @@ const en = {
   "dashboard.traffic.source.disabled": "Disabled",
   "dashboard.traffic.source.disabled_desc": "Proxy traffic metrics are disabled by config.",
   "dashboard.traffic.source.unavailable": "Unavailable",
-  "dashboard.traffic.source.unavailable_desc": "Cannot reach sing-box Clash API, metrics are temporarily unavailable.",
+  "dashboard.traffic.source.unavailable_desc":
+    "Cannot reach sing-box Clash API, metrics are temporarily unavailable.",
   "dashboard.traffic.source.unknown": "Unknown",
   "dashboard.traffic.source.unknown_desc": "Traffic source is not recognized.",
   "dashboard.view_all": "View All",
@@ -347,7 +378,8 @@ const en = {
     "Auto mode enabled. Runtime probe is temporarily unavailable; periodic checks will continue.",
   "toast.runtime.group_selected_auto_probe_failed":
     "Auto mode enabled, but immediate probe failed ({message}). Runtime will continue periodic checks.",
-  "toast.runtime.group_selected_auto_pending": "Auto mode enabled. Candidate test was triggered; best node will update shortly.",
+  "toast.runtime.group_selected_auto_pending":
+    "Auto mode enabled. Candidate test was triggered; best node will update shortly.",
   "toast.runtime.group_select_failed": "Failed to update routing group: {message}",
 };
 

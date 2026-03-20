@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "../../i18n/context";
 
 export default function LocaleSwitcher() {
@@ -28,8 +29,13 @@ export default function LocaleSwitcher() {
     if (!localeOpen) return;
 
     const onResize = () => updatePos();
+    const onScroll = () => updatePos();
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll, true);
+    };
   }, [localeOpen, updatePos]);
 
   useEffect(() => {
@@ -84,39 +90,47 @@ export default function LocaleSwitcher() {
         <span>{locale.toUpperCase()}</span>
       </button>
 
-      {localeOpen ? (
-        <div
-          ref={localeMenuRef}
-          className="bp-locale-menu bp-locale-menu-pop"
-          style={localeMenuPos ? { top: localeMenuPos.top, right: localeMenuPos.right } : undefined}
-          role="menu"
-          aria-label={tr("nav.language", "Language")}
-        >
-          <button
-            type="button"
-            className={locale === "zh" ? "bp-locale-option bp-locale-option-active" : "bp-locale-option"}
-            onClick={() => {
-              setLocale("zh");
-              setLocaleOpen(false);
-            }}
-          >
-            <span>{tr("nav.language.zh", "中文")}</span>
-            {locale === "zh" ? <span>✓</span> : null}
-          </button>
-          <button
-            type="button"
-            className={locale === "en" ? "bp-locale-option bp-locale-option-active" : "bp-locale-option"}
-            onClick={() => {
-              setLocale("en");
-              setLocaleOpen(false);
-            }}
-          >
-            <span>{tr("nav.language.en", "English")}</span>
-            {locale === "en" ? <span>✓</span> : null}
-          </button>
-        </div>
-      ) : null}
+      {localeOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={localeMenuRef}
+              className="bp-locale-menu bp-locale-menu-pop"
+              style={
+                localeMenuPos ? { top: localeMenuPos.top, right: localeMenuPos.right } : undefined
+              }
+              role="menu"
+              aria-label={tr("nav.language", "Language")}
+            >
+              <button
+                type="button"
+                className={
+                  locale === "zh" ? "bp-locale-option bp-locale-option-active" : "bp-locale-option"
+                }
+                onClick={() => {
+                  setLocale("zh");
+                  setLocaleOpen(false);
+                }}
+              >
+                <span>{tr("nav.language.zh", "中文")}</span>
+                {locale === "zh" ? <span>✓</span> : null}
+              </button>
+              <button
+                type="button"
+                className={
+                  locale === "en" ? "bp-locale-option bp-locale-option-active" : "bp-locale-option"
+                }
+                onClick={() => {
+                  setLocale("en");
+                  setLocaleOpen(false);
+                }}
+              >
+                <span>{tr("nav.language.en", "English")}</span>
+                {locale === "en" ? <span>✓</span> : null}
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
-

@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Form, Input, InputNumber, Modal, Segmented, Select, Switch, Tag } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Segmented,
+  Select,
+  Switch,
+  Tag,
+} from "antd";
 import type { ProxyConfig, ProxyType, RoutingSettingsData, RuntimeGroupItem } from "../api/types";
 import { buildProxyUrl, resolveProxyClientHost } from "../api/settings";
 import {
@@ -14,6 +26,10 @@ import {
 import { useRuntimeGroups, useSelectRuntimeGroup } from "../hooks/useRuntime";
 import { useToast } from "../components/common/ToastContext";
 import { useI18n } from "../i18n/context";
+
+const selectPopupClassNames = { popup: { root: "bp-ant-overlay-fix" } } as const;
+const getOverlayContainer = (triggerNode: HTMLElement) =>
+  triggerNode.parentElement ?? document.body;
 
 interface ProxyCardProps {
   title: string;
@@ -50,14 +66,31 @@ export default function Settings() {
     data: runtimeGroups,
     isLoading: runtimeGroupsLoading,
     isFetching: runtimeGroupsFetching,
+    isError: runtimeGroupsIsError,
+    error: runtimeGroupsError,
     refetch: refetchRuntimeGroups,
   } = useRuntimeGroups();
   const applyAll = useApplyProxySettings();
 
-  const refreshing = proxyFetching || routingFetching || forwardingPolicyFetching || runtimeGroupsFetching;
+  const refreshing =
+    proxyFetching || routingFetching || forwardingPolicyFetching || runtimeGroupsFetching;
+  const runtimeGroupsErrorMessage = runtimeGroupsIsError
+    ? formatQueryError(runtimeGroupsError, tr("toast.unknown", "Unknown error"))
+    : "";
+  const showSectionLoading =
+    section === "access"
+      ? isLoading
+      : section === "routing"
+        ? routingLoading || forwardingPolicyLoading
+        : false;
 
   const onRefreshAll = async () =>
-    Promise.all([refetchProxySettings(), refetchRoutingSettings(), refetchForwardingPolicy(), refetchRuntimeGroups()]);
+    Promise.all([
+      refetchProxySettings(),
+      refetchRoutingSettings(),
+      refetchForwardingPolicy(),
+      refetchRuntimeGroups(),
+    ]);
 
   const onApplyAll = async () => {
     try {
@@ -81,7 +114,9 @@ export default function Settings() {
         </div>
         <div className="bp-page-actions bp-page-actions--header">
           {pendingApply ? (
-            <Tag color="warning">{tr("settings.pending_apply", "Pending restart to take effect")}</Tag>
+            <Tag color="warning">
+              {tr("settings.pending_apply", "Pending restart to take effect")}
+            </Tag>
           ) : null}
           <Button
             className="bp-btn-fixed"
@@ -101,10 +136,10 @@ export default function Settings() {
           type="warning"
           showIcon
           style={{ marginBottom: 12 }}
-          message={tr("settings.pending_apply_title", "Configuration saved")}
+          title={tr("settings.pending_apply_title", "Configuration saved")}
           description={tr(
             "settings.pending_apply_desc",
-            "Some changes are saved to DB and will take effect after applying runtime."
+            "Some changes are saved to DB and will take effect after applying runtime.",
           )}
         />
       ) : null}
@@ -149,11 +184,14 @@ export default function Settings() {
           <RuntimeGroupsCard
             items={runtimeGroups?.items}
             autoIntervalSec={forwardingPolicy?.biz_auto_interval_sec}
+            isLoading={runtimeGroupsLoading && !runtimeGroups}
+            isFetching={runtimeGroupsFetching}
+            errorMessage={runtimeGroupsErrorMessage}
             onGoPolicy={() => setSection("routing")}
           />
         </div>
       ) : null}
-      {(isLoading || routingLoading || forwardingPolicyLoading || runtimeGroupsLoading) && (
+      {showSectionLoading && (
         <p className="bp-muted" style={{ marginTop: 12 }}>
           {tr("common.loading", "Loading...")}
         </p>
@@ -165,10 +203,20 @@ export default function Settings() {
 interface RuntimeGroupsCardProps {
   items?: RuntimeGroupItem[];
   autoIntervalSec?: number;
+  isLoading?: boolean;
+  isFetching?: boolean;
+  errorMessage?: string;
   onGoPolicy?: () => void;
 }
 
-function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroupsCardProps) {
+function RuntimeGroupsCard({
+  items,
+  autoIntervalSec,
+  isLoading,
+  isFetching,
+  errorMessage,
+  onGoPolicy,
+}: RuntimeGroupsCardProps) {
   const { tr } = useI18n();
   const updateGroup = useSelectRuntimeGroup();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -177,10 +225,13 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
 
   const groups = useMemo(
     () => (items ?? []).filter((item) => item.tag === "manual" || item.tag.startsWith("biz-")),
-    [items]
+    [items],
   );
   const manualGroup = useMemo(() => groups.find((item) => item.tag === "manual"), [groups]);
-  const businessGroups = useMemo(() => groups.filter((item) => item.tag.startsWith("biz-")), [groups]);
+  const businessGroups = useMemo(
+    () => groups.filter((item) => item.tag.startsWith("biz-")),
+    [groups],
+  );
 
   useEffect(() => {
     setDrafts((prev) => {
@@ -194,6 +245,20 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
         }
         next[item.tag] = upstreamValue;
       }
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      if (prevKeys.length === nextKeys.length) {
+        let changed = false;
+        for (const key of nextKeys) {
+          if (prev[key] !== next[key]) {
+            changed = true;
+            break;
+          }
+        }
+        if (!changed) {
+          return prev;
+        }
+      }
       return next;
     });
   }, [groups, dirtyTags]);
@@ -204,6 +269,20 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
       for (const item of groups) {
         if (prev[item.tag]) {
           next[item.tag] = true;
+        }
+      }
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      if (prevKeys.length === nextKeys.length) {
+        let changed = false;
+        for (const key of nextKeys) {
+          if (prev[key] !== next[key]) {
+            changed = true;
+            break;
+          }
+        }
+        if (!changed) {
+          return prev;
         }
       }
       return next;
@@ -238,16 +317,26 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
       <div className="bp-card-header">
         <div>
           <p className="bp-card-kicker">{tr("settings.groups.kicker", "Runtime Groups")}</p>
-          <h2 className="bp-card-title">{tr("settings.groups.title", "Business Routing Groups")}</h2>
+          <h2 className="bp-card-title">
+            {tr("settings.groups.title", "Business Routing Groups")}
+          </h2>
         </div>
       </div>
       <p className="bp-muted" style={{ marginTop: 0 }}>
         {tr(
           "settings.groups.desc",
-          "Each business group supports auto toggle: on = trigger urltest now and then by configured interval, off = manual node pick in that business pool."
+          "Manual fallback and each business group support auto toggle: on = trigger urltest now and then by configured interval, off = manual node pick in that group pool.",
         )}
       </p>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 8,
+        }}
+      >
         <span className="bp-muted">
           {tr("settings.groups.auto_interval_value", "Current auto interval: {value}", {
             value: formatSecondsInterval(autoIntervalSec),
@@ -261,30 +350,49 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
         type="info"
         showIcon
         style={{ marginBottom: 12 }}
-        message={tr(
+        title={tr(
           "settings.groups.mapping_note",
-          "Business candidates come from explicit members in subscription business groups. Generic groups like manual/proxy are not expanded."
+          "Business candidates come from explicit members in subscription business groups. Generic groups like manual/proxy are not expanded.",
         )}
         description={tr(
           "settings.groups.refresh_note",
-          "If subscription rules changed, refresh subscription first, then re-open this page."
+          "If subscription rules changed, refresh subscription first, then re-open this page.",
         )}
       />
       <Alert
         type="info"
         showIcon
         style={{ marginBottom: 12 }}
-        message={tr(
+        title={tr(
           "settings.groups.auto_probe_note",
-          "When Auto is enabled and applied, runtime triggers a delay test on the auto group with https://www.gstatic.com/generate_204."
+          "When Auto is enabled and applied, runtime triggers a delay test on the auto group with https://www.gstatic.com/generate_204.",
         )}
         description={tr(
           "settings.groups.auto_interval_note",
-          "Recurring auto test interval is configured in Forwarding Policy."
+          "Recurring auto test interval is configured in Forwarding Policy.",
         )}
       />
-      {groups.length === 0 ? (
-        <p className="bp-muted">{tr("settings.groups.empty", "No runtime groups available yet.")}</p>
+      {isFetching && !isLoading ? (
+        <p className="bp-muted" style={{ margin: "0 0 12px" }}>
+          {tr("settings.groups.refreshing", "Refreshing runtime groups...")}
+        </p>
+      ) : null}
+      {errorMessage ? (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          title={tr("settings.groups.load_error", "Failed to load runtime groups")}
+          description={errorMessage}
+        />
+      ) : null}
+      {isLoading ? (
+        <p className="bp-muted">{tr("settings.groups.loading", "Loading runtime groups...")}</p>
+      ) : null}
+      {!isLoading && groups.length === 0 ? (
+        <p className="bp-muted">
+          {tr("settings.groups.empty", "No runtime groups available yet.")}
+        </p>
       ) : (
         <div style={{ display: "grid", gap: 12 }}>
           {manualGroup ? (
@@ -299,74 +407,185 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
               }}
             >
               {(() => {
-                const draftValue = drafts[manualGroup.tag] ?? manualGroup.runtime_selected_outbound ?? manualGroup.default;
+                const draftValue =
+                  drafts[manualGroup.tag] ??
+                  manualGroup.runtime_selected_outbound ??
+                  manualGroup.default;
                 const currentValue = manualGroup.runtime_selected_outbound ?? manualGroup.default;
+                const autoOutbound = manualGroup.auto_outbound;
+                const autoEnabled = Boolean(autoOutbound && draftValue === autoOutbound);
+                const manualNodeCandidates = dedupeOutbounds(
+                  manualGroup.node_candidates ?? manualGroup.outbounds.filter((v) => v !== autoOutbound),
+                );
+                const manualNodeOptions = manualNodeCandidates.map((value) => ({
+                  value,
+                  label: formatOutboundOptionLabel(value, tr),
+                }));
+                const safeDraftValue = manualNodeCandidates.includes(draftValue)
+                  ? draftValue
+                  : (manualNodeCandidates[0] ?? "");
+                const manualExitValue = resolveManualExitValue(
+                  manualNodeCandidates,
+                  manualGroup.runtime_effective_outbound,
+                );
+                const effectiveDraftValue = autoEnabled ? draftValue : safeDraftValue;
                 return (
                   <>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                <strong>{tr("settings.groups.manual_title", "Manual Fallback Group")}</strong>
-                <Tag>{manualGroup.tag}</Tag>
-              </div>
-              <p className="bp-muted" style={{ margin: 0 }}>
-                {tr(
-                  "settings.groups.manual_desc",
-                  "Shared manual fallback. Business groups can choose manual to follow this selection."
-                )}
-              </p>
-              {manualGroup.persisted_selected_outbound ? (
-                <p className="bp-muted" style={{ margin: 0 }}>
-                  {tr("settings.groups.persisted", "Saved: {outbound}", {
-                    outbound: manualGroup.persisted_selected_outbound,
-                  })}
-                  {manualGroup.persisted_updated_at
-                    ? ` · ${tr("settings.groups.persisted_at", "Updated {time}", { time: manualGroup.persisted_updated_at })}`
-                    : ""}
-                </p>
-              ) : null}
-              {manualGroup.runtime_selected_outbound ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  <Tag color="processing">
-                    {tr("settings.groups.runtime_selected", "Runtime selected: {outbound}", {
-                      outbound: manualGroup.runtime_selected_outbound,
-                    })}
-                  </Tag>
-                  {manualGroup.runtime_effective_outbound ? (
-                    <Tag
-                      color={
-                        manualGroup.runtime_effective_outbound === manualGroup.runtime_selected_outbound ? "blue" : "success"
-                      }
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                      <strong>{tr("settings.groups.manual_title", "Manual Fallback Group")}</strong>
+                      <Tag>{manualGroup.tag}</Tag>
+                    </div>
+                    <p className="bp-muted" style={{ margin: 0 }}>
+                      {tr(
+                        "settings.groups.manual_desc",
+                        "Shared manual fallback. Business groups can choose manual to follow this selection.",
+                      )}
+                    </p>
+                    {manualGroup.persisted_selected_outbound ? (
+                      <p className="bp-muted" style={{ margin: 0 }}>
+                        {tr("settings.groups.persisted", "Saved: {outbound}", {
+                          outbound: manualGroup.persisted_selected_outbound,
+                        })}
+                        {manualGroup.persisted_updated_at
+                          ? ` · ${tr("settings.groups.persisted_at", "Updated {time}", { time: manualGroup.persisted_updated_at })}`
+                          : ""}
+                      </p>
+                    ) : null}
+                    {manualGroup.runtime_selected_outbound ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        <Tag color="processing">
+                          {tr("settings.groups.runtime_selected", "Runtime selected: {outbound}", {
+                            outbound: manualGroup.runtime_selected_outbound,
+                          })}
+                        </Tag>
+                        {manualGroup.runtime_effective_outbound ? (
+                          <Tag
+                            color={
+                              manualGroup.runtime_effective_outbound ===
+                              manualGroup.runtime_selected_outbound
+                                ? "blue"
+                                : "success"
+                            }
+                          >
+                            {tr("settings.groups.runtime_effective", "Effective: {outbound}", {
+                              outbound: manualGroup.runtime_effective_outbound,
+                            })}
+                          </Tag>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {manualGroup.auto_candidates && manualGroup.auto_candidates.length > 0 ? (
+                      <details>
+                        <summary className="bp-muted" style={{ cursor: "pointer" }}>
+                          {tr("settings.groups.auto_candidates_toggle", "View auto candidates ({count})", {
+                            count: String(manualGroup.auto_candidates.length),
+                          })}
+                        </summary>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                          {manualGroup.auto_candidates.map((nodeTag) => (
+                            <Tag key={`${manualGroup.tag}-${nodeTag}`}>{nodeTag}</Tag>
+                          ))}
+                        </div>
+                      </details>
+                    ) : null}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                      }}
                     >
-                      {tr("settings.groups.runtime_effective", "Effective: {outbound}", {
-                        outbound: manualGroup.runtime_effective_outbound,
-                      })}
-                    </Tag>
-                  ) : null}
-                </div>
-              ) : null}
-              <Select
-                style={{ width: "100%" }}
-                value={draftValue}
-                virtual={false}
-                getPopupContainer={() => document.body}
-                dropdownClassName="bp-ant-overlay-fix"
-                options={manualGroup.outbounds.map((value) => ({ value, label: value }))}
-                onChange={(value) => updateDraft(manualGroup.tag, value)}
-              />
-              <div className="bp-page-actions bp-settings-actions">
-                <Button
-                  className="bp-btn-fixed"
-                  type="primary"
-                  loading={applyingTag === manualGroup.tag}
-                  disabled={
-                    (applyingTag.length > 0 && applyingTag !== manualGroup.tag) ||
-                    !draftValue ||
-                    draftValue === currentValue
-                  }
-                  onClick={() => void applyGroupChoice(manualGroup.tag, draftValue)}
-                >
-                  {tr("settings.groups.apply", "Apply Group Choice")}
-                </Button>
-              </div>
+                      <span className="bp-muted">
+                        {tr("settings.groups.auto_toggle", "Auto Best Node")}
+                      </span>
+                      <Switch
+                        checked={autoEnabled}
+                        disabled={!autoOutbound}
+                        onChange={(checked) => {
+                          if (checked && autoOutbound) {
+                            updateDraft(manualGroup.tag, autoOutbound);
+                            return;
+                          }
+                          if (manualExitValue) {
+                            updateDraft(manualGroup.tag, manualExitValue);
+                          }
+                        }}
+                      />
+                    </div>
+                    {autoEnabled ? (
+                      <div className="bp-runtime-choice-panel">
+                        <div className="bp-runtime-choice-panel-head">
+                          <strong>{tr("settings.groups.auto_active_title", "Auto mode is active")}</strong>
+                          {autoOutbound ? (
+                            <Tag color="processing">{formatOutboundOptionLabel(autoOutbound, tr)}</Tag>
+                          ) : null}
+                        </div>
+                        <p className="bp-muted" style={{ margin: 0 }}>
+                          {tr(
+                            "settings.groups.manual_auto_active_desc",
+                            "Manual fallback now follows the auto-tested best node until you switch back to manual selection.",
+                          )}
+                        </p>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          {manualGroup.runtime_selected_outbound ? (
+                            <Tag color="processing">
+                              {tr("settings.groups.runtime_selected", "Runtime selected: {outbound}", {
+                                outbound: manualGroup.runtime_selected_outbound,
+                              })}
+                            </Tag>
+                          ) : null}
+                          {manualGroup.runtime_effective_outbound ? (
+                            <Tag color="success">
+                              {tr("settings.groups.runtime_effective", "Effective: {outbound}", {
+                                outbound: manualGroup.runtime_effective_outbound,
+                              })}
+                            </Tag>
+                          ) : null}
+                        </div>
+                        {manualExitValue ? (
+                          <div
+                            className="bp-page-actions bp-settings-actions"
+                            style={{ marginTop: 0, justifyContent: "flex-start" }}
+                          >
+                            <Button size="small" onClick={() => updateDraft(manualGroup.tag, manualExitValue)}>
+                              {tr("settings.groups.switch_manual", "Switch to Manual Selection")}
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : manualNodeOptions.length > 0 ? (
+                      <select
+                        className="bp-native-select"
+                        value={safeDraftValue}
+                        onChange={(e) => updateDraft(manualGroup.tag, e.target.value)}
+                      >
+                        {manualNodeOptions.map((option) => (
+                          <option key={`${manualGroup.tag}-${option.value}`} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="bp-muted" style={{ margin: 0 }}>
+                        {tr("settings.groups.manual_node_empty", "No nodes available for manual selection.")}
+                      </p>
+                    )}
+                    <div className="bp-page-actions bp-settings-actions">
+                      <Button
+                        className="bp-btn-fixed"
+                        type="primary"
+                        loading={applyingTag === manualGroup.tag}
+                        disabled={
+                          (applyingTag.length > 0 && applyingTag !== manualGroup.tag) ||
+                          !effectiveDraftValue ||
+                          effectiveDraftValue === currentValue
+                        }
+                        onClick={() => void applyGroupChoice(manualGroup.tag, effectiveDraftValue)}
+                      >
+                        {tr("settings.groups.apply", "Apply Group Choice")}
+                      </Button>
+                    </div>
                   </>
                 );
               })()}
@@ -375,11 +594,27 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
           {businessGroups.length > 0 ? (
             <div style={{ display: "grid", gap: 8 }}>
               {businessGroups.map((group) => {
-                const draftValue = drafts[group.tag] ?? group.runtime_selected_outbound ?? group.default;
+                const draftValue =
+                  drafts[group.tag] ?? group.runtime_selected_outbound ?? group.default;
                 const currentValue = group.runtime_selected_outbound ?? group.default;
                 const autoOutbound = group.auto_outbound;
                 const autoEnabled = Boolean(autoOutbound && draftValue === autoOutbound);
-                const nodeCandidates = group.node_candidates ?? group.outbounds.filter((v) => v !== autoOutbound);
+                const nodeCandidates = dedupeOutbounds(
+                  group.node_candidates ?? group.outbounds.filter((v) => v !== autoOutbound),
+                );
+                const nodeOptions = nodeCandidates.map((value) => ({
+                  value,
+                  label: formatOutboundOptionLabel(value, tr),
+                }));
+                const safeNodeDraftValue = nodeCandidates.includes(draftValue)
+                  ? draftValue
+                  : (nodeCandidates[0] ?? "");
+                const effectiveDraftValue = autoEnabled ? draftValue : safeNodeDraftValue;
+                const hasBusinessNodes = nodeCandidates.some((value) => value !== "manual");
+                const manualExitValue = resolveManualExitValue(
+                  nodeCandidates,
+                  group.runtime_effective_outbound,
+                );
                 return (
                   <details key={group.tag}>
                     <summary
@@ -395,10 +630,12 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                       }}
                     >
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                        <strong>{formatGroupLabel(group.tag)}</strong>
+                        <strong>{formatGroupLabel(group.tag, tr)}</strong>
                         <Tag>{group.tag}</Tag>
                         <Tag color={autoEnabled ? "success" : "default"}>
-                          {autoEnabled ? tr("settings.groups.mode_auto", "AUTO") : tr("settings.groups.mode_manual", "MANUAL")}
+                          {autoEnabled
+                            ? tr("settings.groups.mode_auto", "AUTO")
+                            : tr("settings.groups.mode_manual", "MANUAL")}
                         </Tag>
                       </span>
                       {group.runtime_effective_outbound ? (
@@ -432,14 +669,20 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                       {group.runtime_selected_outbound ? (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                           <Tag color="processing">
-                            {tr("settings.groups.runtime_selected", "Runtime selected: {outbound}", {
-                              outbound: group.runtime_selected_outbound,
-                            })}
+                            {tr(
+                              "settings.groups.runtime_selected",
+                              "Runtime selected: {outbound}",
+                              {
+                                outbound: group.runtime_selected_outbound,
+                              },
+                            )}
                           </Tag>
                           {group.runtime_effective_outbound ? (
                             <Tag
                               color={
-                                group.runtime_effective_outbound === group.runtime_selected_outbound ? "blue" : "success"
+                                group.runtime_effective_outbound === group.runtime_selected_outbound
+                                  ? "blue"
+                                  : "success"
                               }
                             >
                               {tr("settings.groups.runtime_effective", "Effective: {outbound}", {
@@ -450,15 +693,22 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                         </div>
                       ) : (
                         <p className="bp-muted" style={{ margin: 0 }}>
-                          {tr("settings.groups.runtime_unavailable", "Runtime state unavailable (Clash API unreachable).")}
+                          {tr(
+                            "settings.groups.runtime_unavailable",
+                            "Runtime state unavailable (Clash API unreachable).",
+                          )}
                         </p>
                       )}
                       {group.auto_candidates && group.auto_candidates.length > 0 ? (
                         <details>
                           <summary className="bp-muted" style={{ cursor: "pointer" }}>
-                            {tr("settings.groups.auto_candidates_toggle", "View auto candidates ({count})", {
-                              count: String(group.auto_candidates.length),
-                            })}
+                            {tr(
+                              "settings.groups.auto_candidates_toggle",
+                              "View auto candidates ({count})",
+                              {
+                                count: String(group.auto_candidates.length),
+                              },
+                            )}
                           </summary>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                             {group.auto_candidates.map((nodeTag) => (
@@ -470,13 +720,22 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                         <p className="bp-muted" style={{ margin: 0 }}>
                           {tr(
                             "settings.groups.auto_empty",
-                            "No business node pool was parsed for this group, so only manual is available."
+                            "No business node pool was parsed for this group, so only manual is available.",
                           )}
                         </p>
                       )}
                       <div style={{ display: "grid", gap: 8 }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                          <span className="bp-muted">{tr("settings.groups.auto_toggle", "Auto Best Node")}</span>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 12,
+                          }}
+                        >
+                          <span className="bp-muted">
+                            {tr("settings.groups.auto_toggle", "Auto Best Node")}
+                          </span>
                           <Switch
                             checked={autoEnabled}
                             disabled={!autoOutbound}
@@ -485,37 +744,96 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                                 updateDraft(group.tag, autoOutbound);
                                 return;
                               }
-                              if (nodeCandidates.includes("manual")) {
-                                updateDraft(group.tag, "manual");
+                              if (manualExitValue) {
+                                updateDraft(group.tag, manualExitValue);
                                 return;
-                              }
-                              if (group.runtime_effective_outbound && nodeCandidates.includes(group.runtime_effective_outbound)) {
-                                updateDraft(group.tag, group.runtime_effective_outbound);
-                                return;
-                              }
-                              if (nodeCandidates.length > 0) {
-                                updateDraft(group.tag, nodeCandidates[0]);
                               }
                             }}
                           />
                         </div>
-                        {nodeCandidates.length > 0 ? (
-                          <Select
-                            style={{ width: "100%" }}
-                            value={autoEnabled ? undefined : draftValue}
-                            placeholder={tr("settings.groups.node_pick", "Choose Node")}
-                            disabled={autoEnabled}
-                            virtual={false}
-                            getPopupContainer={() => document.body}
-                            dropdownClassName="bp-ant-overlay-fix"
-                            options={nodeCandidates.map((value) => ({ value, label: value }))}
-                            onChange={(value) => updateDraft(group.tag, value)}
-                          />
+                        {autoEnabled ? (
+                          <div className="bp-runtime-choice-panel">
+                            <div className="bp-runtime-choice-panel-head">
+                              <strong>
+                                {tr("settings.groups.auto_active_title", "Auto mode is active")}
+                              </strong>
+                              {autoOutbound ? <Tag color="processing">{autoOutbound}</Tag> : null}
+                            </div>
+                            <p className="bp-muted" style={{ margin: 0 }}>
+                              {tr(
+                                "settings.groups.auto_active_desc",
+                                "Runtime will keep following the auto-tested best node until you switch back to manual selection.",
+                              )}
+                            </p>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {group.runtime_selected_outbound ? (
+                                <Tag color="processing">
+                                  {tr(
+                                    "settings.groups.runtime_selected",
+                                    "Runtime selected: {outbound}",
+                                    {
+                                      outbound: group.runtime_selected_outbound,
+                                    },
+                                  )}
+                                </Tag>
+                              ) : null}
+                              {group.runtime_effective_outbound ? (
+                                <Tag color="success">
+                                  {tr(
+                                    "settings.groups.runtime_effective",
+                                    "Effective: {outbound}",
+                                    {
+                                      outbound: group.runtime_effective_outbound,
+                                    },
+                                  )}
+                                </Tag>
+                              ) : null}
+                            </div>
+                            {manualExitValue ? (
+                              <div
+                                className="bp-page-actions bp-settings-actions"
+                                style={{ marginTop: 0, justifyContent: "flex-start" }}
+                              >
+                                <Button
+                                  size="small"
+                                  onClick={() => updateDraft(group.tag, manualExitValue)}
+                                >
+                                  {tr(
+                                    "settings.groups.switch_manual",
+                                    "Switch to Manual Selection",
+                                  )}
+                                </Button>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : nodeOptions.length > 0 ? (
+                          <select
+                            className="bp-native-select"
+                            value={safeNodeDraftValue}
+                            onChange={(e) => updateDraft(group.tag, e.target.value)}
+                          >
+                            {nodeOptions.map((option) => (
+                              <option key={`${group.tag}-${option.value}`} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
                         ) : (
                           <p className="bp-muted" style={{ margin: 0 }}>
-                            {tr("settings.groups.node_empty", "No business nodes available for manual selection.")}
+                            {tr(
+                              "settings.groups.node_empty",
+                              "No business nodes available for manual selection.",
+                            )}
                           </p>
                         )}
+                        {!hasBusinessNodes ? (
+                          <p className="bp-muted" style={{ margin: 0 }}>
+                            {tr(
+                              "settings.groups.manual_only",
+                              "This group currently resolves to the shared manual fallback only.",
+                            )}
+                          </p>
+                        ) : null}
                       </div>
                       <div className="bp-page-actions bp-settings-actions">
                         <Button
@@ -524,10 +842,10 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
                           loading={applyingTag === group.tag}
                           disabled={
                             (applyingTag.length > 0 && applyingTag !== group.tag) ||
-                            !draftValue ||
-                            draftValue === currentValue
+                            !effectiveDraftValue ||
+                            effectiveDraftValue === currentValue
                           }
-                          onClick={() => void applyGroupChoice(group.tag, draftValue)}
+                          onClick={() => void applyGroupChoice(group.tag, effectiveDraftValue)}
                         >
                           {tr("settings.groups.apply", "Apply Group Choice")}
                         </Button>
@@ -544,9 +862,12 @@ function RuntimeGroupsCard({ items, autoIntervalSec, onGoPolicy }: RuntimeGroups
   );
 }
 
-function formatGroupLabel(tag: string): string {
+function formatGroupLabel(
+  tag: string,
+  tr: (key: string, fallback: string, vars?: Record<string, string>) => string,
+): string {
   if (tag === "manual") {
-    return "Manual";
+    return tr("settings.groups.manual_title", "Manual Fallback Group");
   }
   if (tag.startsWith("biz-")) {
     const body = tag.slice(4).replace(/-/g, " ").trim();
@@ -567,6 +888,53 @@ function formatSecondsInterval(value?: number): string {
     return `${sec / 60}m`;
   }
   return `${sec}s`;
+}
+
+function dedupeOutbounds(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of values) {
+    const value = raw.trim();
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    out.push(value);
+  }
+  return out;
+}
+
+function resolveManualExitValue(
+  nodeCandidates: string[],
+  runtimeEffectiveOutbound?: string | null,
+): string | undefined {
+  if (nodeCandidates.includes("manual")) {
+    return "manual";
+  }
+  if (runtimeEffectiveOutbound && nodeCandidates.includes(runtimeEffectiveOutbound)) {
+    return runtimeEffectiveOutbound;
+  }
+  return nodeCandidates[0];
+}
+
+function formatOutboundOptionLabel(
+  value: string,
+  tr: (key: string, fallback: string, vars?: Record<string, string>) => string,
+): string {
+  if (value === "manual") {
+    return tr("settings.groups.follow_manual", "Follow Manual Fallback");
+  }
+  return value;
+}
+
+function formatQueryError(error: unknown, fallback: string): string {
+  const anyErr = error as any;
+  return (
+    anyErr?.appError?.message ||
+    anyErr?.response?.data?.error?.message ||
+    anyErr?.message ||
+    fallback
+  );
 }
 
 function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) {
@@ -618,7 +986,13 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
     const url = buildProxyUrl(data, preferredHost);
     try {
       await navigator.clipboard.writeText(url);
-      addToast("success", tr("settings.copy.success", "Connection string copied ({host}:{port})", { host: clientHost, port: data.port }));
+      addToast(
+        "success",
+        tr("settings.copy.success", "Connection string copied ({host}:{port})", {
+          host: clientHost,
+          port: data.port,
+        }),
+      );
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1200);
     } catch {
@@ -627,7 +1001,9 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
   };
 
   const statusTag = data?.status ? (
-    <Tag color={data.status === "running" ? "success" : data.status === "error" ? "error" : "default"}>
+    <Tag
+      color={data.status === "running" ? "success" : data.status === "error" ? "error" : "default"}
+    >
       {data.status === "running"
         ? tr("settings.status.running", "Running")
         : data.status === "error"
@@ -656,7 +1032,7 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
         <span className="bp-table-mono">
           {resolveProxyClientHost(
             data?.listen_address ?? "0.0.0.0",
-            window.location.hostname || undefined
+            window.location.hostname || undefined,
           )}
         </span>
       </div>
@@ -668,16 +1044,16 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
       {isPublicNoAuth(
         enabledWatch ?? data?.enabled ?? true,
         listenAddressWatch ?? data?.listen_address ?? "0.0.0.0",
-        authMode ?? data?.auth_mode ?? "none"
+        authMode ?? data?.auth_mode ?? "none",
       ) && (
         <Alert
           type="warning"
           showIcon
           style={{ marginBottom: 12 }}
-          message={tr("settings.security.warning_title", "Public exposure without authentication")}
+          title={tr("settings.security.warning_title", "Public exposure without authentication")}
           description={tr(
             "settings.security.warning_desc",
-            "Current config listens on 0.0.0.0 with auth_mode=none. Anyone who can access this port may use your proxy."
+            "Current config listens on 0.0.0.0 with auth_mode=none. Anyone who can access this port may use your proxy.",
           )}
         />
       )}
@@ -693,7 +1069,11 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
           password: "",
         }}
       >
-        <Form.Item name="enabled" label={tr("settings.status.enabled", "Enabled")} valuePropName="checked">
+        <Form.Item
+          name="enabled"
+          label={tr("settings.status.enabled", "Enabled")}
+          valuePropName="checked"
+        >
           <Switch />
         </Form.Item>
         <Form.Item name="listen_address" label={tr("settings.proxy.listen", "Listen Address")}>
@@ -702,8 +1082,8 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
               { value: "127.0.0.1", label: "127.0.0.1 (Localhost)" },
               { value: "0.0.0.0", label: "0.0.0.0 (All Interfaces)" },
             ]}
-            getPopupContainer={() => document.body}
-            dropdownClassName="bp-ant-overlay-fix"
+            getPopupContainer={getOverlayContainer}
+            classNames={selectPopupClassNames}
           />
         </Form.Item>
         <Form.Item
@@ -711,7 +1091,12 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
           label={tr("settings.proxy.port", "Port")}
           rules={[
             { required: true, message: tr("settings.proxy.port.required", "Port is required") },
-            { type: "number", min: 1, max: 65535, message: tr("settings.proxy.port.range", "Port must be 1-65535") },
+            {
+              type: "number",
+              min: 1,
+              max: 65535,
+              message: tr("settings.proxy.port.range", "Port must be 1-65535"),
+            },
           ]}
         >
           <InputNumber min={1} max={65535} style={{ width: "100%" }} />
@@ -722,8 +1107,8 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
               { value: "none", label: tr("settings.proxy.auth.none", "None") },
               { value: "basic", label: tr("settings.proxy.auth.basic", "Basic") },
             ]}
-            getPopupContainer={() => document.body}
-            dropdownClassName="bp-ant-overlay-fix"
+            getPopupContainer={getOverlayContainer}
+            classNames={selectPopupClassNames}
           />
         </Form.Item>
         {authMode === "basic" && (
@@ -734,7 +1119,10 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
               rules={[
                 {
                   required: true,
-                  message: tr("settings.proxy.username.required", "Username is required for Basic auth"),
+                  message: tr(
+                    "settings.proxy.username.required",
+                    "Username is required for Basic auth",
+                  ),
                 },
               ]}
             >
@@ -746,7 +1134,10 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
               rules={[
                 {
                   required: true,
-                  message: tr("settings.proxy.password.required", "Password is required for Basic auth"),
+                  message: tr(
+                    "settings.proxy.password.required",
+                    "Password is required for Basic auth",
+                  ),
                 },
               ]}
             >
@@ -803,7 +1194,11 @@ function RoutingSettingsCard({ data, onSaved }: RoutingCardProps) {
           <p className="bp-card-kicker">{tr("settings.routing.kicker", "Route Rules")}</p>
           <h2 className="bp-card-title">{tr("settings.routing.title", "Routing Bypass")}</h2>
         </div>
-        {data?.updated_at ? <span className="bp-muted">{tr("settings.routing.updated", "Updated {time}", { time: data.updated_at })}</span> : null}
+        {data?.updated_at ? (
+          <span className="bp-muted">
+            {tr("settings.routing.updated", "Updated {time}", { time: data.updated_at })}
+          </span>
+        ) : null}
       </div>
       <p className="bp-muted" style={{ marginTop: 0 }}>
         {tr("settings.routing.desc", "Matched domains and CIDRs will go direct instead of proxy.")}
@@ -811,7 +1206,9 @@ function RoutingSettingsCard({ data, onSaved }: RoutingCardProps) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
         <Tag color={data?.bypass_private_enabled ? "success" : "default"}>
           {tr("settings.routing.cn_bundle", "CN Direct Bundle")}:{" "}
-          {data?.bypass_private_enabled ? tr("nodes.status.enabled", "Enabled") : tr("nodes.status.disabled", "Disabled")}
+          {data?.bypass_private_enabled
+            ? tr("nodes.status.enabled", "Enabled")
+            : tr("nodes.status.disabled", "Disabled")}
         </Tag>
       </div>
       <p className="bp-muted" style={{ marginTop: -4, marginBottom: 12 }}>
@@ -827,14 +1224,30 @@ function RoutingSettingsCard({ data, onSaved }: RoutingCardProps) {
             "127.0.0.0/8\n10.0.0.0/8\n172.16.0.0/12\n192.168.0.0/16\n169.254.0.0/16\n::1/128\nfc00::/7\nfe80::/10",
         }}
       >
-        <Form.Item name="bypass_private_enabled" label={tr("settings.routing.enable", "Enable bypass rules")} valuePropName="checked">
+        <Form.Item
+          name="bypass_private_enabled"
+          label={tr("settings.routing.enable", "Enable bypass rules")}
+          valuePropName="checked"
+        >
           <Switch />
         </Form.Item>
-        <Form.Item name="bypass_domains_text" label={tr("settings.routing.domains", "Bypass domains (one per line)")}>
-          <Input.TextArea rows={4} placeholder="localhost&#10;local" />
+        <Form.Item
+          name="bypass_domains_text"
+          label={tr("settings.routing.domains", "Bypass domains (one per line)")}
+        >
+          <Input.TextArea
+            rows={4}
+            placeholder="localhost&#10;local"
+          />
         </Form.Item>
-        <Form.Item name="bypass_cidrs_text" label={tr("settings.routing.cidrs", "Bypass CIDRs (one per line)")}>
-          <Input.TextArea rows={6} placeholder="192.168.0.0/16&#10;10.0.0.0/8" />
+        <Form.Item
+          name="bypass_cidrs_text"
+          label={tr("settings.routing.cidrs", "Bypass CIDRs (one per line)")}
+        >
+          <Input.TextArea
+            rows={6}
+            placeholder="192.168.0.0/16&#10;10.0.0.0/8"
+          />
         </Form.Item>
       </Form>
       <div className="bp-page-actions bp-settings-actions">
@@ -903,16 +1316,20 @@ function ForwardingPolicyCard({ data, onSaved }: ForwardingPolicyCardProps) {
       <div className="bp-card-header">
         <div>
           <p className="bp-card-kicker">{tr("settings.forwarding.kicker", "Forwarding Policy")}</p>
-          <h2 className="bp-card-title">{tr("settings.forwarding.title", "Node Eligibility Gate")}</h2>
+          <h2 className="bp-card-title">
+            {tr("settings.forwarding.title", "Node Eligibility Gate")}
+          </h2>
         </div>
         {data?.updated_at ? (
-          <span className="bp-muted">{tr("settings.forwarding.updated", "Updated {time}", { time: data.updated_at })}</span>
+          <span className="bp-muted">
+            {tr("settings.forwarding.updated", "Updated {time}", { time: data.updated_at })}
+          </span>
         ) : null}
       </div>
       <p className="bp-muted" style={{ marginTop: 0, marginBottom: 12 }}>
         {tr(
           "settings.forwarding.desc",
-          "When enabled, only healthy nodes are included in runtime forwarding config."
+          "When enabled, only healthy nodes are included in runtime forwarding config.",
         )}
       </p>
       <Form
@@ -938,12 +1355,18 @@ function ForwardingPolicyCard({ data, onSaved }: ForwardingPolicyCardProps) {
           name="max_latency_ms"
           label={tr("settings.forwarding.max_latency", "Max latency (ms)")}
           rules={[
-            { required: true, message: tr("settings.forwarding.max_latency.required", "Please enter max latency") },
+            {
+              required: true,
+              message: tr("settings.forwarding.max_latency.required", "Please enter max latency"),
+            },
             {
               type: "number",
               min: 1,
               max: 10000,
-              message: tr("settings.forwarding.max_latency.range", "Max latency must be between 1 and 10000"),
+              message: tr(
+                "settings.forwarding.max_latency.range",
+                "Max latency must be between 1 and 10000",
+              ),
             },
           ]}
         >
@@ -960,12 +1383,21 @@ function ForwardingPolicyCard({ data, onSaved }: ForwardingPolicyCardProps) {
           name="node_test_timeout_ms"
           label={tr("settings.forwarding.test_timeout", "Node test timeout (ms)")}
           rules={[
-            { required: true, message: tr("settings.forwarding.test_timeout.required", "Please enter node test timeout") },
+            {
+              required: true,
+              message: tr(
+                "settings.forwarding.test_timeout.required",
+                "Please enter node test timeout",
+              ),
+            },
             {
               type: "number",
               min: 500,
               max: 10000,
-              message: tr("settings.forwarding.test_timeout.range", "Timeout must be between 500 and 10000 ms"),
+              message: tr(
+                "settings.forwarding.test_timeout.range",
+                "Timeout must be between 500 and 10000 ms",
+              ),
             },
           ]}
         >
@@ -975,12 +1407,21 @@ function ForwardingPolicyCard({ data, onSaved }: ForwardingPolicyCardProps) {
           name="node_test_concurrency"
           label={tr("settings.forwarding.test_concurrency", "Node test concurrency")}
           rules={[
-            { required: true, message: tr("settings.forwarding.test_concurrency.required", "Please enter node test concurrency") },
+            {
+              required: true,
+              message: tr(
+                "settings.forwarding.test_concurrency.required",
+                "Please enter node test concurrency",
+              ),
+            },
             {
               type: "number",
               min: 1,
               max: 64,
-              message: tr("settings.forwarding.test_concurrency.range", "Concurrency must be between 1 and 64"),
+              message: tr(
+                "settings.forwarding.test_concurrency.range",
+                "Concurrency must be between 1 and 64",
+              ),
             },
           ]}
         >
@@ -992,13 +1433,19 @@ function ForwardingPolicyCard({ data, onSaved }: ForwardingPolicyCardProps) {
           rules={[
             {
               required: true,
-              message: tr("settings.forwarding.biz_auto_interval.required", "Please enter auto test interval"),
+              message: tr(
+                "settings.forwarding.biz_auto_interval.required",
+                "Please enter auto test interval",
+              ),
             },
             {
               type: "number",
               min: 60,
               max: 86400,
-              message: tr("settings.forwarding.biz_auto_interval.range", "Interval must be between 60 and 86400 sec"),
+              message: tr(
+                "settings.forwarding.biz_auto_interval.range",
+                "Interval must be between 60 and 86400 sec",
+              ),
             },
           ]}
         >
@@ -1019,14 +1466,18 @@ function isPublicNoAuth(enabled: boolean, listenAddress: string, authMode: strin
 }
 
 function confirmPublicNoAuth(
-  tr: (key: string, fallback?: string, params?: Record<string, string | number | boolean | null | undefined>) => string
+  tr: (
+    key: string,
+    fallback?: string,
+    params?: Record<string, string | number | boolean | null | undefined>,
+  ) => string,
 ): Promise<boolean> {
   return new Promise((resolve) => {
     Modal.confirm({
       title: tr("settings.security.confirm_title", "Confirm public unauthenticated proxy"),
       content: tr(
         "settings.security.confirm_desc",
-        "This setting exposes proxy service on all interfaces without authentication. Continue only if this is intended."
+        "This setting exposes proxy service on all interfaces without authentication. Continue only if this is intended.",
       ),
       okText: tr("common.save", "Save"),
       cancelText: tr("common.cancel", "Cancel"),

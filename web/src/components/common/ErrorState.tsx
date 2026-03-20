@@ -12,7 +12,7 @@ export function ErrorState({ message, onRetry }: ErrorStateProps): ReactNode {
   return (
     <Alert
       type="error"
-      message={message}
+      title={message}
       showIcon
       action={
         onRetry && (

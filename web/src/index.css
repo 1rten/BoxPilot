@@ -1,6 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap");
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 :focus-visible {
   outline: 2px solid rgba(31, 94, 255, 0.45);
@@ -33,7 +35,13 @@
 
 body {
   margin: 0;
-  font-family: "Fira Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    "Fira Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   background: linear-gradient(180deg, #f4f6fb 0%, #eef2f9 100%);
   color: var(--color-text);
   overflow-x: hidden;
@@ -124,7 +132,9 @@ a {
   align-items: center;
   padding: 0 6px;
   border-bottom: 3px solid transparent;
-  transition: color 180ms ease, border-color 180ms ease;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease;
 }
 
 .bp-tab:hover {
@@ -242,6 +252,28 @@ a {
   transition: all 160ms ease;
 }
 
+.bp-forwarding-trigger-wrap {
+  display: inline-flex;
+}
+
+.bp-forwarding-flyout-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.bp-forwarding-flyout-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2000;
+  background: #ffffff;
+  border: 1px solid #e3e8f2;
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: var(--bp-shadow);
+  max-width: min(420px, calc(100vw - 24px));
+}
+
 .bp-forwarding-toggle:hover {
   border-color: #a9bce9;
   background: #eef3ff;
@@ -284,6 +316,10 @@ a {
   background: #94a3b8;
 }
 
+.bp-runtime-dot-unknown {
+  background: #cbd5e1;
+}
+
 .bp-forwarding-popover {
   min-width: 320px;
   max-width: 420px;
@@ -308,10 +344,20 @@ a {
   font-size: 12px;
 }
 
+.bp-forwarding-popover-status-note {
+  margin: 0 0 8px 0;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
 .bp-forwarding-popover-error {
   margin: 0 0 8px 0;
   color: #b91c1c;
   font-size: 12px;
+}
+
+.bp-forwarding-popover-loading {
+  padding: 2px 0 8px;
 }
 
 .bp-forwarding-popover-list {
@@ -501,7 +547,8 @@ a {
   font-size: 26px;
   font-weight: 600;
   margin: 0;
-  font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+  font-family:
+    "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
 }
 
@@ -610,7 +657,10 @@ a {
   background: var(--bp-surface);
   box-shadow: var(--shadow-sm);
   padding: 18px;
-  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease,
+    border-color 200ms ease;
 }
 
 .bp-dashboard-card:hover {
@@ -903,7 +953,8 @@ a {
 }
 
 .bp-mono {
-  font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+  font-family:
+    "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
 }
 
@@ -969,7 +1020,9 @@ a {
   color: var(--bp-accent);
   background: var(--bp-accent-soft);
   border: 1px solid #cdd9ff;
-  transition: transform 200ms ease, box-shadow 200ms ease;
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease;
 }
 
 .bp-link-pill:hover {
@@ -1012,7 +1065,9 @@ a {
   border-radius: 8px;
   padding: 16px;
   box-shadow: var(--shadow-sm);
-  transition: box-shadow 200ms ease, transform 200ms ease;
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease;
 }
 
 .bp-card:hover {
@@ -1035,7 +1090,10 @@ a {
   color: #ffffff;
   font-size: 14px;
   cursor: pointer;
-  transition: transform 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease,
+    background-color 200ms ease;
 }
 
 .bp-btn-primary:hover {
@@ -1275,7 +1333,8 @@ a {
 }
 
 .bp-table-mono {
-  font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+  font-family:
+    "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
   font-size: 13px;
   color: #3b4b68;
@@ -1669,6 +1728,38 @@ a {
 .bp-settings-actions {
   margin-top: 12px;
   justify-content: flex-end;
+}
+
+.bp-runtime-choice-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #d7e3fb;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.bp-runtime-choice-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bp-native-select {
+  width: 100%;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid #d6deee;
+  background: #ffffff;
+  color: #1f2a44;
+  padding: 0 12px;
+}
+
+.bp-native-select:focus {
+  outline: none;
+  border-color: #7aa2ff;
+  box-shadow: 0 0 0 2px rgba(122, 162, 255, 0.2);
 }
 
 .bp-list-compact {
