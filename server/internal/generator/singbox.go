@@ -1,13 +1,13 @@
 package generator
 
 import (
+	"boxpilot/server/internal/util/errorx"
 	"encoding/json"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
-
-	"boxpilot/server/internal/util/errorx"
+	"unicode"
 )
 
 const (
@@ -489,7 +489,7 @@ func slugTag(raw string) string {
 		isAZ := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
 		is09 := r >= '0' && r <= '9'
 		isUnicodeLetter := r >= 0x80 && (unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsSymbol(r))
-		
+
 		if isAZ || is09 || isUnicodeLetter {
 			b.WriteRune(r)
 			lastDash = false
