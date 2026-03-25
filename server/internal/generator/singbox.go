@@ -402,11 +402,10 @@ func buildBusinessGroups(
 			selectedDefault = selected
 		}
 		*outbounds = append(*outbounds, map[string]any{
-			"type":         "selector",
-			"tag":          selectorTag,
-			"display_name": target,
-			"outbounds":    selectorOutbounds,
-			"default":      selectedDefault,
+			"type":      "selector",
+			"tag":       selectorTag,
+			"outbounds": selectorOutbounds,
+			"default":   selectedDefault,
 		})
 	}
 	return result

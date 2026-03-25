@@ -791,10 +791,6 @@ func parseSelectorGroups(cfg []byte, persisted map[string]repo.RuntimeGroupSelec
 			continue
 		}
 		defaultOutbound := strings.TrimSpace(fmt.Sprintf("%v", outbound["default"]))
-		displayName := strings.TrimSpace(fmt.Sprintf("%v", outbound["display_name"]))
-		if displayName == "<nil>" {
-			displayName = ""
-		}
 		memberAny, _ := outbound["outbounds"].([]any)
 		members := make([]string, 0, len(memberAny))
 		for _, m := range memberAny {
@@ -804,11 +800,10 @@ func parseSelectorGroups(cfg []byte, persisted map[string]repo.RuntimeGroupSelec
 			}
 		}
 		item := dto.RuntimeGroupItem{
-			Tag:         tag,
-			DisplayName: displayName,
-			Type:        typ,
-			Outbounds:   members,
-			Default:     defaultOutbound,
+			Tag:       tag,
+			Type:      typ,
+			Outbounds: members,
+			Default:   defaultOutbound,
 		}
 		nodeCandidates := make([]string, 0, len(members))
 		autoTag := ""
