@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useBatchForwarding, useNodes, useUpdateNode, useTestNodes } from "../hooks/useNodes";
 import { useSubscriptions } from "../hooks/useSubscriptions";
 import { ErrorState } from "../components/common/ErrorState";
@@ -13,8 +13,7 @@ import {
   SwapOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Drawer, Dropdown, Input, Popconfirm, Table, Tag, Tooltip } from "antd";
-import type { MenuProps } from "antd";
+import { Button, Card, Drawer, Input, Popconfirm, Table, Tag, Tooltip } from "antd";
 import type { ColumnsType, TableRowSelection } from "antd/es/table/interface";
 import type { Node } from "../api/types";
 import { useI18n } from "../i18n/context";
@@ -31,6 +30,8 @@ export default function Nodes() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const [testMode, setTestMode] = useState<"ping" | "http">("http");
+  const [testMenuOpen, setTestMenuOpen] = useState(false);
+  const [forwardingMenuOpen, setForwardingMenuOpen] = useState(false);
   const [rowTestingId, setRowTestingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -71,30 +72,14 @@ export default function Nodes() {
     const found = subscriptions.find((s) => s.id === selectedNode.sub_id);
     return found?.name || null;
   }, [selectedNode, subscriptions]);
-  const forwardingMenu: MenuProps = {
-    items: [
-      { key: "enable", label: tr("nodes.forwarding.enable", "Enable Forwarding") },
-      { key: "disable", label: tr("nodes.forwarding.disable", "Disable Forwarding") },
-    ],
-    onClick: ({ key }) => {
-      if (key === "enable") {
-        void batchSetForwarding(true);
-      }
-      if (key === "disable") {
-        void batchSetForwarding(false);
-      }
-    },
-  };
-  const testMenu: MenuProps = {
-    items: [
-      { key: "ping", label: "PING" },
-      { key: "http", label: "HTTP" },
-    ],
-    onClick: ({ key }) => {
-      const mode = key === "http" ? "http" : "ping";
-      setTestMode(mode);
-    },
-  };
+  const forwardingMenuItems = [
+    { key: "enable", label: tr("nodes.forwarding.enable", "Enable Forwarding") },
+    { key: "disable", label: tr("nodes.forwarding.disable", "Disable Forwarding") },
+  ];
+  const testMenuItems = [
+    { key: "ping", label: "PING" },
+    { key: "http", label: "HTTP" },
+  ];
 
   const virtualEnabled = (filtered?.length ?? 0) > 200;
 
@@ -117,11 +102,22 @@ export default function Nodes() {
           >
             {tr("nodes.test.selected", "Test Selected")}
           </Button>
-          <Dropdown menu={testMenu} trigger={["click"]}>
-            <Button className="bp-btn-fixed bp-btn-test-mode">
+          <SimpleDropdown
+            items={testMenuItems}
+            open={testMenuOpen}
+            onOpenChange={setTestMenuOpen}
+            onSelect={(key) => {
+              setTestMenuOpen(false);
+              setTestMode(key === "http" ? "http" : "ping");
+            }}
+          >
+            <Button
+              className="bp-btn-fixed bp-btn-test-mode"
+              onClick={() => setTestMenuOpen((v) => !v)}
+            >
               {tr("nodes.test.mode", "Mode")}: {testModeLabel}
             </Button>
-          </Dropdown>
+          </SimpleDropdown>
           <Button
             className="bp-btn-fixed"
             disabled={allNodeIDs.length === 0}
@@ -150,16 +146,26 @@ export default function Nodes() {
             <span className="bp-selection-pill bp-selection-pill-static">
               {tr("nodes.selected", "Selected {count}", { count: selectedCount })}
             </span>
-            <Dropdown menu={forwardingMenu} disabled={selectedCount === 0} trigger={["click"]}>
+            <SimpleDropdown
+              items={forwardingMenuItems}
+              open={selectedCount > 0 && forwardingMenuOpen}
+              onOpenChange={setForwardingMenuOpen}
+              onSelect={(key) => {
+                setForwardingMenuOpen(false);
+                if (key === "enable") void batchSetForwarding(true);
+                if (key === "disable") void batchSetForwarding(false);
+              }}
+            >
               <Button
                 className="bp-batch-forwarding-btn bp-btn-fixed"
                 disabled={selectedCount === 0}
                 loading={batchForwarding.isPending}
                 icon={<MoreOutlined />}
+                onClick={() => selectedCount > 0 && setForwardingMenuOpen((v) => !v)}
               >
                 {tr("nodes.forwarding.batch", "Batch Forwarding")}
               </Button>
-            </Dropdown>
+            </SimpleDropdown>
           </div>
         </div>
 
@@ -596,4 +602,52 @@ function formatLatency(latencyMs?: number | null): string {
     return "-";
   }
   return `${latencyMs} ms`;
+}
+
+/* ---------- lightweight dropdown (bypasses antd Dropdown / rc-trigger) ---------- */
+
+interface SimpleDropdownProps {
+  items: { key: string; label: React.ReactNode }[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (key: string) => void;
+  children: React.ReactNode;
+}
+
+function SimpleDropdown({ items, open, onOpenChange, onSelect, children }: SimpleDropdownProps) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as HTMLElement)) {
+        onOpenChange(false);
+      }
+    };
+    // use setTimeout so the current click event finishes before we start listening
+    const id = setTimeout(() => document.addEventListener("mousedown", handler), 0);
+    return () => {
+      clearTimeout(id);
+      document.removeEventListener("mousedown", handler);
+    };
+  }, [open, onOpenChange]);
+
+  return (
+    <div ref={wrapperRef} style={{ position: "relative", display: "inline-block" }}>
+      {children}
+      {open && (
+        <ul className="bp-simple-dropdown-menu">
+          {items.map((item) => (
+            <li
+              key={item.key}
+              className="bp-simple-dropdown-item"
+              onClick={() => onSelect(item.key)}
+            >
+              {item.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
