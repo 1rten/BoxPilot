@@ -402,10 +402,11 @@ func buildBusinessGroups(
 			selectedDefault = selected
 		}
 		*outbounds = append(*outbounds, map[string]any{
-			"type":      "selector",
-			"tag":       selectorTag,
-			"outbounds": selectorOutbounds,
-			"default":   selectedDefault,
+			"type":         "selector",
+			"tag":          selectorTag,
+			"display_name": target,
+			"outbounds":    selectorOutbounds,
+			"default":      selectedDefault,
 		})
 	}
 	return result
@@ -477,16 +478,19 @@ func containsString(items []string, candidate string) bool {
 }
 
 func slugTag(raw string) string {
-	s := strings.ToLower(strings.TrimSpace(raw))
+	s := strings.TrimSpace(raw)
 	if s == "" {
 		return "group"
 	}
 	var b strings.Builder
 	lastDash := false
 	for _, r := range s {
-		isAZ := r >= 'a' && r <= 'z'
+		// Keep alphanumeric, Unicode letters (e.g., Chinese), and basic Emoji/Symbols
+		isAZ := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
 		is09 := r >= '0' && r <= '9'
-		if isAZ || is09 {
+		isUnicodeLetter := r >= 0x80 && (unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsSymbol(r))
+		
+		if isAZ || is09 || isUnicodeLetter {
 			b.WriteRune(r)
 			lastDash = false
 			continue

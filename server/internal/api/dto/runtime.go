@@ -139,6 +139,7 @@ type RuntimeGroupSummaryData struct {
 
 type RuntimeGroupItem struct {
 	Tag                       string   `json:"tag"`
+	DisplayName               string   `json:"display_name,omitempty"`
 	Type                      string   `json:"type"`
 	Outbounds                 []string `json:"outbounds"`
 	Default                   string   `json:"default"`

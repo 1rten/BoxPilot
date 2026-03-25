@@ -213,7 +213,7 @@ export default function App() {
                               return (
                                 <div key={group.tag} className="bp-forwarding-popover-item">
                                   <span className="bp-forwarding-popover-name">
-                                    {formatRuntimeGroupLabel(group.tag, tr)}
+                                    {formatRuntimeGroupLabel(group, tr)}
                                   </span>
                                   <div className="bp-forwarding-popover-side">
                                     <Tag color={isAuto ? "processing" : "default"}>
@@ -338,9 +338,13 @@ export default function App() {
 }
 
 function formatRuntimeGroupLabel(
-  tag: string,
+  group: {tag: string; display_name?: string},
   tr: (key: string, fallback: string, vars?: Record<string, string>) => string,
 ): string {
+  if (group.display_name) {
+    return group.display_name;
+  }
+  const tag = group.tag;
   if (tag === "manual") {
     return tr("settings.groups.manual_title", "Manual Fallback Group");
   }
