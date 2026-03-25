@@ -775,6 +775,7 @@ func clashProxyToOutbound(proxy map[string]any) (*OutboundItem, error) {
 		}
 		attachTransport(out, proxy)
 		attachTLS(out, proxy)
+		ensureTLSEnabled(out)
 		return mapToItem(out), nil
 	case "http", "https":
 		out := map[string]any{
@@ -1007,6 +1008,7 @@ func parseTrojanURI(link string) (*OutboundItem, bool) {
 	}
 	attachTransportFromQuery(out, u.Query())
 	attachTLSFromQuery(out, u.Query())
+	ensureTLSEnabled(out)
 	return mapToItem(out), true
 }
 
@@ -1255,6 +1257,20 @@ func attachTLSFromQuery(out map[string]any, q url.Values) {
 		tls["insecure"] = true
 	}
 	out["tls"] = tls
+}
+
+// ensureTLSEnabled guarantees the outbound has tls.enabled=true.
+// Trojan protocol always requires TLS; some Clash subscriptions omit the
+// explicit "tls: true" flag because it is implied for the protocol.
+// Without this, sing-box panics with a nil-pointer dereference during
+// TLS handshake.
+func ensureTLSEnabled(out map[string]any) {
+	existing, ok := out["tls"].(map[string]any)
+	if ok {
+		existing["enabled"] = true
+		return
+	}
+	out["tls"] = map[string]any{"enabled": true}
 }
 
 func mapToItem(m map[string]any) *OutboundItem {
