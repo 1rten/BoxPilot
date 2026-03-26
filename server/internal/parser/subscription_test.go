@@ -355,6 +355,62 @@ rules:
 	}
 }
 
+func TestParseSubscriptionBundle_SingboxIgnoreAutoSelectorAsBusinessTarget(t *testing.T) {
+	payload := `{
+	  "outbounds": [
+	    {"type":"vmess","tag":"node-a","server":"example.com","server_port":443,"uuid":"11111111-1111-1111-1111-111111111111"},
+	    {"type":"urltest","tag":"Auto_Selector_Proxy","outbounds":["node-a"]}
+	  ],
+	  "route": {
+	    "rules": [
+	      {"domain_suffix":["example.com"],"outbound":"Auto_Selector_Proxy"},
+	      {"domain_suffix":["openai.com"],"outbound":"OpenAI"}
+	    ]
+	  }
+	}`
+	parsed, err := ParseSubscriptionBundle([]byte(payload))
+	if err != nil {
+		t.Fatalf("ParseSubscriptionBundle returned error: %v", err)
+	}
+	if len(parsed.BusinessGroups) != 0 {
+		t.Fatalf("expected no business groups when target only points to helper/unknown groups, got %+v", parsed.BusinessGroups)
+	}
+	if len(parsed.Rules) != 1 || parsed.Rules[0].TargetOutbound != "OpenAI" {
+		t.Fatalf("expected only OpenAI business rule retained, got %+v", parsed.Rules)
+	}
+}
+
+func TestParseSubscriptionBundle_ClashIgnoreAutoSelectorAsBusinessTarget(t *testing.T) {
+	payload := `
+proxies:
+  - name: node-1
+    type: vmess
+    server: a.example.com
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111111
+proxy-groups:
+  - name: 自动选择 - HK
+    type: url-test
+    proxies: [node-1]
+  - name: OpenAI
+    type: select
+    proxies: [node-1]
+rules:
+  - DOMAIN-SUFFIX,example.com,自动选择 - HK
+  - DOMAIN-SUFFIX,openai.com,OpenAI
+`
+	parsed, err := ParseSubscriptionBundle([]byte(payload))
+	if err != nil {
+		t.Fatalf("ParseSubscriptionBundle returned error: %v", err)
+	}
+	if len(parsed.Rules) != 1 || parsed.Rules[0].TargetOutbound != "OpenAI" {
+		t.Fatalf("expected only OpenAI business rule retained, got %+v", parsed.Rules)
+	}
+	if len(parsed.BusinessGroups) != 1 || parsed.BusinessGroups[0].TargetOutbound != "OpenAI" {
+		t.Fatalf("expected only OpenAI business group mapping, got %+v", parsed.BusinessGroups)
+	}
+}
+
 func assertHasType(t *testing.T, list []OutboundItem, typ string) {
 	t.Helper()
 	for _, item := range list {

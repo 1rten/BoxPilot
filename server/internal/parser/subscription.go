@@ -669,6 +669,9 @@ func isBusinessTargetTag(tag string) bool {
 	if strings.Contains(lower, "直连") ||
 		strings.Contains(lower, "manual") ||
 		strings.Contains(lower, "手动切换") ||
+		strings.Contains(lower, "auto_selector") ||
+		strings.Contains(lower, "auto-selector") ||
+		strings.Contains(lower, "自动选择") ||
 		strings.Contains(lower, "漏网之鱼") ||
 		strings.Contains(lower, "节点选择") {
 		return false

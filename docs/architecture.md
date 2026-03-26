@@ -103,6 +103,16 @@ Core tables:
 
 The scheduler checks refresh eligibility every 30 seconds. Actual refresh cadence comes from each subscription's `refresh_interval_sec`.
 
+## Subscription Compatibility Notes
+
+Current parser behavior is intentionally normalized across Clash and sing-box sources:
+
+- business targets are extracted from routing rules (`rules` / `route.rules`)
+- helper targets are filtered out (`manual`, `proxy`, `节点选择`, `手动切换`, auto-selector style names)
+- business group members prefer explicit concrete nodes over recursive helper-pool expansion
+
+This keeps runtime candidate pools stable when both Clash and sing-box subscriptions coexist.
+
 ## Config Generation
 
 Runtime config is built by `generator.BuildConfigWithRuntime`.
@@ -135,6 +145,22 @@ Apply flow:
 5. run `SINGBOX_RESTART_CMD`
 6. save `.last-good` on success
 7. roll back to previous or last-known-good config on failure
+
+## sing-box Version Guardrail
+
+BoxPilot runs preflight via `sing-box check` before restart.  
+When upgrading sing-box, config generation must avoid removed legacy fields.
+
+Known compatibility pitfall:
+
+- sing-box `1.13+` removes legacy inbound fields (for example legacy `sniff` on inbound)
+- if generated config contains removed fields, startup or preflight fails with config decode errors
+
+Operational recommendation:
+
+- after sing-box upgrades, run a full reload check once (`/api/v1/runtime/reload`)
+- confirm `runtime_state.last_reload_error` is empty
+- if not empty, inspect preflight `error.details.output` first
 
 ## Static Assets
 

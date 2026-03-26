@@ -569,7 +569,6 @@ func buildInbound(inType, tag string, p ProxyInbound) map[string]any {
 		"tag":         tag,
 		"listen":      p.ListenAddress,
 		"listen_port": p.Port,
-		"sniff":       true,
 	}
 	if p.AuthMode == "basic" && p.Username != "" && p.Password != "" {
 		inb["users"] = []map[string]any{
