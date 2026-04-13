@@ -19,6 +19,12 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 	if err != nil {
 		return 0, "", "", err
 	}
+	expectedHTTPProxy := httpProxy
+	expectedSocksProxy := socksProxy
+	if !forwardingRunning {
+		expectedHTTPProxy.Enabled = false
+		expectedSocksProxy.Enabled = false
+	}
 	routing, _, err := LoadRoutingSettings(db)
 	if err != nil {
 		return 0, "", "", err
@@ -36,7 +42,7 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 		prevHash = prevRow.ConfigHash
 	}
 
-	out, err := applyConfigWithPreflight(ctx, configPath, cfg)
+	out, err := applyConfigWithPreflight(ctx, configPath, cfg, expectedHTTPProxy, expectedSocksProxy)
 	durationMs := int(time.Since(startedAt).Milliseconds())
 	if durationMs < 0 {
 		durationMs = 0

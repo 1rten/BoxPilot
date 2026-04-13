@@ -46,12 +46,17 @@ start_singbox() {
   sing-box run -c "$CONFIG_PATH" >>"$LOG_PATH" 2>&1 &
   pid="$!"
   echo "$pid" >"$PID_FILE"
-  sleep 0.2
-  if ! kill -0 "$pid" 2>/dev/null; then
-    echo "sing-box failed to start, see log: $LOG_PATH" >&2
-    tail -n 40 "$LOG_PATH" 2>/dev/null || true
-    exit 1
-  fi
+  i=0
+  max_checks="${SINGBOX_STARTUP_PROBE_STEPS:-10}"
+  while [ "$i" -lt "$max_checks" ]; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      echo "sing-box failed to stay running, see log: $LOG_PATH" >&2
+      tail -n 40 "$LOG_PATH" 2>/dev/null || true
+      exit 1
+    fi
+    i=$((i + 1))
+    sleep 0.1
+  done
 }
 
 case "${1:-}" in

@@ -100,6 +100,16 @@ func (h *Runtime) Status(c *gin.Context) {
 		if socksRow, ok := settings["socks"]; ok && socksRow.Port > 0 {
 			socksPort = socksRow.Port
 		}
+		if forwardingRunning && lastReloadError == nil {
+			httpProxy, socksProxy := runtimeProxyRowsToInbounds(settings["http"], settings["socks"])
+			if healthErr := service.ObserveRuntimeHealth(c.Request.Context(), httpProxy, socksProxy).ListenerError(); healthErr != nil {
+				msg := healthErr.Error()
+				lastReloadError = &msg
+			}
+		}
+	} else if forwardingRunning && lastReloadError == nil {
+		msg := "proxy settings unavailable; unable to verify runtime listeners"
+		lastReloadError = &msg
 	}
 	c.JSON(http.StatusOK, dto.RuntimeStatusResponse{
 		Data: dto.RuntimeStatusData{

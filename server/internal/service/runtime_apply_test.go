@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"boxpilot/server/internal/generator"
 	"boxpilot/server/internal/util/errorx"
 )
 
@@ -23,7 +24,13 @@ func TestApplyConfigWithPreflight_CheckFailedNoWrite(t *testing.T) {
 	t.Setenv("SINGBOX_CHECK_CMD", `echo invalid >&2; exit 2`)
 	t.Setenv("TEST_RESTART_MARKER", marker)
 
-	_, err := applyConfigWithPreflight(context.Background(), configPath, []byte(`{"mode":"new"}`))
+	_, err := applyConfigWithPreflight(
+		context.Background(),
+		configPath,
+		[]byte(`{"mode":"new"}`),
+		generator.ProxyInbound{},
+		generator.ProxyInbound{},
+	)
 	assertAppErrorCode(t, err, errorx.CFGCheckFailed)
 
 	got, readErr := os.ReadFile(configPath)
@@ -49,7 +56,13 @@ func TestApplyConfigWithPreflight_RestartFailedRollbackSucceeded(t *testing.T) {
 	t.Setenv("SINGBOX_CHECK_CMD", `test -s "$SINGBOX_CONFIG"`)
 	t.Setenv("SINGBOX_RESTART_CMD", `if grep -q '"mode":"new"' "$SINGBOX_CONFIG"; then echo broken >&2; exit 1; fi; echo restarted`)
 
-	out, err := applyConfigWithPreflight(context.Background(), configPath, []byte(`{"mode":"new"}`))
+	out, err := applyConfigWithPreflight(
+		context.Background(),
+		configPath,
+		[]byte(`{"mode":"new"}`),
+		generator.ProxyInbound{},
+		generator.ProxyInbound{},
+	)
 	assertAppErrorCode(t, err, errorx.RTRestartFailed)
 	appErr := err.(*errorx.AppError)
 	if appErr.Details["rollback_success"] != true {
@@ -75,7 +88,13 @@ func TestApplyConfigWithPreflight_SavesLastKnownGoodOnSuccess(t *testing.T) {
 	t.Setenv("SINGBOX_CHECK_CMD", `test -s "$SINGBOX_CONFIG"`)
 	t.Setenv("SINGBOX_RESTART_CMD", `echo restarted`)
 
-	_, err := applyConfigWithPreflight(context.Background(), configPath, []byte(`{"mode":"stable"}`))
+	_, err := applyConfigWithPreflight(
+		context.Background(),
+		configPath,
+		[]byte(`{"mode":"stable"}`),
+		generator.ProxyInbound{},
+		generator.ProxyInbound{},
+	)
 	if err != nil {
 		t.Fatalf("apply config failed: %v", err)
 	}
@@ -87,6 +106,48 @@ func TestApplyConfigWithPreflight_SavesLastKnownGoodOnSuccess(t *testing.T) {
 	}
 	if string(backup) != `{"mode":"stable"}` {
 		t.Fatalf("unexpected backup content: %s", string(backup))
+	}
+}
+
+func TestApplyConfigWithPreflight_HealthCheckFailureRollsBack(t *testing.T) {
+	tmp := t.TempDir()
+	configPath := filepath.Join(tmp, "sing-box.json")
+	if err := os.WriteFile(configPath, []byte(`{"mode":"good"}`), 0644); err != nil {
+		t.Fatalf("write initial config: %v", err)
+	}
+
+	t.Setenv("SINGBOX_CONFIG", configPath)
+	t.Setenv("SINGBOX_CHECK_CMD", `test -s "$SINGBOX_CONFIG"`)
+	t.Setenv("SINGBOX_RESTART_CMD", `echo restarted`)
+
+	httpProxy := generator.ProxyInbound{
+		Type:          "http",
+		ListenAddress: "127.0.0.1",
+		Port:          1,
+		Enabled:       true,
+	}
+
+	out, err := applyConfigWithPreflight(
+		context.Background(),
+		configPath,
+		[]byte(`{"mode":"new"}`),
+		httpProxy,
+		generator.ProxyInbound{},
+	)
+	assertAppErrorCode(t, err, errorx.CFGRollbackFailed)
+	if !strings.Contains(string(out), "restarted") {
+		t.Fatalf("expected restart output, got %q", string(out))
+	}
+	if !strings.Contains(err.Error(), "listener") {
+		t.Fatalf("expected listener health error, got %v", err)
+	}
+
+	got, readErr := os.ReadFile(configPath)
+	if readErr != nil {
+		t.Fatalf("read config: %v", readErr)
+	}
+	if string(got) != `{"mode":"good"}` {
+		t.Fatalf("expected rolled back config, got %s", string(got))
 	}
 }
 

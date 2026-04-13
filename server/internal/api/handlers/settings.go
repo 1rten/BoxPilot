@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"strconv"
@@ -438,10 +439,48 @@ func runtimeStatus(db *sql.DB) (bool, string, *string) {
 		msg := row.LastReloadError.String
 		return row.ForwardingRunning == 1, "error", &msg
 	}
+	if row.ForwardingRunning == 1 {
+		if healthErr := observedListenerError(context.Background(), db); healthErr != nil {
+			msg := healthErr.Error()
+			return true, "error", &msg
+		}
+	}
 	if row.ForwardingRunning != 1 {
 		return false, "stopped", nil
 	}
 	return true, "running", nil
+}
+
+func observedListenerError(ctx context.Context, db *sql.DB) error {
+	settings, err := repo.GetProxySettings(db)
+	if err != nil {
+		return errorx.New(errorx.DBError, "proxy settings unavailable; unable to verify runtime listeners")
+	}
+	httpProxy := generator.ProxyInbound{
+		Type:          "http",
+		ListenAddress: settings["http"].ListenAddress,
+		Port:          settings["http"].Port,
+		Enabled:       settings["http"].Enabled == 1,
+	}
+	socksProxy := generator.ProxyInbound{
+		Type:          "socks",
+		ListenAddress: settings["socks"].ListenAddress,
+		Port:          settings["socks"].Port,
+		Enabled:       settings["socks"].Enabled == 1,
+	}
+	if httpProxy.ListenAddress == "" {
+		httpProxy.ListenAddress = "0.0.0.0"
+	}
+	if httpProxy.Port == 0 {
+		httpProxy.Port = 7890
+	}
+	if socksProxy.ListenAddress == "" {
+		socksProxy.ListenAddress = "0.0.0.0"
+	}
+	if socksProxy.Port == 0 {
+		socksProxy.Port = 7891
+	}
+	return service.ObserveRuntimeHealth(ctx, httpProxy, socksProxy).ListenerError()
 }
 
 func forwardingPolicyToDTO(p service.ForwardingPolicy) dto.ForwardingPolicyData {

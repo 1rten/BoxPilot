@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"boxpilot/server/internal/generator"
 	"boxpilot/server/internal/runtime"
 	"boxpilot/server/internal/util"
 	"boxpilot/server/internal/util/errorx"
@@ -16,7 +17,13 @@ const (
 	lastKnownGoodSuffix = ".last-good"
 )
 
-func applyConfigWithPreflight(ctx context.Context, configPath string, cfg []byte) ([]byte, error) {
+func applyConfigWithPreflight(
+	ctx context.Context,
+	configPath string,
+	cfg []byte,
+	httpProxy generator.ProxyInbound,
+	socksProxy generator.ProxyInbound,
+) ([]byte, error) {
 	configPath = strings.TrimSpace(configPath)
 	if configPath == "" {
 		return nil, errorx.New(errorx.REQMissingField, "config path required")
@@ -67,6 +74,9 @@ func applyConfigWithPreflight(ctx context.Context, configPath string, cfg []byte
 
 	restartOut, restartErr := runtime.Restart(ctx, configPath)
 	if restartErr == nil {
+		restartErr = WaitForRuntimeReady(ctx, httpProxy, socksProxy)
+	}
+	if restartErr == nil {
 		_ = saveLastKnownGoodConfig(configPath, cfg)
 		return restartOut, nil
 	}
@@ -95,8 +105,11 @@ func applyConfigWithPreflight(ctx context.Context, configPath string, cfg []byte
 	}
 
 	rollbackOut, rollbackErr := runtime.Restart(ctx, configPath)
+	if rollbackErr == nil {
+		rollbackErr = WaitForRuntimeReady(ctx, httpProxy, socksProxy)
+	}
 	if rollbackErr != nil {
-		return joinOutputs(restartOut, rollbackOut), errorx.New(errorx.CFGRollbackFailed, "restart failed and rollback restart failed").WithDetails(map[string]any{
+		return joinOutputs(restartOut, rollbackOut), errorx.New(errorx.CFGRollbackFailed, "restart failed and rollback restart failed: "+rollbackErr.Error()).WithDetails(map[string]any{
 			"path":             configPath,
 			"rollback_source":  rollbackSource,
 			"restart_output":   string(truncateOutput(restartOut, 2048)),
@@ -105,7 +118,7 @@ func applyConfigWithPreflight(ctx context.Context, configPath string, cfg []byte
 		})
 	}
 
-	return joinOutputs(restartOut, rollbackOut), errorx.New(errorx.RTRestartFailed, "restart failed; rollback succeeded").WithDetails(map[string]any{
+	return joinOutputs(restartOut, rollbackOut), errorx.New(errorx.RTRestartFailed, restartErr.Error()+"; rollback succeeded").WithDetails(map[string]any{
 		"rollback_attempted": true,
 		"rollback_success":   true,
 		"rollback_source":    rollbackSource,
