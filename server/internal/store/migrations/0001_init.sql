@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS runtime_state (
   last_apply_duration_ms INTEGER NOT NULL DEFAULT 0,
   last_reload_at TEXT,
   last_apply_success_at TEXT,
-  last_reload_error TEXT
+  last_reload_error TEXT,
+  last_reload_warning TEXT
 );
 
 INSERT OR IGNORE INTO runtime_state (
