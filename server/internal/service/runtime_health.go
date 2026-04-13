@@ -12,9 +12,18 @@ import (
 )
 
 const (
-	runtimeHealthDialTimeout = 250 * time.Millisecond
-	runtimeHealthWaitStep    = 150 * time.Millisecond
-	runtimeHealthWaitSteps   = 10
+	// runtimeHealthDialTimeout is the per-probe TCP dial timeout.
+	// 500 ms gives enough headroom for loopback without masking a truly-dead
+	// listener for too long.
+	runtimeHealthDialTimeout = 500 * time.Millisecond
+
+	// runtimeHealthWaitStep / runtimeHealthWaitSteps together determine the
+	// maximum time we will poll before declaring the runtime unhealthy.
+	// sing-box must load ruleset files (several MB) before binding ports, which
+	// can take 3-10 s on constrained hardware.  40 × 300 ms = 12 s gives a
+	// generous window while still detecting real crashes promptly.
+	runtimeHealthWaitStep  = 300 * time.Millisecond
+	runtimeHealthWaitSteps = 40
 )
 
 type RuntimeHealth struct {
