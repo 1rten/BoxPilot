@@ -13,6 +13,8 @@ import (
 const (
 	DefaultAutoTestURL      = "https://www.gstatic.com/generate_204"
 	DefaultAutoTestInterval = "30m"
+	DefaultGeoSiteCNURL     = "https://ghfast.top/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/cn.srs"
+	DefaultGeoIPCNURL       = "https://ghfast.top/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/cn.srs"
 )
 
 type ProxyInbound struct {
@@ -203,13 +205,13 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 				"tag":    "geosite-cn",
 				"type":   "remote",
 				"format": "binary",
-				"url":    "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/cn.srs",
+				"url":    DefaultGeoSiteCNURL,
 			},
 			map[string]any{
 				"tag":    "geoip-cn",
 				"type":   "remote",
 				"format": "binary",
-				"url":    "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/cn.srs",
+				"url":    DefaultGeoIPCNURL,
 			},
 		)
 		routeRules = append(routeRules, map[string]any{
