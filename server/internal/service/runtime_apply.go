@@ -118,7 +118,10 @@ func applyConfigWithPreflight(
 		})
 	}
 
-	return joinOutputs(restartOut, rollbackOut), errorx.New(errorx.RTRestartFailed, restartErr.Error()+"; rollback succeeded").WithDetails(map[string]any{
+	return joinOutputs(restartOut, rollbackOut), errorx.New(
+		errorx.RTRestartFailed,
+		appendRestartOutputSummary(restartErr, "rollback succeeded"),
+	).WithDetails(map[string]any{
 		"rollback_attempted": true,
 		"rollback_success":   true,
 		"rollback_source":    rollbackSource,
@@ -175,4 +178,44 @@ func truncateOutput(out []byte, max int) []byte {
 		return out
 	}
 	return out[:max]
+}
+
+func appendRestartOutputSummary(err error, suffix string) string {
+	base := summarizeRestartError(err)
+	if base == "" {
+		base = "runtime restart failed"
+	}
+	if appErr, ok := err.(*errorx.AppError); ok {
+		if raw, ok := appErr.Details["output"].(string); ok {
+			summary := strings.TrimSpace(raw)
+			if summary != "" {
+				summary = strings.ReplaceAll(summary, "\n", " ")
+				if len(summary) > 180 {
+					summary = summary[:180] + "..."
+				}
+				base += " [restart_output: " + summary + "]"
+			}
+		}
+	}
+	suffix = strings.TrimSpace(suffix)
+	if suffix != "" {
+		base += "; " + suffix
+	}
+	return base
+}
+
+func summarizeRestartError(err error) string {
+	raw := strings.TrimSpace(err.Error())
+	if raw == "" {
+		return ""
+	}
+	lower := strings.ToLower(raw)
+	switch {
+	case strings.Contains(lower, "listener unreachable"):
+		return "runtime listener startup timeout"
+	case strings.Contains(lower, "config preflight failed"):
+		return "sing-box config preflight failed"
+	default:
+		return raw
+	}
 }
