@@ -37,6 +37,36 @@ export type Node = {
   last_test_error?: string | null;
 };
 
+export type ManualNodeCreateMode = "form" | "json" | "uri";
+
+export type ManualNodeFormInput = {
+  type: string;
+  tag?: string;
+  name?: string;
+  server: string;
+  server_port: number;
+  uuid?: string;
+  password?: string;
+  method?: string;
+  flow?: string;
+  network?: string;
+  ws_path?: string;
+  ws_host?: string;
+  tls_enabled?: boolean;
+  tls_server_name?: string;
+  tls_insecure?: boolean;
+  reality_public_key?: string;
+  reality_short_id?: string;
+  reality_spider_x?: string;
+  utls_fingerprint?: string;
+};
+
+export type ManualNodeCreateData = {
+  count: number;
+  mode: ManualNodeCreateMode;
+  nodes: Node[];
+};
+
 export type RuntimeStatusData = {
   config_version: number;
   config_hash: string;
