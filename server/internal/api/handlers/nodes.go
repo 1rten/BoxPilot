@@ -136,59 +136,24 @@ func (h *Nodes) CreateManual(c *gin.Context) {
 		return
 	}
 
-	existing, err := repo.ListNodes(h.DB, "", nil)
-	if err != nil {
-		writeError(c, errorx.New(errorx.DBError, "list nodes"))
+	ingestSource := service.IngestSourceManualURI
+	switch mode {
+	case "json":
+		ingestSource = service.IngestSourceManualJSON
+	case "form":
+		ingestSource = service.IngestSourceManualForm
+	}
+	ingestResult, ingestErr := service.IngestOutbounds(h.DB, service.IngestInput{
+		SubID:                    repo.ManualSubscriptionID,
+		Source:                   ingestSource,
+		Mode:                     service.IngestModeAppend,
+		DefaultEnabled:           1,
+		DefaultForwardingEnabled: 1,
+		Nodes:                    service.BuildIngestNodesFromOutbounds(outbounds, "manual-node"),
+	})
+	if ingestErr != nil {
+		writeError(c, ingestErr)
 		return
-	}
-	usedTags := make(map[string]struct{}, len(existing))
-	for _, row := range existing {
-		tag := strings.TrimSpace(row.Tag)
-		if tag != "" {
-			usedTags[tag] = struct{}{}
-		}
-	}
-
-	now := util.NowRFC3339()
-	createdRows := make([]repo.NodeRow, 0, len(outbounds))
-	for idx, item := range outbounds {
-		tag, name := resolveManualNodeIdentity(item, idx, usedTags)
-		if tag == "" {
-			writeError(c, errorx.New(errorx.NODEInvalidOutbound, "node tag is empty"))
-			return
-		}
-		if _, exists := usedTags[tag]; exists {
-			writeError(c, errorx.New(errorx.NODETagConflict, "node tag already exists").WithDetails(map[string]any{
-				"tag": tag,
-			}))
-			return
-		}
-		usedTags[tag] = struct{}{}
-
-		createdRows = append(createdRows, repo.NodeRow{
-			ID:                util.NewID(),
-			SubID:             repo.ManualSubscriptionID,
-			Tag:               tag,
-			Name:              name,
-			Type:              strings.ToLower(strings.TrimSpace(item.Type)),
-			Enabled:           1,
-			ForwardingEnabled: 1,
-			OutboundJSON:      string(item.Raw),
-			CreatedAt:         now,
-		})
-	}
-
-	for _, row := range createdRows {
-		if err := repo.CreateNode(h.DB, row); err != nil {
-			if strings.Contains(strings.ToLower(err.Error()), "unique") {
-				writeError(c, errorx.New(errorx.NODETagConflict, "node tag already exists").WithDetails(map[string]any{
-					"tag": row.Tag,
-				}))
-				return
-			}
-			writeError(c, errorx.New(errorx.DBError, "create manual node"))
-			return
-		}
 	}
 
 	if err := service.ReloadIfForwardingRunning(c.Request.Context(), h.DB); err != nil {
@@ -202,8 +167,8 @@ func (h *Nodes) CreateManual(c *gin.Context) {
 		return
 	}
 
-	created := make([]dto.Node, 0, len(createdRows))
-	for _, row := range createdRows {
+	created := make([]dto.Node, 0, len(ingestResult.Rows))
+	for _, row := range ingestResult.Rows {
 		fresh, getErr := repo.GetNode(h.DB, row.ID)
 		if getErr == nil && fresh != nil {
 			created = append(created, nodeRowToDTO(*fresh))
@@ -802,43 +767,4 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 		out["tls"] = tls
 	}
 	return out, nil
-}
-
-func resolveManualNodeIdentity(item parser.OutboundItem, idx int, used map[string]struct{}) (string, string) {
-	tag := strings.TrimSpace(item.Tag)
-	if tag == "" {
-		var payload map[string]any
-		if err := json.Unmarshal(item.Raw, &payload); err == nil {
-			if rawTag, ok := payload["tag"].(string); ok {
-				tag = strings.TrimSpace(rawTag)
-			}
-		}
-	}
-	if tag == "" {
-		base := fmt.Sprintf("manual-%s", strings.TrimSpace(item.Type))
-		if base == "manual-" {
-			base = "manual-node"
-		}
-		tag = resolveUniqueTag(base, used)
-	}
-	name := tag
-	return tag, name
-}
-
-func resolveUniqueTag(base string, used map[string]struct{}) string {
-	base = strings.TrimSpace(base)
-	if base == "" {
-		base = "manual-node"
-	}
-	if _, ok := used[base]; !ok {
-		return base
-	}
-	i := 2
-	for {
-		candidate := fmt.Sprintf("%s-%d", base, i)
-		if _, ok := used[candidate]; !ok {
-			return candidate
-		}
-		i++
-	}
 }

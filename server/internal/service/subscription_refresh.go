@@ -56,24 +56,21 @@ func RefreshSubscription(db *sql.DB, subID string) (notModified bool, nodesTotal
 	if len(subShort) > 8 {
 		subShort = subShort[:8]
 	}
-	nodes := make([]repo.NodeRow, 0, len(parsed.Outbounds))
-	sourceToFinalTag := map[string]string{}
-	for i, o := range parsed.Outbounds {
-		tag := o.Tag
-		if tag == "" {
-			tag = subShort + "-" + strconv.Itoa(i) + "-node"
-		}
-		if strings.TrimSpace(o.Tag) != "" {
-			sourceToFinalTag[strings.TrimSpace(o.Tag)] = tag
-		}
-		nodes = append(nodes, repo.NodeRow{
-			ID: util.NewID(), SubID: row.ID, Tag: tag, Name: tag, Type: o.Type, Enabled: 1,
-			OutboundJSON: string(o.Raw), CreatedAt: util.NowRFC3339(),
-		})
+	ingestNodes := BuildIngestNodesFromOutbounds(parsed.Outbounds, subShort+"-node")
+	ingestResult, ingestErr := IngestOutbounds(db, IngestInput{
+		SubID:                    row.ID,
+		Source:                   IngestSourceSub,
+		Mode:                     IngestModeReplace,
+		TagPrefix:                subShort + "-node",
+		DefaultEnabled:           1,
+		DefaultForwardingEnabled: 1,
+		Nodes:                    ingestNodes,
+	})
+	if ingestErr != nil {
+		return false, 0, 0, ingestErr
 	}
-	if err := repo.ReplaceNodesForSubscription(db, row.ID, nodes); err != nil {
-		return false, 0, 0, errorx.New(errorx.SUBReplaceNodesFailed, "replace nodes").WithDetails(map[string]any{"id": subID})
-	}
+	nodes := ingestResult.Rows
+	sourceToFinalTag := ingestResult.SourceTagTo
 	ruleSets := make([]repo.SubscriptionRuleSetRow, 0, len(parsed.RuleSets))
 	for _, rs := range parsed.RuleSets {
 		ruleSets = append(ruleSets, repo.SubscriptionRuleSetRow{

@@ -892,8 +892,10 @@ func containsString(items []string, candidate string) bool {
 
 func probeProxyEndpoint(target *url.URL, proxyType string, row repo.ProxySettingsRow, timeout time.Duration) dto.RuntimeProxyCheckItem {
 	result := dto.RuntimeProxyCheckItem{
-		Enabled:  row.Enabled == 1,
-		ProxyURL: proxyURL(proxyType, row.Port),
+		Enabled:         row.Enabled == 1,
+		ProxyURL:        proxyURL(proxyType, row.Port),
+		ProxyReachable:  false,
+		TargetReachable: false,
 	}
 	if !result.Enabled {
 		return result
@@ -906,6 +908,7 @@ func probeProxyEndpoint(target *url.URL, proxyType string, row repo.ProxySetting
 		result.Error = &msg
 		return result
 	}
+	result.ProxyReachable = true
 	defer closeFn()
 
 	req, err := http.NewRequest(http.MethodGet, target.String(), nil)
@@ -928,6 +931,7 @@ func probeProxyEndpoint(target *url.URL, proxyType string, row repo.ProxySetting
 	code := resp.StatusCode
 	result.StatusCode = &code
 	result.Connected = true
+	result.TargetReachable = true
 	if target.Scheme == "https" {
 		result.TLSOK = resp.TLS != nil
 	} else {

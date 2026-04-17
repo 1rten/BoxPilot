@@ -68,14 +68,16 @@ type RuntimeProxyCheckData struct {
 }
 
 type RuntimeProxyCheckItem struct {
-	Enabled    bool    `json:"enabled"`
-	ProxyURL   string  `json:"proxy_url"`
-	Connected  bool    `json:"connected"`
-	TLSOK      bool    `json:"tls_ok"`
-	StatusCode *int    `json:"status_code,omitempty"`
-	LatencyMS  *int64  `json:"latency_ms,omitempty"`
-	Error      *string `json:"error,omitempty"`
-	EgressIP   *string `json:"egress_ip,omitempty"`
+	Enabled         bool    `json:"enabled"`
+	ProxyURL        string  `json:"proxy_url"`
+	Connected       bool    `json:"connected"`
+	TLSOK           bool    `json:"tls_ok"`
+	ProxyReachable  bool    `json:"proxy_reachable"`
+	TargetReachable bool    `json:"target_reachable"`
+	StatusCode      *int    `json:"status_code,omitempty"`
+	LatencyMS       *int64  `json:"latency_ms,omitempty"`
+	Error           *string `json:"error,omitempty"`
+	EgressIP        *string `json:"egress_ip,omitempty"`
 }
 
 type RuntimeTrafficResponse struct {
