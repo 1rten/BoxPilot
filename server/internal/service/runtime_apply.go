@@ -110,13 +110,19 @@ func applyConfigWithPreflight(
 		rollbackErr = WaitForRuntimeReady(ctx, httpProxy, socksProxy, listenerReadyMaxMs)
 	}
 	if rollbackErr != nil {
-		return joinOutputs(restartOut, rollbackOut), errorx.New(errorx.CFGRollbackFailed, "restart failed and rollback restart failed: "+rollbackErr.Error()).WithDetails(map[string]any{
+		details := map[string]any{
 			"path":             configPath,
 			"rollback_source":  rollbackSource,
 			"restart_output":   string(truncateOutput(restartOut, 2048)),
 			"rollback_output":  string(truncateOutput(rollbackOut, 2048)),
 			"rollback_restart": rollbackErr.Error(),
-		})
+		}
+		if appErr, ok := rollbackErr.(*errorx.AppError); ok && appErr.Details != nil {
+			for k, v := range appErr.Details {
+				details["rollback_"+k] = v
+			}
+		}
+		return joinOutputs(restartOut, rollbackOut), errorx.New(errorx.CFGRollbackFailed, "restart failed and rollback restart failed: "+rollbackErr.Error()).WithDetails(details)
 	}
 
 	return joinOutputs(restartOut, rollbackOut), errorx.New(

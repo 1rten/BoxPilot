@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"boxpilot/server/internal/generator"
+	"boxpilot/server/internal/util/errorx"
 )
 
 func TestObserveRuntimeHealth_AcceptsWildcardListenerViaLoopback(t *testing.T) {
@@ -49,7 +50,15 @@ func TestObserveRuntimeHealth_ReportsUnreachableEnabledListeners(t *testing.T) {
 	if got == "" {
 		t.Fatal("expected non-empty error message")
 	}
-	if !(strings.Contains(strings.ToLower(got), "http") && strings.Contains(strings.ToLower(got), "socks")) {
-		t.Fatalf("expected both listener names in error, got %q", got)
+	if !strings.Contains(strings.ToLower(got), "startup timeout") {
+		t.Fatalf("expected timeout message, got %q", got)
+	}
+	appErr, ok := err.(*errorx.AppError)
+	if !ok {
+		t.Fatalf("expected AppError, got %T", err)
+	}
+	listenerDetails, _ := appErr.Details["listener_errors"].(string)
+	if !(strings.Contains(strings.ToLower(listenerDetails), "http") && strings.Contains(strings.ToLower(listenerDetails), "socks")) {
+		t.Fatalf("expected both listener names in details, got %q", listenerDetails)
 	}
 }

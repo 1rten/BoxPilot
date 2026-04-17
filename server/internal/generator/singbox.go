@@ -204,16 +204,18 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 		}
 		routeRuleSets = append(routeRuleSets,
 			map[string]any{
-				"tag":    "geosite-cn",
-				"type":   "remote",
-				"format": "binary",
-				"url":    DefaultGeoSiteCNURL,
+				"tag":            "geosite-cn",
+				"type":           "remote",
+				"format":         "binary",
+				"url":            DefaultGeoSiteCNURL,
+				"download_detour": "direct",
 			},
 			map[string]any{
-				"tag":    "geoip-cn",
-				"type":   "remote",
-				"format": "binary",
-				"url":    DefaultGeoIPCNURL,
+				"tag":            "geoip-cn",
+				"type":           "remote",
+				"format":         "binary",
+				"url":            DefaultGeoIPCNURL,
+				"download_detour": "direct",
 			},
 		)
 		routeRules = append(routeRules, map[string]any{
@@ -307,6 +309,7 @@ func buildRouteRuleSets(extras []RouteRuleSetRef) []map[string]any {
 		}
 		if u := strings.TrimSpace(rs.URL); u != "" {
 			item["url"] = u
+			item["download_detour"] = "direct"
 		}
 		if p := strings.TrimSpace(rs.Path); p != "" {
 			item["path"] = p

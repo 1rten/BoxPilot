@@ -77,6 +77,15 @@ func TestBuildConfig_WithBypassRules(t *testing.T) {
 	if !ok || len(ruleSets) != 2 {
 		t.Fatalf("expected 2 route.rule_set entries, got %v", route["rule_set"])
 	}
+	for _, item := range ruleSets {
+		rs, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if detour, _ := rs["download_detour"].(string); detour != "direct" {
+			t.Fatalf("expected rule_set download_detour=direct, got %v", rs["download_detour"])
+		}
+	}
 }
 
 func TestBuildConfig_WithoutBypassRules(t *testing.T) {

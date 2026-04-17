@@ -79,21 +79,20 @@ func (h RuntimeHealth) ListenerError() error {
 	if len(h.ListenerErrors) == 0 {
 		return nil
 	}
-	full := strings.Join(h.ListenerErrors, "; ")
 	return errorx.New(errorx.RTRestartFailed, "runtime listener startup timeout").WithDetails(map[string]any{
-		"listener_errors": full,
+		"listener_errors": strings.Join(h.ListenerErrors, "; "),
 	})
 }
 
 func WaitForRuntimeReady(ctx context.Context, httpProxy, socksProxy generator.ProxyInbound, overrideMs int) error {
-	var lastErr error
+	var lastHealth RuntimeHealth
+	waitMax := runtimeHealthMaxWait(overrideMs)
+	startedAt := time.Now()
 	steps := runtimeHealthWaitSteps(overrideMs)
 	for attempt := 0; attempt < steps; attempt++ {
-		health := ObserveRuntimeHealth(ctx, httpProxy, socksProxy)
-		if err := health.ListenerError(); err == nil {
+		lastHealth = ObserveRuntimeHealth(ctx, httpProxy, socksProxy)
+		if err := lastHealth.ListenerError(); err == nil {
 			return nil
-		} else {
-			lastErr = err
 		}
 		if attempt == steps-1 {
 			break
@@ -106,8 +105,18 @@ func WaitForRuntimeReady(ctx context.Context, httpProxy, socksProxy generator.Pr
 		case <-time.After(runtimeHealthWaitStep):
 		}
 	}
-	if lastErr != nil {
-		return lastErr
+	if len(lastHealth.ListenerErrors) > 0 {
+		waitedMs := int(time.Since(startedAt).Milliseconds())
+		if waitedMs < 0 {
+			waitedMs = 0
+		}
+		return errorx.New(errorx.RTRestartFailed, "runtime listener startup timeout").WithDetails(map[string]any{
+			"listener_errors": strings.Join(lastHealth.ListenerErrors, "; "),
+			"wait_max_ms":     int(waitMax.Milliseconds()),
+			"waited_ms":       waitedMs,
+			"probe_step_ms":   int(runtimeHealthWaitStep.Milliseconds()),
+			"probe_attempts":  steps,
+		})
 	}
 	return errorx.New(errorx.RTRestartFailed, "runtime listeners not ready")
 }

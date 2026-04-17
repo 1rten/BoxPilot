@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"boxpilot/server/internal/util/errorx"
 )
@@ -21,14 +22,20 @@ func Restart(ctx context.Context, configPath string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	startedAt := time.Now()
 	cmd := exec.CommandContext(ctx, "sh", "-lc", cmdline)
 	cmd.Env = append(os.Environ(), "SINGBOX_CONFIG="+configPath)
 	out, err := cmd.CombinedOutput()
+	elapsedMs := int(time.Since(startedAt).Milliseconds())
+	if elapsedMs < 0 {
+		elapsedMs = 0
+	}
 	if err != nil {
 		return out, errorx.New(errorx.RTRestartFailed, "process restart failed").WithDetails(map[string]any{
-			"cmd":    cmdline,
-			"config": configPath,
-			"output": string(truncate(out, 2048)),
+			"cmd":        cmdline,
+			"config":     configPath,
+			"output":     string(truncate(out, 2048)),
+			"elapsed_ms": elapsedMs,
 		})
 	}
 	return out, nil
