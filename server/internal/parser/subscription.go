@@ -1259,6 +1259,25 @@ func attachTLSFromQuery(out map[string]any, q url.Values) {
 	if insecure {
 		tls["insecure"] = true
 	}
+	if security == "reality" {
+		reality := map[string]any{"enabled": true}
+		if pbk := strings.TrimSpace(q.Get("pbk")); pbk != "" {
+			reality["public_key"] = pbk
+		}
+		if sid := strings.TrimSpace(q.Get("sid")); sid != "" {
+			reality["short_id"] = sid
+		}
+		if spx := strings.TrimSpace(q.Get("spx")); spx != "" {
+			reality["spider_x"] = spx
+		}
+		tls["reality"] = reality
+		if fp := strings.TrimSpace(q.Get("fp")); fp != "" {
+			tls["utls"] = map[string]any{
+				"enabled":     true,
+				"fingerprint": fp,
+			}
+		}
+	}
 	out["tls"] = tls
 }
 

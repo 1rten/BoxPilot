@@ -3,13 +3,16 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"boxpilot/server/internal/api/dto"
+	"boxpilot/server/internal/parser"
 	"boxpilot/server/internal/service"
 	"boxpilot/server/internal/store/repo"
 	"boxpilot/server/internal/util"
@@ -105,6 +108,117 @@ func (h *Nodes) Update(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": nil})
+}
+
+func (h *Nodes) CreateManual(c *gin.Context) {
+	var req dto.ManualNodeCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, errorx.New(errorx.REQValidationFailed, "invalid body"))
+		return
+	}
+	mode := strings.ToLower(strings.TrimSpace(req.Mode))
+	if mode == "" {
+		mode = "uri"
+	}
+
+	if err := repo.EnsureManualSubscription(h.DB); err != nil {
+		writeError(c, errorx.New(errorx.DBError, "ensure manual subscription"))
+		return
+	}
+
+	outbounds, parseErr := parseManualCreateOutbounds(mode, req)
+	if parseErr != nil {
+		writeError(c, parseErr)
+		return
+	}
+	if len(outbounds) == 0 {
+		writeError(c, errorx.New(errorx.NODEInvalidOutbound, "no valid outbounds"))
+		return
+	}
+
+	existing, err := repo.ListNodes(h.DB, "", nil)
+	if err != nil {
+		writeError(c, errorx.New(errorx.DBError, "list nodes"))
+		return
+	}
+	usedTags := make(map[string]struct{}, len(existing))
+	for _, row := range existing {
+		tag := strings.TrimSpace(row.Tag)
+		if tag != "" {
+			usedTags[tag] = struct{}{}
+		}
+	}
+
+	now := util.NowRFC3339()
+	createdRows := make([]repo.NodeRow, 0, len(outbounds))
+	for idx, item := range outbounds {
+		tag, name := resolveManualNodeIdentity(item, idx, usedTags)
+		if tag == "" {
+			writeError(c, errorx.New(errorx.NODEInvalidOutbound, "node tag is empty"))
+			return
+		}
+		if _, exists := usedTags[tag]; exists {
+			writeError(c, errorx.New(errorx.NODETagConflict, "node tag already exists").WithDetails(map[string]any{
+				"tag": tag,
+			}))
+			return
+		}
+		usedTags[tag] = struct{}{}
+
+		createdRows = append(createdRows, repo.NodeRow{
+			ID:                util.NewID(),
+			SubID:             repo.ManualSubscriptionID,
+			Tag:               tag,
+			Name:              name,
+			Type:              strings.ToLower(strings.TrimSpace(item.Type)),
+			Enabled:           1,
+			ForwardingEnabled: 1,
+			OutboundJSON:      string(item.Raw),
+			CreatedAt:         now,
+		})
+	}
+
+	for _, row := range createdRows {
+		if err := repo.CreateNode(h.DB, row); err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "unique") {
+				writeError(c, errorx.New(errorx.NODETagConflict, "node tag already exists").WithDetails(map[string]any{
+					"tag": row.Tag,
+				}))
+				return
+			}
+			writeError(c, errorx.New(errorx.DBError, "create manual node"))
+			return
+		}
+	}
+
+	if err := service.ReloadIfForwardingRunning(c.Request.Context(), h.DB); err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			writeError(c, appErr)
+			return
+		}
+		writeError(c, errorx.New(errorx.RTRestartFailed, "reload after create manual nodes failed").WithDetails(map[string]any{
+			"err": err.Error(),
+		}))
+		return
+	}
+
+	created := make([]dto.Node, 0, len(createdRows))
+	for _, row := range createdRows {
+		fresh, getErr := repo.GetNode(h.DB, row.ID)
+		if getErr == nil && fresh != nil {
+			created = append(created, nodeRowToDTO(*fresh))
+			continue
+		}
+		created = append(created, nodeRowToDTO(row))
+	}
+
+	c.JSON(http.StatusOK, dto.ManualNodeCreateResponse{
+		Data: dto.ManualNodeCreateData{
+			Count: len(created),
+			Mode:  mode,
+			Nodes: created,
+		},
+	})
 }
 
 func (h *Nodes) BatchForwarding(c *gin.Context) {
@@ -561,4 +675,173 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func parseManualCreateOutbounds(mode string, req dto.ManualNodeCreateRequest) ([]parser.OutboundItem, *errorx.AppError) {
+	switch mode {
+	case "uri", "json":
+		raw := strings.TrimSpace(req.RawInput)
+		if raw == "" {
+			return nil, errorx.New(errorx.REQMissingField, "raw_input required")
+		}
+		parsed, err := parser.ParseSubscriptionBundle([]byte(raw))
+		if err != nil {
+			if appErr, ok := err.(*errorx.AppError); ok {
+				return nil, appErr
+			}
+			return nil, errorx.New(errorx.NODEInvalidOutbound, "parse manual input failed")
+		}
+		return parsed.Outbounds, nil
+	case "form":
+		if req.Form == nil {
+			return nil, errorx.New(errorx.REQMissingField, "form required")
+		}
+		outbound, err := buildOutboundFromForm(req.Form)
+		if err != nil {
+			return nil, err
+		}
+		raw, _ := json.Marshal(outbound)
+		return []parser.OutboundItem{{
+			Tag:  strings.TrimSpace(req.Form.Tag),
+			Type: strings.ToLower(strings.TrimSpace(req.Form.Type)),
+			Raw:  raw,
+		}}, nil
+	default:
+		return nil, errorx.New(errorx.REQInvalidField, "mode must be form/json/uri")
+	}
+}
+
+func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *errorx.AppError) {
+	if form == nil {
+		return nil, errorx.New(errorx.REQMissingField, "form required")
+	}
+	typ := strings.ToLower(strings.TrimSpace(form.Type))
+	if typ == "" {
+		return nil, errorx.New(errorx.REQMissingField, "form.type required")
+	}
+	server := strings.TrimSpace(form.Server)
+	if server == "" {
+		return nil, errorx.New(errorx.REQMissingField, "form.server required")
+	}
+	if form.ServerPort < 1 || form.ServerPort > 65535 {
+		return nil, errorx.New(errorx.REQInvalidField, "form.server_port must be between 1 and 65535")
+	}
+	out := map[string]any{
+		"type":        typ,
+		"tag":         strings.TrimSpace(form.Tag),
+		"server":      server,
+		"server_port": form.ServerPort,
+	}
+	switch typ {
+	case "vless", "vmess":
+		if strings.TrimSpace(form.UUID) == "" {
+			return nil, errorx.New(errorx.REQMissingField, "form.uuid required")
+		}
+		out["uuid"] = strings.TrimSpace(form.UUID)
+	case "trojan":
+		if strings.TrimSpace(form.Password) == "" {
+			return nil, errorx.New(errorx.REQMissingField, "form.password required")
+		}
+		out["password"] = strings.TrimSpace(form.Password)
+	case "shadowsocks", "ss":
+		if strings.TrimSpace(form.Method) == "" || strings.TrimSpace(form.Password) == "" {
+			return nil, errorx.New(errorx.REQMissingField, "form.method/password required")
+		}
+		out["type"] = "shadowsocks"
+		out["method"] = strings.TrimSpace(form.Method)
+		out["password"] = strings.TrimSpace(form.Password)
+	case "http", "socks":
+		if strings.TrimSpace(form.Password) != "" {
+			out["password"] = strings.TrimSpace(form.Password)
+		}
+	default:
+		return nil, errorx.New(errorx.REQInvalidField, fmt.Sprintf("unsupported form.type: %s", typ))
+	}
+	if flow := strings.TrimSpace(form.Flow); flow != "" {
+		out["flow"] = flow
+	}
+	if network := strings.ToLower(strings.TrimSpace(form.Network)); network == "ws" {
+		transport := map[string]any{"type": "ws"}
+		if p := strings.TrimSpace(form.WSPath); p != "" {
+			transport["path"] = p
+		}
+		if host := strings.TrimSpace(form.WSHost); host != "" {
+			transport["headers"] = map[string]any{"Host": host}
+		}
+		out["transport"] = transport
+	}
+	if form.TLSEnabled || strings.TrimSpace(form.TLSServerName) != "" || form.TLSInsecure ||
+		strings.TrimSpace(form.RealityPublicKey) != "" || strings.TrimSpace(form.RealityShortID) != "" ||
+		strings.TrimSpace(form.UTLSFingerprint) != "" {
+		tls := map[string]any{
+			"enabled": form.TLSEnabled || strings.TrimSpace(form.RealityPublicKey) != "",
+		}
+		if sni := strings.TrimSpace(form.TLSServerName); sni != "" {
+			tls["server_name"] = sni
+		}
+		if form.TLSInsecure {
+			tls["insecure"] = true
+		}
+		reality := map[string]any{}
+		if pk := strings.TrimSpace(form.RealityPublicKey); pk != "" {
+			reality["enabled"] = true
+			reality["public_key"] = pk
+		}
+		if sid := strings.TrimSpace(form.RealityShortID); sid != "" {
+			reality["short_id"] = sid
+		}
+		if spx := strings.TrimSpace(form.RealitySpiderX); spx != "" {
+			reality["spider_x"] = spx
+		}
+		if len(reality) > 0 {
+			tls["reality"] = reality
+		}
+		if fp := strings.TrimSpace(form.UTLSFingerprint); fp != "" {
+			tls["utls"] = map[string]any{
+				"enabled":     true,
+				"fingerprint": fp,
+			}
+		}
+		out["tls"] = tls
+	}
+	return out, nil
+}
+
+func resolveManualNodeIdentity(item parser.OutboundItem, idx int, used map[string]struct{}) (string, string) {
+	tag := strings.TrimSpace(item.Tag)
+	if tag == "" {
+		var payload map[string]any
+		if err := json.Unmarshal(item.Raw, &payload); err == nil {
+			if rawTag, ok := payload["tag"].(string); ok {
+				tag = strings.TrimSpace(rawTag)
+			}
+		}
+	}
+	if tag == "" {
+		base := fmt.Sprintf("manual-%s", strings.TrimSpace(item.Type))
+		if base == "manual-" {
+			base = "manual-node"
+		}
+		tag = resolveUniqueTag(base, used)
+	}
+	name := tag
+	return tag, name
+}
+
+func resolveUniqueTag(base string, used map[string]struct{}) string {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		base = "manual-node"
+	}
+	if _, ok := used[base]; !ok {
+		return base
+	}
+	i := 2
+	for {
+		candidate := fmt.Sprintf("%s-%d", base, i)
+		if _, ok := used[candidate]; !ok {
+			return candidate
+		}
+		i++
+	}
 }

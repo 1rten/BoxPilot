@@ -2,6 +2,7 @@ package repo
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"boxpilot/server/internal/util/errorx"
@@ -169,4 +170,22 @@ func ListEnabledForwardingNodes(db *sql.DB) ([]NodeRow, error) {
 		list = append(list, r)
 	}
 	return list, rows.Err()
+}
+
+func CreateNode(db *sql.DB, row NodeRow) error {
+	_, err := db.Exec(
+		`INSERT INTO nodes (
+			id, sub_id, tag, name, type, enabled, forwarding_enabled, outbound_json, created_at, last_test_at, last_latency_ms, last_test_status, last_test_error
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL)`,
+		row.ID,
+		row.SubID,
+		strings.TrimSpace(row.Tag),
+		strings.TrimSpace(row.Name),
+		strings.TrimSpace(row.Type),
+		row.Enabled,
+		row.ForwardingEnabled,
+		row.OutboundJSON,
+		row.CreatedAt,
+	)
+	return err
 }

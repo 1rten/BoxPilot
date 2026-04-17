@@ -6,6 +6,11 @@ import (
 	"database/sql"
 )
 
+const (
+	ManualSubscriptionID   = "local-manual"
+	ManualSubscriptionName = "Manual Nodes"
+)
+
 type SubscriptionRow struct {
 	ID                 string
 	Name               string
@@ -206,5 +211,22 @@ func EnsureSubscriptionExists(db *sql.DB, id string) error {
 	if err == sql.ErrNoRows {
 		return errorx.New(errorx.SUBNotFound, "subscription not found").WithDetails(map[string]any{"id": id})
 	}
+	return err
+}
+
+func EnsureManualSubscription(db *sql.DB) error {
+	now := util.NowRFC3339()
+	_, err := db.Exec(
+		`INSERT INTO subscriptions (
+			id, name, url, type, enabled, auto_update_enabled, refresh_interval_sec, etag, last_modified, created_at, updated_at
+		) VALUES (?, ?, ?, ?, 1, 0, 0, '', '', ?, ?)
+		ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at`,
+		ManualSubscriptionID,
+		ManualSubscriptionName,
+		"manual://local",
+		"singbox",
+		now,
+		now,
+	)
 	return err
 }

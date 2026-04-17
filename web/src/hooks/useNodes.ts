@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { Node } from "../api/types";
+import type { ManualNodeCreateData, ManualNodeCreateMode, ManualNodeFormInput, Node } from "../api/types";
 import { useToast } from "../components/common/ToastContext";
 import { useI18n } from "../i18n/context";
 import { notifyAutoReloadQueuedIfRunning } from "./notifyAutoReload";
@@ -119,6 +119,41 @@ export function useBatchForwarding() {
         anyErr?.message ||
         tr("toast.unknown", "Unknown error");
       addToast("error", tr("toast.forwarding.batch_failed", "Batch forwarding update failed: {message}", { message }));
+    },
+  });
+}
+
+export function useCreateManualNode() {
+  const { tr } = useI18n();
+  const q = useQueryClient();
+  const { addToast } = useToast();
+  return useMutation({
+    mutationFn: async (body: {
+      mode: ManualNodeCreateMode;
+      raw_input?: string;
+      form?: ManualNodeFormInput;
+    }) => {
+      const { data } = await api.post<{ data: ManualNodeCreateData }>("/nodes/create-manual", body);
+      return data.data;
+    },
+    onSuccess: (result) => {
+      q.invalidateQueries({ queryKey: ["nodes"] });
+      q.invalidateQueries({ queryKey: ["runtime-groups"] });
+      q.invalidateQueries({ queryKey: ["runtime-status"] });
+      q.invalidateQueries({ queryKey: ["runtime-connections"] });
+      q.invalidateQueries({ queryKey: ["runtime-logs"] });
+      q.invalidateQueries({ queryKey: ["runtime-traffic"] });
+      addToast("success", tr("toast.node.created_manual", "Created {count} manual node(s)", { count: result.count }));
+      void notifyAutoReloadQueuedIfRunning(q, addToast, tr);
+    },
+    onError: (error: unknown) => {
+      const anyErr = error as any;
+      const message =
+        anyErr?.appError?.message ||
+        anyErr?.response?.data?.error?.message ||
+        anyErr?.message ||
+        tr("toast.unknown", "Unknown error");
+      addToast("error", tr("toast.node.create_manual_failed", "Create manual node failed: {message}", { message }));
     },
   });
 }

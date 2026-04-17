@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useBatchForwarding, useNodes, useUpdateNode, useTestNodes } from "../hooks/useNodes";
+import {
+  useBatchForwarding,
+  useCreateManualNode,
+  useNodes,
+  useUpdateNode,
+  useTestNodes,
+} from "../hooks/useNodes";
 import { useSubscriptions } from "../hooks/useSubscriptions";
 import { ErrorState } from "../components/common/ErrorState";
 import { EmptyState } from "../components/common/EmptyState";
@@ -13,9 +19,9 @@ import {
   SwapOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Drawer, Input, Popconfirm, Table, Tag, Tooltip } from "antd";
+import { Button, Card, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Select, Table, Tag, Tooltip } from "antd";
 import type { ColumnsType, TableRowSelection } from "antd/es/table/interface";
-import type { Node } from "../api/types";
+import type { ManualNodeFormInput, Node } from "../api/types";
 import { useI18n } from "../i18n/context";
 
 export default function Nodes() {
@@ -23,6 +29,7 @@ export default function Nodes() {
   const { data: list, isLoading, error, refetch } = useNodes({});
   const { data: subscriptions } = useSubscriptions();
   const update = useUpdateNode();
+  const createManualNode = useCreateManualNode();
   const testNodes = useTestNodes();
   const batchForwarding = useBatchForwarding();
   const [search, setSearch] = useState("");
@@ -33,6 +40,10 @@ export default function Nodes() {
   const [testMenuOpen, setTestMenuOpen] = useState(false);
   const [forwardingMenuOpen, setForwardingMenuOpen] = useState(false);
   const [rowTestingId, setRowTestingId] = useState<string | null>(null);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [manualMode, setManualMode] = useState<"form" | "json" | "uri">("uri");
+  const [manualRawInput, setManualRawInput] = useState("");
+  const [manualForm] = Form.useForm<ManualNodeFormInput>();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const allNodeIDs = useMemo(() => (list ?? []).map((n) => n.id), [list]);
@@ -93,6 +104,9 @@ export default function Nodes() {
           </p>
         </div>
         <div className="bp-page-actions bp-page-actions--header">
+          <Button type="primary" className="bp-btn-fixed" onClick={() => setManualModalOpen(true)}>
+            {tr("nodes.manual.add", "Add Manual Node")}
+          </Button>
           <Button
             type="primary"
             className="bp-btn-fixed bp-btn-test-selected"
@@ -360,6 +374,117 @@ export default function Nodes() {
           </div>
         )}
       </Drawer>
+
+      <Modal
+        title={tr("nodes.manual.modal.title", "Add Manual Node")}
+        open={manualModalOpen}
+        onCancel={() => {
+          setManualModalOpen(false);
+        }}
+        onOk={() => void submitManualCreate()}
+        okButtonProps={{ loading: createManualNode.isPending }}
+        okText={tr("nodes.manual.submit", "Create")}
+        cancelText={tr("common.cancel", "Cancel")}
+        width={680}
+      >
+        <div style={{ display: "grid", gap: 12 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Button
+              type={manualMode === "uri" ? "primary" : "default"}
+              onClick={() => setManualMode("uri")}
+              size="small"
+            >
+              {tr("nodes.manual.mode.uri", "URI Links")}
+            </Button>
+            <Button
+              type={manualMode === "json" ? "primary" : "default"}
+              onClick={() => setManualMode("json")}
+              size="small"
+            >
+              {tr("nodes.manual.mode.json", "Outbound JSON")}
+            </Button>
+            <Button
+              type={manualMode === "form" ? "primary" : "default"}
+              onClick={() => setManualMode("form")}
+              size="small"
+            >
+              {tr("nodes.manual.mode.form", "Basic Form")}
+            </Button>
+          </div>
+          {manualMode === "form" ? (
+            <Form
+              form={manualForm}
+              layout="vertical"
+              initialValues={{ type: "vless", server_port: 443, tls_enabled: true, utls_fingerprint: "chrome" }}
+            >
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <Form.Item
+                  name="type"
+                  label={tr("nodes.manual.form.type", "Protocol")}
+                  rules={[{ required: true, message: tr("nodes.manual.form.type.required", "Protocol is required") }]}
+                >
+                  <Select
+                    options={[
+                      { value: "vless", label: "VLESS" },
+                      { value: "vmess", label: "VMESS" },
+                      { value: "trojan", label: "Trojan" },
+                      { value: "shadowsocks", label: "Shadowsocks" },
+                      { value: "http", label: "HTTP" },
+                      { value: "socks", label: "SOCKS" },
+                    ]}
+                  />
+                </Form.Item>
+                <Form.Item name="tag" label={tr("nodes.manual.form.tag", "Tag (optional)")}>
+                  <Input placeholder="manual-vless-01" />
+                </Form.Item>
+                <Form.Item
+                  name="server"
+                  label={tr("nodes.manual.form.server", "Server")}
+                  rules={[{ required: true, message: tr("nodes.manual.form.server.required", "Server is required") }]}
+                >
+                  <Input placeholder="example.com" />
+                </Form.Item>
+                <Form.Item
+                  name="server_port"
+                  label={tr("nodes.manual.form.port", "Port")}
+                  rules={[{ required: true, message: tr("nodes.manual.form.port.required", "Port is required") }]}
+                >
+                  <InputNumber min={1} max={65535} style={{ width: "100%" }} />
+                </Form.Item>
+                <Form.Item name="uuid" label="UUID">
+                  <Input />
+                </Form.Item>
+                <Form.Item name="password" label={tr("nodes.manual.form.password", "Password")}>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="tls_server_name" label="SNI">
+                  <Input placeholder="www.microsoft.com" />
+                </Form.Item>
+                <Form.Item name="utls_fingerprint" label={tr("nodes.manual.form.fingerprint", "Fingerprint")}>
+                  <Input placeholder="chrome" />
+                </Form.Item>
+              </div>
+            </Form>
+          ) : (
+            <Input.TextArea
+              rows={10}
+              value={manualRawInput}
+              onChange={(e) => setManualRawInput(e.target.value)}
+              placeholder={
+                manualMode === "uri"
+                  ? tr("nodes.manual.uri.placeholder", "Paste one or more links, one per line...")
+                  : tr("nodes.manual.json.placeholder", "Paste sing-box outbound JSON or array...")
+              }
+            />
+          )}
+          <p className="bp-muted" style={{ margin: 0 }}>
+            {tr(
+              "nodes.manual.hint",
+              "Created nodes are enabled for forwarding and will appear in Manual Fallback Group.",
+            )}
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 
@@ -401,6 +526,22 @@ export default function Nodes() {
     } finally {
       setRowTestingId(null);
     }
+  }
+
+  async function submitManualCreate() {
+    if (manualMode === "form") {
+      const values = await manualForm.validateFields();
+      await createManualNode.mutateAsync({ mode: "form", form: values });
+    } else {
+      const payload = manualRawInput.trim();
+      if (!payload) {
+        return;
+      }
+      await createManualNode.mutateAsync({ mode: manualMode, raw_input: payload });
+    }
+    setManualModalOpen(false);
+    setManualRawInput("");
+    manualForm.resetFields();
   }
 }
 

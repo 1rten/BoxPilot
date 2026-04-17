@@ -33,6 +33,7 @@ func Router(db *sql.DB) *gin.Engine {
 
 		node := &handlers.Nodes{DB: db}
 		v1.GET("/nodes", node.List)
+		v1.POST("/nodes/create-manual", node.CreateManual)
 		v1.POST("/nodes/update", node.Update)
 		v1.POST("/nodes/forwarding/batch", node.BatchForwarding)
 		v1.POST("/nodes/test", node.Test)

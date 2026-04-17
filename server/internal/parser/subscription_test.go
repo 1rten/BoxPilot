@@ -24,6 +24,38 @@ func TestParseSubscription_TraditionalURIList(t *testing.T) {
 	assertHasType(t, out, "trojan")
 }
 
+func TestParseSubscription_VLESSRealityURI(t *testing.T) {
+	payload := "vless://23b2a4d9-f79b-4dab-95ba-a830bbf3319e@209.141.45.135:21883?type=tcp&encryption=none&security=reality&pbk=xcyhfdC14W9c5hlqMx0rAkhpQBBEBTtuVi1dLLOcMjs&fp=chrome&sni=www.microsoft.com&sid=5a9f0379&spx=%2F#BuyVM-LV-Reality"
+	out, err := ParseSubscription([]byte(payload))
+	if err != nil {
+		t.Fatalf("ParseSubscription returned error: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected one outbound, got %d", len(out))
+	}
+	var m map[string]any
+	if err := json.Unmarshal(out[0].Raw, &m); err != nil {
+		t.Fatalf("unmarshal outbound failed: %v", err)
+	}
+	tls, ok := m["tls"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected tls config in outbound: %+v", m)
+	}
+	if enabled, _ := tls["enabled"].(bool); !enabled {
+		t.Fatalf("expected tls.enabled=true, got %+v", tls["enabled"])
+	}
+	reality, ok := tls["reality"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected tls.reality in outbound: %+v", tls)
+	}
+	if got := reality["public_key"]; got != "xcyhfdC14W9c5hlqMx0rAkhpQBBEBTtuVi1dLLOcMjs" {
+		t.Fatalf("unexpected reality public key: %v", got)
+	}
+	if got := reality["short_id"]; got != "5a9f0379" {
+		t.Fatalf("unexpected reality short_id: %v", got)
+	}
+}
+
 func TestParseSubscription_SingboxPlainAndBase64(t *testing.T) {
 	singbox := `{
 	  "outbounds": [
