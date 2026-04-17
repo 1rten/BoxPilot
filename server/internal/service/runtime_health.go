@@ -21,10 +21,10 @@ const (
 	// maximum time we will poll before declaring the runtime unhealthy.
 	// sing-box must load ruleset files (several MB) before binding ports, which
 	// can take 3-10 s on constrained hardware and occasionally longer under
-	// heavy I/O or cold cache conditions. 80 × 300 ms = 24 s reduces false
+	// heavy I/O or cold cache conditions. 120 × 300 ms = 36 s reduces false
 	// rollback on slow starts while still bounding detection time.
 	runtimeHealthWaitStep  = 300 * time.Millisecond
-	runtimeHealthWaitSteps = 80
+	runtimeHealthWaitSteps = 120
 )
 
 type RuntimeHealth struct {
