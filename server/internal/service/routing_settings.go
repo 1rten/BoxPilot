@@ -25,6 +25,7 @@ func LoadRoutingSettings(db *sql.DB) (generator.RoutingSettings, string, error) 
 		BypassPrivateEnabled: row.BypassPrivateEnabled == 1,
 		BypassDomains:        decodeStringArray(row.BypassDomainsJSON, def.BypassDomains),
 		BypassCIDRs:          decodeStringArray(row.BypassCIDRsJSON, def.BypassCIDRs),
+		ListenerReadyMaxMs:   row.ListenerReadyMaxMs,
 	}
 	normalized, err := NormalizeRoutingSettings(settings)
 	if err != nil {
@@ -45,6 +46,7 @@ func SaveRoutingSettings(db *sql.DB, settings generator.RoutingSettings) (genera
 		BypassPrivateEnabled: boolToInt(normalized.BypassPrivateEnabled),
 		BypassDomainsJSON:    string(domainsJSON),
 		BypassCIDRsJSON:      string(cidrsJSON),
+		ListenerReadyMaxMs:   normalized.ListenerReadyMaxMs,
 		UpdatedAt:            updatedAt,
 	})
 	if err != nil {
@@ -63,10 +65,15 @@ func NormalizeRoutingSettings(settings generator.RoutingSettings) (generator.Rou
 			})
 		}
 	}
+	maxMs := settings.ListenerReadyMaxMs
+	if maxMs != 0 && (maxMs < 5000 || maxMs > 300000) {
+		return generator.RoutingSettings{}, errorx.New(errorx.REQInvalidField, "listener_ready_max_ms must be 0 or between 5000 and 300000")
+	}
 	return generator.RoutingSettings{
 		BypassPrivateEnabled: settings.BypassPrivateEnabled,
 		BypassDomains:        domains,
 		BypassCIDRs:          cidrs,
+		ListenerReadyMaxMs:   maxMs,
 	}, nil
 }
 

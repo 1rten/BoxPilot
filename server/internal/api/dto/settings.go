@@ -51,6 +51,7 @@ type RoutingSettingsData struct {
 	BypassPrivateEnabled bool     `json:"bypass_private_enabled"`
 	BypassDomains        []string `json:"bypass_domains"`
 	BypassCIDRs          []string `json:"bypass_cidrs"`
+	ListenerReadyMaxMs   int      `json:"listener_ready_max_ms"`
 	UpdatedAt            string   `json:"updated_at,omitempty"`
 }
 
@@ -58,6 +59,7 @@ type UpdateRoutingSettingsRequest struct {
 	BypassPrivateEnabled *bool    `json:"bypass_private_enabled"`
 	BypassDomains        []string `json:"bypass_domains"`
 	BypassCIDRs          []string `json:"bypass_cidrs"`
+	ListenerReadyMaxMs   int      `json:"listener_ready_max_ms"`
 }
 
 type RoutingSummaryResponse struct {

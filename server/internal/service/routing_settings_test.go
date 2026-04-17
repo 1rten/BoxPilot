@@ -38,3 +38,28 @@ func TestNormalizeRoutingSettings_InvalidCIDR(t *testing.T) {
 		t.Fatalf("expected invalid CIDR message, got %v", err)
 	}
 }
+
+func TestNormalizeRoutingSettings_ListenerReadyMaxMsRange(t *testing.T) {
+	got, err := NormalizeRoutingSettings(generator.RoutingSettings{
+		BypassPrivateEnabled: true,
+		BypassDomains:        []string{"localhost"},
+		BypassCIDRs:          []string{"10.0.0.0/8"},
+		ListenerReadyMaxMs:   120000,
+	})
+	if err != nil {
+		t.Fatalf("NormalizeRoutingSettings returned error: %v", err)
+	}
+	if got.ListenerReadyMaxMs != 120000 {
+		t.Fatalf("unexpected listener_ready_max_ms: %d", got.ListenerReadyMaxMs)
+	}
+
+	_, err = NormalizeRoutingSettings(generator.RoutingSettings{
+		BypassPrivateEnabled: true,
+		BypassDomains:        []string{"localhost"},
+		BypassCIDRs:          []string{"10.0.0.0/8"},
+		ListenerReadyMaxMs:   4000,
+	})
+	if err == nil {
+		t.Fatalf("expected error for out-of-range listener_ready_max_ms")
+	}
+}

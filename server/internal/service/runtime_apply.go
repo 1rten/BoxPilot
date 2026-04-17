@@ -23,6 +23,7 @@ func applyConfigWithPreflight(
 	cfg []byte,
 	httpProxy generator.ProxyInbound,
 	socksProxy generator.ProxyInbound,
+	listenerReadyMaxMs int,
 ) ([]byte, error) {
 	configPath = strings.TrimSpace(configPath)
 	if configPath == "" {
@@ -74,7 +75,7 @@ func applyConfigWithPreflight(
 
 	restartOut, restartErr := runtime.Restart(ctx, configPath)
 	if restartErr == nil {
-		restartErr = WaitForRuntimeReady(ctx, httpProxy, socksProxy)
+		restartErr = WaitForRuntimeReady(ctx, httpProxy, socksProxy, listenerReadyMaxMs)
 	}
 	if restartErr == nil {
 		_ = saveLastKnownGoodConfig(configPath, cfg)
@@ -106,7 +107,7 @@ func applyConfigWithPreflight(
 
 	rollbackOut, rollbackErr := runtime.Restart(ctx, configPath)
 	if rollbackErr == nil {
-		rollbackErr = WaitForRuntimeReady(ctx, httpProxy, socksProxy)
+		rollbackErr = WaitForRuntimeReady(ctx, httpProxy, socksProxy, listenerReadyMaxMs)
 	}
 	if rollbackErr != nil {
 		return joinOutputs(restartOut, rollbackOut), errorx.New(errorx.CFGRollbackFailed, "restart failed and rollback restart failed: "+rollbackErr.Error()).WithDetails(map[string]any{
@@ -194,6 +195,16 @@ func appendRestartOutputSummary(err error, suffix string) string {
 					summary = summary[:180] + "..."
 				}
 				base += " [restart_output: " + summary + "]"
+			}
+		}
+		if raw, ok := appErr.Details["listener_errors"].(string); ok {
+			summary := strings.TrimSpace(raw)
+			if summary != "" {
+				summary = strings.ReplaceAll(summary, "\n", " ")
+				if len(summary) > 220 {
+					summary = summary[:220] + "..."
+				}
+				base += " [listener_errors: " + summary + "]"
 			}
 		}
 	}

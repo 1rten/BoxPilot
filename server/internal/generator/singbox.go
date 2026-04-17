@@ -31,6 +31,7 @@ type RoutingSettings struct {
 	BypassPrivateEnabled bool
 	BypassDomains        []string
 	BypassCIDRs          []string
+	ListenerReadyMaxMs   int
 }
 
 type NodeOutbound struct {
@@ -77,6 +78,7 @@ func DefaultRoutingSettings() RoutingSettings {
 			"fc00::/7",
 			"fe80::/10",
 		},
+		ListenerReadyMaxMs: 0,
 	}
 }
 

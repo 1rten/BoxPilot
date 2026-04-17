@@ -144,6 +144,7 @@ func (h *Settings) GetRoutingSettings(c *gin.Context) {
 			BypassPrivateEnabled: settings.BypassPrivateEnabled,
 			BypassDomains:        settings.BypassDomains,
 			BypassCIDRs:          settings.BypassCIDRs,
+			ListenerReadyMaxMs:   settings.ListenerReadyMaxMs,
 			UpdatedAt:            updatedAt,
 		},
 	})
@@ -163,6 +164,7 @@ func (h *Settings) UpdateRoutingSettings(c *gin.Context) {
 		BypassPrivateEnabled: *req.BypassPrivateEnabled,
 		BypassDomains:        req.BypassDomains,
 		BypassCIDRs:          req.BypassCIDRs,
+		ListenerReadyMaxMs:   req.ListenerReadyMaxMs,
 	})
 	if err != nil {
 		if appErr, ok := err.(*errorx.AppError); ok {
@@ -177,6 +179,7 @@ func (h *Settings) UpdateRoutingSettings(c *gin.Context) {
 			BypassPrivateEnabled: saved.BypassPrivateEnabled,
 			BypassDomains:        saved.BypassDomains,
 			BypassCIDRs:          saved.BypassCIDRs,
+			ListenerReadyMaxMs:   saved.ListenerReadyMaxMs,
 			UpdatedAt:            updatedAt,
 		},
 	})

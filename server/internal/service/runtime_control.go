@@ -42,7 +42,7 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 		prevHash = prevRow.ConfigHash
 	}
 
-	out, err := applyConfigWithPreflight(ctx, configPath, cfg, expectedHTTPProxy, expectedSocksProxy)
+	out, err := applyConfigWithPreflight(ctx, configPath, cfg, expectedHTTPProxy, expectedSocksProxy, routing.ListenerReadyMaxMs)
 	durationMs := int(time.Since(startedAt).Milliseconds())
 	if durationMs < 0 {
 		durationMs = 0

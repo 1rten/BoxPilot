@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -17,15 +18,44 @@ const (
 	// listener for too long.
 	runtimeHealthDialTimeout = 500 * time.Millisecond
 
-	// runtimeHealthWaitStep / runtimeHealthWaitSteps together determine the
-	// maximum time we will poll before declaring the runtime unhealthy.
-	// sing-box must load ruleset files (several MB) before binding ports, which
-	// can take 3-10 s on constrained hardware and occasionally longer under
-	// heavy I/O or cold cache conditions. 120 × 300 ms = 36 s reduces false
-	// rollback on slow starts while still bounding detection time.
-	runtimeHealthWaitStep  = 300 * time.Millisecond
-	runtimeHealthWaitSteps = 120
+	// runtimeHealthWaitStep determines the poll interval while waiting for
+	// sing-box to bind HTTP/SOCKS inbounds after restart.
+	runtimeHealthWaitStep = 300 * time.Millisecond
+
+	// defaultRuntimeHealthMaxWait is used when BOXPILOT_RUNTIME_LISTENER_READY_MAX_MS
+	// is unset. sing-box may download large rule-sets before binding ports (120 × 300ms = 36s).
+	defaultRuntimeHealthMaxWait = 120 * 300 * time.Millisecond
 )
+
+func runtimeHealthMaxWait(overrideMs int) time.Duration {
+	if overrideMs >= 5000 && overrideMs <= 300000 {
+		return time.Duration(overrideMs) * time.Millisecond
+	}
+	// 120 × 300ms = 36s by default; override for slow disks (e.g. BOXPILOT_RUNTIME_LISTENER_READY_MAX_MS=120000).
+	const minMs = 5000
+	const maxMs = 300000
+	s := strings.TrimSpace(os.Getenv("BOXPILOT_RUNTIME_LISTENER_READY_MAX_MS"))
+	if s == "" {
+		return defaultRuntimeHealthMaxWait
+	}
+	ms, err := strconv.Atoi(s)
+	if err != nil || ms < minMs {
+		return defaultRuntimeHealthMaxWait
+	}
+	if ms > maxMs {
+		ms = maxMs
+	}
+	return time.Duration(ms) * time.Millisecond
+}
+
+func runtimeHealthWaitSteps(overrideMs int) int {
+	maxWait := runtimeHealthMaxWait(overrideMs)
+	n := int(maxWait / runtimeHealthWaitStep)
+	if n < 10 {
+		return 10
+	}
+	return n
+}
 
 type RuntimeHealth struct {
 	ListenerErrors []string
@@ -49,19 +79,23 @@ func (h RuntimeHealth) ListenerError() error {
 	if len(h.ListenerErrors) == 0 {
 		return nil
 	}
-	return errorx.New(errorx.RTRestartFailed, strings.Join(h.ListenerErrors, "; "))
+	full := strings.Join(h.ListenerErrors, "; ")
+	return errorx.New(errorx.RTRestartFailed, "runtime listener startup timeout").WithDetails(map[string]any{
+		"listener_errors": full,
+	})
 }
 
-func WaitForRuntimeReady(ctx context.Context, httpProxy, socksProxy generator.ProxyInbound) error {
+func WaitForRuntimeReady(ctx context.Context, httpProxy, socksProxy generator.ProxyInbound, overrideMs int) error {
 	var lastErr error
-	for attempt := 0; attempt < runtimeHealthWaitSteps; attempt++ {
+	steps := runtimeHealthWaitSteps(overrideMs)
+	for attempt := 0; attempt < steps; attempt++ {
 		health := ObserveRuntimeHealth(ctx, httpProxy, socksProxy)
 		if err := health.ListenerError(); err == nil {
 			return nil
 		} else {
 			lastErr = err
 		}
-		if attempt == runtimeHealthWaitSteps-1 {
+		if attempt == steps-1 {
 			break
 		}
 		select {
