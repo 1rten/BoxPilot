@@ -429,6 +429,7 @@ export default function Nodes() {
                       { value: "vmess", label: "VMESS" },
                       { value: "trojan", label: "Trojan" },
                       { value: "shadowsocks", label: "Shadowsocks" },
+                      { value: "hysteria2", label: "Hysteria2" },
                       { value: "http", label: "HTTP" },
                       { value: "socks", label: "SOCKS" },
                     ]}
@@ -451,11 +452,58 @@ export default function Nodes() {
                 >
                   <InputNumber min={1} max={65535} style={{ width: "100%" }} />
                 </Form.Item>
-                <Form.Item name="uuid" label="UUID">
-                  <Input />
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prev, curr) => prev.type !== curr.type}
+                >
+                  {({ getFieldValue }) => {
+                    const type = getFieldValue("type");
+                    if (type === "vless" || type === "vmess") {
+                      return (
+                        <Form.Item name="uuid" label="UUID" rules={[{ required: true }]}>
+                          <Input />
+                        </Form.Item>
+                      );
+                    }
+                    return null;
+                  }}
                 </Form.Item>
-                <Form.Item name="password" label={tr("nodes.manual.form.password", "Password")}>
-                  <Input />
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prev, curr) => prev.type !== curr.type}
+                >
+                  {({ getFieldValue }) => {
+                    const type = getFieldValue("type");
+                    if (type === "trojan" || type === "shadowsocks" || type === "hysteria2") {
+                      return (
+                        <Form.Item name="password" label={tr("nodes.manual.form.password", "Password")} rules={[{ required: true }]}>
+                          <Input />
+                        </Form.Item>
+                      );
+                    }
+                    return null;
+                  }}
+                </Form.Item>
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prev, curr) => prev.type !== curr.type}
+                >
+                  {({ getFieldValue }) => {
+                    const type = getFieldValue("type");
+                    if (type === "hysteria2") {
+                      return (
+                        <>
+                          <Form.Item name="hysteria2_up_mbps" label="Up Mbps">
+                            <InputNumber min={0} style={{ width: "100%" }} />
+                          </Form.Item>
+                          <Form.Item name="hysteria2_down_mbps" label="Down Mbps">
+                            <InputNumber min={0} style={{ width: "100%" }} />
+                          </Form.Item>
+                        </>
+                      );
+                    }
+                    return null;
+                  }}
                 </Form.Item>
                 <Form.Item name="tls_server_name" label="SNI">
                   <Input placeholder="www.microsoft.com" />

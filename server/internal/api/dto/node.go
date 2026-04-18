@@ -49,9 +49,11 @@ type ManualNodeFormInput struct {
 	TLSServerName    string `json:"tls_server_name"`
 	TLSInsecure      bool   `json:"tls_insecure"`
 	RealityPublicKey string `json:"reality_public_key"`
-	RealityShortID   string `json:"reality_short_id"`
-	RealitySpiderX   string `json:"reality_spider_x"`
-	UTLSFingerprint  string `json:"utls_fingerprint"`
+	RealityShortID    string `json:"reality_short_id"`
+	RealitySpiderX    string `json:"reality_spider_x"`
+	UTLSFingerprint   string `json:"utls_fingerprint"`
+	Hysteria2UpMbps   int    `json:"hysteria2_up_mbps"`
+	Hysteria2DownMbps int    `json:"hysteria2_down_mbps"`
 }
 
 type ManualNodeCreateResponse struct {

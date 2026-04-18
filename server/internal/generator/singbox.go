@@ -118,7 +118,7 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 		var m map[string]any
 		if err := json.Unmarshal([]byte(raw), &m); err == nil {
 			typ := strings.ToLower(fmt.Sprintf("%v", m["type"]))
-			if typ == "vless" || typ == "vmess" || typ == "trojan" || typ == "shadowsocks" {
+			if typ == "vless" || typ == "vmess" || typ == "trojan" || typ == "shadowsocks" || typ == "hysteria2" {
 				m["tcp_fast_open"] = true
 				m["domain_strategy"] = "ipv4_only"
 			}

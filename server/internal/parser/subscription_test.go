@@ -56,6 +56,38 @@ func TestParseSubscription_VLESSRealityURI(t *testing.T) {
 	}
 }
 
+func TestParseSubscription_Hysteria2URI(t *testing.T) {
+	payload := "hysteria2://mypassword@example.com:443/?sni=www.bing.com&obfs=salamander&obfs-password=obfspass&up=100&down=100#hy2-node"
+	out, err := ParseSubscription([]byte(payload))
+	if err != nil {
+		t.Fatalf("ParseSubscription returned error: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected one outbound, got %d", len(out))
+	}
+	var m map[string]any
+	if err := json.Unmarshal(out[0].Raw, &m); err != nil {
+		t.Fatalf("unmarshal outbound failed: %v", err)
+	}
+	if m["type"] != "hysteria2" {
+		t.Fatalf("expected hysteria2 type, got %v", m["type"])
+	}
+	if m["password"] != "mypassword" {
+		t.Fatalf("expected password mypassword, got %v", m["password"])
+	}
+	if m["up_mbps"].(float64) != 100 {
+		t.Fatalf("expected up_mbps 100, got %v", m["up_mbps"])
+	}
+	obfs := m["obfs"].(map[string]any)
+	if obfs["type"] != "salamander" {
+		t.Fatalf("expected obfs type salamander, got %v", obfs["type"])
+	}
+	tls := m["tls"].(map[string]any)
+	if tls["server_name"] != "www.bing.com" {
+		t.Fatalf("expected sni www.bing.com, got %v", tls["server_name"])
+	}
+}
+
 func TestParseSubscription_SingboxPlainAndBase64(t *testing.T) {
 	singbox := `{
 	  "outbounds": [

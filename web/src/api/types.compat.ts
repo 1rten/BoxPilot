@@ -59,6 +59,8 @@ export type ManualNodeFormInput = {
   reality_short_id?: string;
   reality_spider_x?: string;
   utls_fingerprint?: string;
+  hysteria2_up_mbps?: number;
+  hysteria2_down_mbps?: number;
 };
 
 export type ManualNodeCreateData = {

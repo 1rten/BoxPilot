@@ -719,6 +719,17 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 		if strings.TrimSpace(form.Password) != "" {
 			out["password"] = strings.TrimSpace(form.Password)
 		}
+	case "hysteria2":
+		if strings.TrimSpace(form.Password) == "" {
+			return nil, errorx.New(errorx.REQMissingField, "form.password required")
+		}
+		out["password"] = strings.TrimSpace(form.Password)
+		if form.Hysteria2UpMbps > 0 {
+			out["up_mbps"] = form.Hysteria2UpMbps
+		}
+		if form.Hysteria2DownMbps > 0 {
+			out["down_mbps"] = form.Hysteria2DownMbps
+		}
 	default:
 		return nil, errorx.New(errorx.REQInvalidField, fmt.Sprintf("unsupported form.type: %s", typ))
 	}

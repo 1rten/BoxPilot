@@ -778,8 +778,35 @@ func clashProxyToOutbound(proxy map[string]any) (*OutboundItem, error) {
 		}
 		attachTransport(out, proxy)
 		attachTLS(out, proxy)
+		return mapToItem(out), nil
+	case "hysteria2":
+		password := toString(proxy["password"])
+		if password == "" {
+			return nil, nil
+		}
+		out := map[string]any{
+			"type":        "hysteria2",
+			"tag":         tag,
+			"server":      server,
+			"server_port": port,
+			"password":    password,
+		}
+		if up := toInt(proxy["up"]); up > 0 {
+			out["up_mbps"] = up
+		}
+		if down := toInt(proxy["down"]); down > 0 {
+			out["down_mbps"] = down
+		}
+		if obfs := toString(proxy["obfs"]); obfs != "" {
+			out["obfs"] = map[string]any{
+				"type":     obfs,
+				"password": toString(proxy["obfs-password"]),
+			}
+		}
+		attachTLS(out, proxy)
 		ensureTLSEnabled(out)
 		return mapToItem(out), nil
+	case "http", "socks":
 	case "http", "https":
 		out := map[string]any{
 			"type":        "http",
@@ -890,6 +917,9 @@ func parseTraditionalURI(line string) (*OutboundItem, bool) {
 		return item, ok
 	case strings.HasPrefix(lower, "ss://"):
 		item, ok := parseShadowsocksURI(line)
+		return item, ok
+	case strings.HasPrefix(lower, "hysteria2://") || strings.HasPrefix(lower, "hy2://"):
+		item, ok := parseHysteria2URI(line)
 		return item, ok
 	case strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://"):
 		item, ok := parseHTTPURI(line)
@@ -1011,6 +1041,57 @@ func parseTrojanURI(link string) (*OutboundItem, bool) {
 	}
 	attachTransportFromQuery(out, u.Query())
 	attachTLSFromQuery(out, u.Query())
+	ensureTLSEnabled(out)
+	return mapToItem(out), true
+}
+
+func parseHysteria2URI(link string) (*OutboundItem, bool) {
+	u, err := url.Parse(link)
+	if err != nil {
+		return nil, true
+	}
+	password := ""
+	if u.User != nil {
+		password = u.User.Username()
+	}
+	server := u.Hostname()
+	portStr := u.Port()
+	if portStr == "" {
+		portStr = "443"
+	}
+	port, _ := strconv.Atoi(portStr)
+	if server == "" || port <= 0 {
+		return nil, true
+	}
+	out := map[string]any{
+		"type":        "hysteria2",
+		"tag":         fragmentTag(u.Fragment),
+		"server":      server,
+		"server_port": port,
+	}
+	if password != "" {
+		out["password"] = password
+	}
+
+	q := u.Query()
+	if up := q.Get("up"); up != "" {
+		if v, err := strconv.Atoi(up); err == nil {
+			out["up_mbps"] = v
+		}
+	}
+	if down := q.Get("down"); down != "" {
+		if v, err := strconv.Atoi(down); err == nil {
+			out["down_mbps"] = v
+		}
+	}
+	if obfs := q.Get("obfs"); obfs != "" {
+		out["obfs"] = map[string]any{
+			"type":     obfs,
+			"password": q.Get("obfs-password"),
+		}
+	}
+
+	attachTLSFromQuery(out, q)
 	ensureTLSEnabled(out)
 	return mapToItem(out), true
 }
