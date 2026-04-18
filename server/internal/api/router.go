@@ -17,7 +17,7 @@ import (
 // Router returns the HTTP router.
 func Router(db *sql.DB) *gin.Engine {
 	r := gin.New()
-	r.Use(middleware.Recover(), middleware.RequestID(), middleware.CORS())
+	r.Use(gin.Logger(), middleware.Recover(), middleware.RequestID(), middleware.CORS())
 
 	sys := &handlers.System{}
 	r.GET("/healthz", sys.Healthz)

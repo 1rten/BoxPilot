@@ -51,11 +51,12 @@ func applyConfigWithPreflight(
 			"err":  err.Error(),
 		})
 	}
-	defer func() { _ = os.Remove(candidatePath) }()
+	// Removed defer Remove so user can inspect on failure.
 
 	if _, err := runtime.Check(ctx, candidatePath); err != nil {
 		return nil, err
 	}
+	_ = os.Remove(candidatePath) // Clean up only on success.
 
 	prevConfig, prevErr := os.ReadFile(configPath)
 	hadPrevConfig := prevErr == nil

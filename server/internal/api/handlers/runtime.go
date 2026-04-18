@@ -536,6 +536,7 @@ func (h *Runtime) SelectGroup(c *gin.Context) {
 }
 
 func (h *Runtime) Reload(c *gin.Context) {
+	log.Printf("[handlers.Runtime] Reload requested")
 	configPath := service.ResolveConfigPath()
 	v, hsh, out, err := service.Reload(c.Request.Context(), h.DB, configPath)
 	if err != nil {
