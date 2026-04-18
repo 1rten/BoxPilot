@@ -49,11 +49,12 @@ start_singbox() {
   i=0
   max_checks="${SINGBOX_STARTUP_PROBE_STEPS:-10}"
   while [ "$i" -lt "$max_checks" ]; do
-    if ! kill -0 "$pid" 2>/dev/null; then
+    if !kill -0 "$pid" 2>/dev/null; then
       echo "sing-box failed to stay running, see log: $LOG_PATH" >&2
-      tail -n 40 "$LOG_PATH" 2>/dev/null || true
+      tail -n 100 "$LOG_PATH" 2>/dev/null || true
       exit 1
     fi
+
     i=$((i + 1))
     sleep 0.1
   done

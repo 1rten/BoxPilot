@@ -295,6 +295,9 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 	}
 
 	cfg := map[string]any{
+		"log": map[string]any{
+			"level": "info",
+		},
 		"inbounds":  inbounds,
 		"outbounds": outbounds,
 		"route":     route,
