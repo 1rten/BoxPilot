@@ -806,7 +806,6 @@ func clashProxyToOutbound(proxy map[string]any) (*OutboundItem, error) {
 		attachTLS(out, proxy)
 		ensureTLSEnabled(out)
 		return mapToItem(out), nil
-	case "http", "socks":
 	case "http", "https":
 		out := map[string]any{
 			"type":        "http",
