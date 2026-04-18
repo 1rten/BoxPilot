@@ -277,8 +277,20 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 
 	dns := map[string]any{
 		"servers": []map[string]any{
-			{"tag": "dns-direct", "address": "223.5.5.5", "detour": "direct"},
-			{"tag": "dns-tencent", "address": "119.29.29.29", "detour": "direct"},
+			{
+				"tag":         "dns-direct",
+				"type":        "udp",
+				"server":      "223.5.5.5",
+				"server_port": 53,
+				"detour":      "direct",
+			},
+			{
+				"tag":         "dns-tencent",
+				"type":        "udp",
+				"server":      "119.29.29.29",
+				"server_port": 53,
+				"detour":      "direct",
+			},
 		},
 	}
 
