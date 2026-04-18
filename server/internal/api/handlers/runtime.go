@@ -57,8 +57,8 @@ type clashProxyState struct {
 var trafficSnapshot runtimeTrafficSnapshot
 
 const (
-	autoProbeTimeoutMS  = 5000
-	autoProbeAttempts   = 8
+	autoProbeTimeoutMS  = 10000
+	autoProbeAttempts   = 10
 	autoProbeInterval   = 350 * time.Millisecond
 	manualProbeAttempts = 3
 	manualProbeInterval = 250 * time.Millisecond
@@ -944,7 +944,12 @@ func probeProxyEndpoint(target *url.URL, proxyType string, row repo.ProxySetting
 
 func buildProxyHTTPClient(proxyType string, port int, timeout time.Duration) (*http.Client, func(), error) {
 	address := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+	dialer := &net.Dialer{
+		Timeout:   timeout,
+		KeepAlive: 30 * time.Second,
+	}
 	transport := &http.Transport{
+		DialContext:       dialer.DialContext,
 		ForceAttemptHTTP2: true,
 	}
 

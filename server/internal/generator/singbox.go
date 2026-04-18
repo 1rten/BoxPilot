@@ -3,6 +3,7 @@ package generator
 import (
 	"boxpilot/server/internal/util/errorx"
 	"encoding/json"
+	"fmt"
 	"os"
 	"sort"
 	"strconv"
@@ -112,7 +113,24 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 		if !json.Valid([]byte(raw)) {
 			continue
 		}
-		outbounds = append(outbounds, json.RawMessage(raw))
+
+		// Inject optimizations into the node outbound JSON
+		var m map[string]any
+		if err := json.Unmarshal([]byte(raw), &m); err == nil {
+			typ := strings.ToLower(fmt.Sprintf("%v", m["type"]))
+			if typ == "vless" || typ == "vmess" || typ == "trojan" || typ == "shadowsocks" {
+				m["tcp_fast_open"] = true
+				m["domain_strategy"] = "ipv4_only"
+			}
+			if optimized, err := json.Marshal(m); err == nil {
+				outbounds = append(outbounds, json.RawMessage(optimized))
+			} else {
+				outbounds = append(outbounds, json.RawMessage(raw))
+			}
+		} else {
+			outbounds = append(outbounds, json.RawMessage(raw))
+		}
+
 		tag := strings.TrimSpace(node.Tag)
 		if tag == "" {
 			tag = parseTagFromOutbound(raw)
