@@ -51,8 +51,16 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 	}
 	if err != nil {
 		if appErr, ok := err.(*errorx.AppError); ok {
+			// Log preflight or restart output if present
 			if detailOut, ok := appErr.Details["output"].(string); ok && detailOut != "" {
-				log.Printf("runtime reload preflight output:\n%s", detailOut)
+				log.Printf("runtime reload failure output:\n%s", detailOut)
+			}
+			// Log specific errors from nested rollback failures
+			if orig, ok := appErr.Details["original_err"].(string); ok {
+				log.Printf("original restart error: %s", orig)
+			}
+			if roll, ok := appErr.Details["rollback_err"].(string); ok {
+				log.Printf("rollback restart error: %s", roll)
 			}
 		}
 		_ = repo.UpdateRuntimeState(db, prevVersion, prevHash, err.Error(), len(tags), durationMs, false)
