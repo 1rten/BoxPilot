@@ -63,4 +63,32 @@ func TestFilterForwardingNodes(t *testing.T) {
 			t.Fatalf("expected all nodes, got %d", len(out))
 		}
 	})
+
+	t.Run("manual subscription untested passes healthy_only", func(t *testing.T) {
+		mixed := []repo.NodeRow{
+			{
+				ID:             "sub-untested",
+				SubID:          "other-sub",
+				LastTestStatus: sql.NullString{},
+			},
+			{
+				ID:             "manual-untested",
+				SubID:          repo.ManualSubscriptionID,
+				LastTestStatus: sql.NullString{},
+			},
+			{
+				ID:             "manual-error",
+				SubID:          repo.ManualSubscriptionID,
+				LastTestStatus: sql.NullString{String: "error", Valid: true},
+			},
+		}
+		out := FilterForwardingNodes(mixed, ForwardingPolicy{
+			HealthyOnlyEnabled: true,
+			MaxLatencyMs:       1200,
+			AllowUntested:      false,
+		})
+		if len(out) != 1 || out[0].ID != "manual-untested" {
+			t.Fatalf("unexpected filtered nodes: %#v", out)
+		}
+	})
 }

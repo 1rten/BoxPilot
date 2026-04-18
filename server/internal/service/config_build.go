@@ -107,6 +107,12 @@ func FilterForwardingNodes(nodes []repo.NodeRow, policy ForwardingPolicy) []repo
 		if n.LastTestStatus.Valid {
 			status = strings.ToLower(strings.TrimSpace(n.LastTestStatus.String))
 		}
+		// User-added manual nodes start with no probe result; default policy would
+		// drop them and break forwarding until settings change or a test is run.
+		if n.SubID == repo.ManualSubscriptionID && status == "" {
+			out = append(out, n)
+			continue
+		}
 		if status == "ok" {
 			if !n.LastLatencyMs.Valid {
 				continue

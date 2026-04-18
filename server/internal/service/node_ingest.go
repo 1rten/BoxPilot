@@ -64,6 +64,10 @@ func IngestOutbounds(db *sql.DB, input IngestInput) (*IngestResult, *errorx.AppE
 		if name == "" {
 			name = tag
 		}
+		outJSON, mErr := mergeOutboundJSONTag(node.Raw, tag)
+		if mErr != nil {
+			return nil, mErr
+		}
 		rows = append(rows, repo.NodeRow{
 			ID:                util.NewID(),
 			SubID:             input.SubID,
@@ -72,7 +76,7 @@ func IngestOutbounds(db *sql.DB, input IngestInput) (*IngestResult, *errorx.AppE
 			Type:              rawType,
 			Enabled:           input.DefaultEnabled,
 			ForwardingEnabled: input.DefaultForwardingEnabled,
-			OutboundJSON:      string(node.Raw),
+			OutboundJSON:      outJSON,
 			CreatedAt:         now,
 		})
 		if src := strings.TrimSpace(node.SourceTag); src != "" {
@@ -187,4 +191,26 @@ func listAllNodeTags(db *sql.DB) ([]string, error) {
 		tags = append(tags, tag)
 	}
 	return tags, rows.Err()
+}
+
+// mergeOutboundJSONTag sets the outbound "tag" field to match the resolved DB tag.
+// Selector/route logic keys off DB tag; sing-box uses the JSON tag, so they must agree.
+func mergeOutboundJSONTag(raw []byte, tag string) (string, *errorx.AppError) {
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return "", errorx.New(errorx.NODEInvalidOutbound, "merge outbound tag: tag is empty")
+	}
+	if !json.Valid(raw) {
+		return "", errorx.New(errorx.NODEInvalidOutbound, "merge outbound tag: invalid json")
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return "", errorx.New(errorx.NODEInvalidOutbound, "merge outbound tag: unmarshal failed")
+	}
+	payload["tag"] = tag
+	out, err := json.Marshal(payload)
+	if err != nil {
+		return "", errorx.New(errorx.NODEInvalidOutbound, "merge outbound tag: marshal failed")
+	}
+	return string(out), nil
 }
