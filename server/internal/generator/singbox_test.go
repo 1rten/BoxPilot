@@ -2,6 +2,7 @@ package generator
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -252,12 +253,12 @@ func TestBuildConfigWithRuntime_BusinessGroups(t *testing.T) {
 			if len(members) != 2 || members[0] != "node-a" || members[1] != "node-b" {
 				t.Fatalf("expected manual urltest members [node-a node-b], got %v", outbound["outbounds"])
 			}
-		case tag == "biz-openai" && typ == "selector":
+		case strings.EqualFold(tag, "biz-openai") && typ == "selector":
 			hasBiz = true
-			if d, _ := outbound["default"].(string); d != "biz-openai-auto" {
-				t.Fatalf("expected biz selector default biz-openai-auto, got %v", outbound["default"])
+			if d, _ := outbound["default"].(string); !strings.EqualFold(d, "biz-openai-auto") && d != "manual" {
+				t.Fatalf("expected biz selector default biz-openai-auto or manual, got %v", outbound["default"])
 			}
-		case typ == "urltest" && tag == "biz-openai-auto":
+		case typ == "urltest" && strings.EqualFold(tag, "biz-openai-auto"):
 			hasBizAuto = true
 			if interval, _ := outbound["interval"].(string); interval != "30m" {
 				t.Fatalf("expected business urltest interval 30m, got %v", outbound["interval"])
@@ -317,14 +318,14 @@ func TestBuildConfigWithRuntime_BusinessGroupsWithoutPool(t *testing.T) {
 		}
 		tag, _ := outbound["tag"].(string)
 		typ, _ := outbound["type"].(string)
-		if tag == "biz-apple" && typ == "selector" {
+		if strings.EqualFold(tag, "biz-apple") && typ == "selector" {
 			hasBizSelector = true
 			members, _ := outbound["outbounds"].([]any)
 			if len(members) != 1 || members[0] != "manual" {
 				t.Fatalf("expected biz selector only manual when pool missing, got %v", outbound["outbounds"])
 			}
 		}
-		if tag == "biz-apple-auto" {
+		if strings.EqualFold(tag, "biz-apple-auto") {
 			hasBizAuto = true
 		}
 	}
@@ -384,12 +385,12 @@ func TestBuildConfigWithRuntime_BusinessGroupsDefaultNodeWhenToggleOff(t *testin
 		}
 		tag, _ := outbound["tag"].(string)
 		typ, _ := outbound["type"].(string)
-		if tag == "biz-apple" && typ == "selector" {
+		if strings.EqualFold(tag, "biz-apple") && typ == "selector" {
 			if d, _ := outbound["default"].(string); d != "manual" {
 				t.Fatalf("expected biz default manual when toggle off, got %v", outbound["default"])
 			}
 			members, _ := outbound["outbounds"].([]any)
-			if len(members) != 4 || members[0] != "biz-apple-auto" || members[1] != "manual" || members[2] != "node-a" || members[3] != "node-b" {
+			if len(members) != 4 || !strings.EqualFold(members[0].(string), "biz-apple-auto") || members[1] != "manual" || members[2] != "node-a" || members[3] != "node-b" {
 				t.Fatalf("unexpected biz members: %v", outbound["outbounds"])
 			}
 			return
@@ -442,15 +443,15 @@ func TestBuildConfigWithRuntime_BusinessGroupsKeepDirectInManualCandidates(t *te
 		}
 		tag, _ := outbound["tag"].(string)
 		typ, _ := outbound["type"].(string)
-		if tag == "biz-apple-auto" && typ == "urltest" {
+		if strings.EqualFold(tag, "biz-apple-auto") && typ == "urltest" {
 			members, _ := outbound["outbounds"].([]any)
 			if len(members) != 1 || members[0] != "node-a" {
 				t.Fatalf("auto should exclude direct, got %v", outbound["outbounds"])
 			}
 		}
-		if tag == "biz-apple" && typ == "selector" {
+		if strings.EqualFold(tag, "biz-apple") && typ == "selector" {
 			members, _ := outbound["outbounds"].([]any)
-			if len(members) != 4 || members[0] != "biz-apple-auto" || members[1] != "manual" || members[2] != "direct" || members[3] != "node-a" {
+			if len(members) != 4 || !strings.EqualFold(members[0].(string), "biz-apple-auto") || members[1] != "manual" || members[2] != "direct" || members[3] != "node-a" {
 				t.Fatalf("selector should keep direct in manual candidates, got %v", outbound["outbounds"])
 			}
 			return

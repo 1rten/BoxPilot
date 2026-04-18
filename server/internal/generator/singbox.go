@@ -274,10 +274,19 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 		route["rules"] = routeRules
 	}
 
+	dns := map[string]any{
+		"servers": []map[string]any{
+			{"tag": "dns-direct", "address": "8.8.8.8", "detour": "direct"},
+			{"tag": "dns-cloudflare", "address": "1.1.1.1", "detour": "direct"},
+		},
+		"final": "dns-direct",
+	}
+
 	cfg := map[string]any{
 		"inbounds":  inbounds,
 		"outbounds": outbounds,
 		"route":     route,
+		"dns":       dns,
 	}
 	applyClashAPI(cfg)
 	b, err := json.MarshalIndent(cfg, "", "  ")

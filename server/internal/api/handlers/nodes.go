@@ -725,7 +725,8 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 	if flow := strings.TrimSpace(form.Flow); flow != "" {
 		out["flow"] = flow
 	}
-	if network := strings.ToLower(strings.TrimSpace(form.Network)); network == "ws" {
+	network := strings.ToLower(strings.TrimSpace(form.Network))
+	if network == "ws" {
 		transport := map[string]any{"type": "ws"}
 		if p := strings.TrimSpace(form.WSPath); p != "" {
 			transport["path"] = p
@@ -734,12 +735,18 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 			transport["headers"] = map[string]any{"Host": host}
 		}
 		out["transport"] = transport
+	} else if network == "grpc" {
+		transport := map[string]any{"type": "grpc"}
+		if p := strings.TrimSpace(form.WSPath); p != "" {
+			transport["service_name"] = p
+		}
+		out["transport"] = transport
 	}
 	if form.TLSEnabled || strings.TrimSpace(form.TLSServerName) != "" || form.TLSInsecure ||
 		strings.TrimSpace(form.RealityPublicKey) != "" || strings.TrimSpace(form.RealityShortID) != "" ||
-		strings.TrimSpace(form.UTLSFingerprint) != "" {
+		strings.TrimSpace(form.UTLSFingerprint) != "" || strings.Contains(strings.ToLower(form.Flow), "xtls") {
 		tls := map[string]any{
-			"enabled": form.TLSEnabled || strings.TrimSpace(form.RealityPublicKey) != "",
+			"enabled": form.TLSEnabled || strings.TrimSpace(form.RealityPublicKey) != "" || strings.Contains(strings.ToLower(form.Flow), "xtls"),
 		}
 		if sni := strings.TrimSpace(form.TLSServerName); sni != "" {
 			tls["server_name"] = sni
@@ -748,9 +755,11 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 			tls["insecure"] = true
 		}
 		reality := map[string]any{}
+		isReality := false
 		if pk := strings.TrimSpace(form.RealityPublicKey); pk != "" {
 			reality["enabled"] = true
 			reality["public_key"] = pk
+			isReality = true
 		}
 		if sid := strings.TrimSpace(form.RealityShortID); sid != "" {
 			reality["short_id"] = sid
@@ -761,7 +770,11 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 		if len(reality) > 0 {
 			tls["reality"] = reality
 		}
-		if fp := strings.TrimSpace(form.UTLSFingerprint); fp != "" {
+		fp := strings.TrimSpace(form.UTLSFingerprint)
+		if fp == "" && isReality {
+			fp = "chrome"
+		}
+		if fp != "" {
 			tls["utls"] = map[string]any{
 				"enabled":     true,
 				"fingerprint": fp,
