@@ -189,7 +189,13 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 		"default_domain_resolver": "dns-direct",
 	}
 	routeRuleSets := make([]map[string]any, 0, 2+len(extras.RuleSets))
-	routeRules := make([]map[string]any, 0, 4+len(extras.Rules))
+	routeRules := make([]map[string]any, 0, 5+len(extras.Rules))
+	// Critical: Add explicit DNS routing rule at the top to replace detours in dns.servers
+	routeRules = append(routeRules, map[string]any{
+		"protocol": "dns",
+		"outbound": "direct",
+	})
+
 	if routing.BypassPrivateEnabled {
 		if len(routing.BypassDomains) > 0 {
 			routeRules = append(routeRules, map[string]any{
@@ -282,13 +288,11 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 				"type":        "udp",
 				"server":      "223.5.5.5",
 				"server_port": 53,
-				"detour":      "direct",
 			},
 			{
 				"tag":    "dns-tencent",
 				"type":   "udp",
 				"server": "119.29.29.29",
-				"detour": "direct",
 			},
 		},
 		"strategy": "prefer_ipv4",
