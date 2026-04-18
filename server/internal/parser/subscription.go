@@ -791,16 +791,21 @@ func clashProxyToOutbound(proxy map[string]any) (*OutboundItem, error) {
 			"server_port": port,
 			"password":    password,
 		}
-		if up := toInt(proxy["up"]); up > 0 {
+		if up, ok := toOptionalInt(proxy["up"]); ok && up > 0 {
 			out["up_mbps"] = up
 		}
-		if down := toInt(proxy["down"]); down > 0 {
+		if down, ok := toOptionalInt(proxy["down"]); ok && down > 0 {
 			out["down_mbps"] = down
 		}
+		// Clash field is 'obfs', sing-box field inside hysteria2 is 'obfs'
 		if obfs := toString(proxy["obfs"]); obfs != "" {
+			obfsPwd := toString(proxy["obfs-password"])
+			if obfsPwd == "" {
+				obfsPwd = toString(proxy["obfs_password"])
+			}
 			out["obfs"] = map[string]any{
 				"type":     obfs,
-				"password": toString(proxy["obfs-password"]),
+				"password": obfsPwd,
 			}
 		}
 		attachTLS(out, proxy)
