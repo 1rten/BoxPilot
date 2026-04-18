@@ -703,13 +703,6 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 			return nil, errorx.New(errorx.REQMissingField, "form.uuid required")
 		}
 		out["uuid"] = strings.TrimSpace(form.UUID)
-		if typ == "vless" {
-			out["packet_encoding"] = "xudp"
-			out["multiplex"] = map[string]any{
-				"enabled":  true,
-				"protocol": "smux",
-			}
-		}
 	case "trojan":
 		if strings.TrimSpace(form.Password) == "" {
 			return nil, errorx.New(errorx.REQMissingField, "form.password required")

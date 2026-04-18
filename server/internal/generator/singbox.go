@@ -295,7 +295,7 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 				"server": "119.29.29.29",
 			},
 		},
-		"strategy": "prefer_ipv4",
+		"strategy": "ipv4_only",
 	}
 
 	cfg := map[string]any{
