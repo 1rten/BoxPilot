@@ -974,11 +974,13 @@ func parseVLESSURI(link string) (*OutboundItem, bool) {
 		return nil, true
 	}
 	out := map[string]any{
-		"type":        "vless",
-		"tag":         fragmentTag(u.Fragment),
-		"server":      server,
-		"server_port": port,
-		"uuid":        uuid,
+		"type":            "vless",
+		"tag":             fragmentTag(u.Fragment),
+		"server":          server,
+		"server_port":     port,
+		"uuid":            uuid,
+		"packet_encoding": "xudp",
+		"encryption":      "none",
 	}
 	if flow := u.Query().Get("flow"); flow != "" {
 		out["flow"] = flow

@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"database/sql"
+	"log"
 	"time"
 
 	"boxpilot/server/internal/generator"
 	"boxpilot/server/internal/store/repo"
+	"boxpilot/server/internal/util/errorx"
 )
 
 func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, hash string, output string, err error) {
@@ -48,6 +50,11 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 		durationMs = 0
 	}
 	if err != nil {
+		if appErr, ok := err.(*errorx.AppError); ok {
+			if detailOut, ok := appErr.Details["output"].(string); ok && detailOut != "" {
+				log.Printf("runtime reload preflight output:\n%s", detailOut)
+			}
+		}
 		_ = repo.UpdateRuntimeState(db, prevVersion, prevHash, err.Error(), len(tags), durationMs, false)
 		return prevVersion, prevHash, string(out), err
 	}
