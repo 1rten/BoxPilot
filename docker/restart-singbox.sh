@@ -17,23 +17,21 @@ is_running() {
 }
 
 stop_singbox() {
-  if ! is_running; then
-    rm -f "$PID_FILE"
-    return 0
-  fi
-  pid="$(cat "$PID_FILE")"
-  kill "$pid" 2>/dev/null || true
-  i=0
-  while [ "$i" -lt 50 ]; do
-    if ! kill -0 "$pid" 2>/dev/null; then
-      break
+  if is_running; then
+    pid="$(cat "$PID_FILE")"
+    kill "$pid" 2>/dev/null || true
+    i=0
+    while [ "$i" -lt 50 ]; do
+      if ! kill -0 "$pid" 2>/dev/null; then break; fi
+      i=$((i + 1))
+      sleep 0.1
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
     fi
-    i=$((i + 1))
-    sleep 0.1
-  done
-  if kill -0 "$pid" 2>/dev/null; then
-    kill -9 "$pid" 2>/dev/null || true
   fi
+  # Aggressive cleanup: kill any other sing-box processes
+  pkill -9 sing-box 2>/dev/null || true
   rm -f "$PID_FILE"
 }
 
@@ -43,22 +41,25 @@ start_singbox() {
     exit 1
   fi
   mkdir -p "$(dirname "$LOG_PATH")"
+  # Clear log for a fresh start
+  : >"$LOG_PATH"
   sing-box run -c "$CONFIG_PATH" >>"$LOG_PATH" 2>&1 &
   pid="$!"
   echo "$pid" >"$PID_FILE"
   i=0
-  max_checks="${SINGBOX_STARTUP_PROBE_STEPS:-10}"
+  max_checks="${SINGBOX_STARTUP_PROBE_STEPS:-20}"
   while [ "$i" -lt "$max_checks" ]; do
-    if !kill -0 "$pid" 2>/dev/null; then
+    if ! kill -0 "$pid" 2>/dev/null; then
       echo "sing-box failed to stay running, see log: $LOG_PATH" >&2
-      tail -n 100 "$LOG_PATH" 2>/dev/null || true
+      # Print last 100 lines of log to stderr so it gets captured by the backend
+      tail -n 100 "$LOG_PATH" >&2
       exit 1
     fi
-
     i=$((i + 1))
     sleep 0.1
   done
 }
+
 
 case "${1:-}" in
   --start-only)

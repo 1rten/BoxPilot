@@ -285,13 +285,13 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 				"detour":      "direct",
 			},
 			{
-				"tag":         "dns-tencent",
-				"type":        "udp",
-				"server":      "119.29.29.29",
-				"server_port": 53,
-				"detour":      "direct",
+				"tag":    "dns-tencent",
+				"type":   "udp",
+				"server": "119.29.29.29",
+				"detour": "direct",
 			},
 		},
+		"strategy": "prefer_ipv4",
 	}
 
 	cfg := map[string]any{
