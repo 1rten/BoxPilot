@@ -30,6 +30,7 @@ func TestApplyConfigWithPreflight_CheckFailedNoWrite(t *testing.T) {
 		[]byte(`{"mode":"new"}`),
 		generator.ProxyInbound{},
 		generator.ProxyInbound{},
+		0,
 	)
 	assertAppErrorCode(t, err, errorx.CFGCheckFailed)
 
@@ -62,6 +63,7 @@ func TestApplyConfigWithPreflight_RestartFailedRollbackSucceeded(t *testing.T) {
 		[]byte(`{"mode":"new"}`),
 		generator.ProxyInbound{},
 		generator.ProxyInbound{},
+		0,
 	)
 	assertAppErrorCode(t, err, errorx.RTRestartFailed)
 	appErr := err.(*errorx.AppError)
@@ -94,6 +96,7 @@ func TestApplyConfigWithPreflight_SavesLastKnownGoodOnSuccess(t *testing.T) {
 		[]byte(`{"mode":"stable"}`),
 		generator.ProxyInbound{},
 		generator.ProxyInbound{},
+		0,
 	)
 	if err != nil {
 		t.Fatalf("apply config failed: %v", err)
@@ -133,6 +136,7 @@ func TestApplyConfigWithPreflight_HealthCheckFailureRollsBack(t *testing.T) {
 		[]byte(`{"mode":"new"}`),
 		httpProxy,
 		generator.ProxyInbound{},
+		0,
 	)
 	assertAppErrorCode(t, err, errorx.CFGRollbackFailed)
 	if !strings.Contains(string(out), "restarted") {
