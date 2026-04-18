@@ -757,7 +757,6 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 		reality := map[string]any{}
 		isReality := false
 		if pk := strings.TrimSpace(form.RealityPublicKey); pk != "" {
-			reality["enabled"] = true
 			reality["public_key"] = pk
 			isReality = true
 		}
@@ -776,7 +775,6 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 		}
 		if fp != "" {
 			tls["utls"] = map[string]any{
-				"enabled":     true,
 				"fingerprint": fp,
 			}
 		}
