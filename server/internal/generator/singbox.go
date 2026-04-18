@@ -105,7 +105,6 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 	outbounds := []any{
 		map[string]any{"type": "direct", "tag": "direct"},
 		map[string]any{"type": "block", "tag": "block"},
-		map[string]any{"type": "dns", "tag": "dns-out"},
 	}
 	var tags []string
 	for _, node := range nodes {
