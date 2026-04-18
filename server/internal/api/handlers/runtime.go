@@ -584,7 +584,7 @@ func (h *Runtime) ProxyCheck(c *gin.Context) {
 
 	timeoutMS := req.TimeoutMS
 	if timeoutMS == 0 {
-		timeoutMS = 5000
+		timeoutMS = 15000
 	}
 	if timeoutMS < 500 || timeoutMS > 30000 {
 		writeError(c, errorx.New(errorx.REQInvalidField, "timeout_ms must be between 500 and 30000"))
