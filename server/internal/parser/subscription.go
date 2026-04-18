@@ -1268,7 +1268,7 @@ func attachTLSFromQuery(out map[string]any, q url.Values) {
 			reality["short_id"] = sid
 		}
 		if spx := strings.TrimSpace(q.Get("spx")); spx != "" {
-			reality["spider_x"] = spx
+			reality["spider_path"] = spx
 		}
 		tls["reality"] = reality
 		if fp := strings.TrimSpace(q.Get("fp")); fp != "" {

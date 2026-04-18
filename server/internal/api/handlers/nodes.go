@@ -764,7 +764,7 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 			reality["short_id"] = sid
 		}
 		if spx := strings.TrimSpace(form.RealitySpiderX); spx != "" {
-			reality["spider_x"] = spx
+			reality["spider_path"] = spx
 		}
 		if len(reality) > 0 {
 			tls["reality"] = reality
