@@ -942,11 +942,8 @@ func probeProxyEndpoint(target *url.URL, proxyType string, row repo.ProxySetting
 
 func buildProxyHTTPClient(proxyType string, port int, timeout time.Duration) (*http.Client, func(), error) {
 	address := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
-	// Local sing-box HTTP inbound expects HTTP/1.x (e.g. CONNECT). Forcing HTTP/2
-	// on the client transport can produce extra dials that close before a request
-	// line, which shows up in sing-box logs as "read http request: EOF".
 	transport := &http.Transport{
-		ForceAttemptHTTP2: false,
+		ForceAttemptHTTP2: true,
 	}
 
 	switch proxyType {
