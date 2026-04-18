@@ -54,9 +54,6 @@ func TestParseSubscription_VLESSRealityURI(t *testing.T) {
 	if got := reality["short_id"]; got != "5a9f0379" {
 		t.Fatalf("unexpected reality short_id: %v", got)
 	}
-	if got := reality["spider_path"]; got != "/" {
-		t.Fatalf("expected reality.spider_path to be '/', got %v", got)
-	}
 }
 
 func TestParseSubscription_SingboxPlainAndBase64(t *testing.T) {

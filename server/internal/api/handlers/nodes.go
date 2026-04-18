@@ -757,7 +757,7 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 		if form.TLSInsecure {
 			tls["insecure"] = true
 		}
-		reality := map[string]any{}
+		reality := map[string]any{"enabled": true}
 		isReality := false
 		if pk := strings.TrimSpace(form.RealityPublicKey); pk != "" {
 			reality["public_key"] = pk
@@ -765,9 +765,6 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 		}
 		if sid := strings.TrimSpace(form.RealityShortID); sid != "" {
 			reality["short_id"] = sid
-		}
-		if spx := strings.TrimSpace(form.RealitySpiderX); spx != "" {
-			reality["spider_path"] = spx
 		}
 		if len(reality) > 0 {
 			tls["reality"] = reality
@@ -778,6 +775,7 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 		}
 		if fp != "" {
 			tls["utls"] = map[string]any{
+				"enabled":     true,
 				"fingerprint": fp,
 			}
 		}

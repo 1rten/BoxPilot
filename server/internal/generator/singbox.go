@@ -185,7 +185,8 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 		"default":   manualDefault,
 	})
 	route := map[string]any{
-		"final": "manual",
+		"final":                   "manual",
+		"default_domain_resolver": "dns-direct",
 	}
 	routeRuleSets := make([]map[string]any, 0, 2+len(extras.RuleSets))
 	routeRules := make([]map[string]any, 0, 4+len(extras.Rules))
