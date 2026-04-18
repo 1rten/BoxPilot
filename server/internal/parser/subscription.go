@@ -980,6 +980,10 @@ func parseVLESSURI(link string) (*OutboundItem, bool) {
 		"server_port":     port,
 		"uuid":            uuid,
 		"packet_encoding": "xudp",
+		"multiplex": map[string]any{
+			"enabled":  true,
+			"protocol": "smux",
+		},
 	}
 	if flow := u.Query().Get("flow"); flow != "" {
 		out["flow"] = flow

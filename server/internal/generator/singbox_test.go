@@ -35,11 +35,11 @@ func TestBuildConfig_WithBypassRules(t *testing.T) {
 	}
 
 	rules, ok := route["rules"].([]any)
-	if !ok || len(rules) != 3 {
-		t.Fatalf("expected 3 route rules, got %v", route["rules"])
+	if !ok || len(rules) != 4 {
+		t.Fatalf("expected 4 route rules, got %v", route["rules"])
 	}
 
-	domainRule, ok := rules[0].(map[string]any)
+	domainRule, ok := rules[1].(map[string]any)
 	if !ok {
 		t.Fatalf("invalid domain rule type")
 	}
@@ -51,7 +51,7 @@ func TestBuildConfig_WithBypassRules(t *testing.T) {
 		t.Fatalf("expected 2 domain_suffix values, got %v", domainRule["domain_suffix"])
 	}
 
-	cidrRule, ok := rules[1].(map[string]any)
+	cidrRule, ok := rules[2].(map[string]any)
 	if !ok {
 		t.Fatalf("invalid cidr rule type")
 	}
@@ -63,7 +63,7 @@ func TestBuildConfig_WithBypassRules(t *testing.T) {
 		t.Fatalf("expected 2 ip_cidr values, got %v", cidrRule["ip_cidr"])
 	}
 
-	cnRule, ok := rules[2].(map[string]any)
+	cnRule, ok := rules[3].(map[string]any)
 	if !ok {
 		t.Fatalf("invalid cn rule type")
 	}
@@ -113,8 +113,9 @@ func TestBuildConfig_WithoutBypassRules(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing route section")
 	}
-	if _, exists := route["rules"]; exists {
-		t.Fatalf("did not expect route.rules when bypass is disabled")
+	rules, _ := route["rules"].([]any)
+	if len(rules) != 1 {
+		t.Fatalf("expected 1 route rule (dns) when bypass is disabled, got %v", route["rules"])
 	}
 }
 

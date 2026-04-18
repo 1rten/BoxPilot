@@ -705,6 +705,10 @@ func buildOutboundFromForm(form *dto.ManualNodeFormInput) (map[string]any, *erro
 		out["uuid"] = strings.TrimSpace(form.UUID)
 		if typ == "vless" {
 			out["packet_encoding"] = "xudp"
+			out["multiplex"] = map[string]any{
+				"enabled":  true,
+				"protocol": "smux",
+			}
 		}
 	case "trojan":
 		if strings.TrimSpace(form.Password) == "" {
