@@ -3,12 +3,14 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"boxpilot/server/internal/api/dto"
@@ -591,6 +593,41 @@ func probeNodePing(rawOutbound string, timeout time.Duration) (latencyMs int, st
 	return int(time.Since(start).Milliseconds()), "ok", ""
 }
 
+// probeNodeHysteria2UDP checks UDP reachability for Hysteria2 (QUIC) outbounds.
+// TCP dial to the same port often yields false negatives because the server listens on UDP only.
+func probeNodeHysteria2UDP(rawOutbound string, timeout time.Duration) (latencyMs int, status string, errMsg string) {
+	meta := parseNodeMeta(rawOutbound)
+	if meta.Server == "" || meta.ServerPort <= 0 {
+		return -1, "error", "node has no server/server_port"
+	}
+	addr := net.JoinHostPort(meta.Server, strconv.Itoa(meta.ServerPort))
+	start := time.Now()
+	conn, err := net.DialTimeout("udp", addr, timeout)
+	if err != nil {
+		return -1, "error", err.Error()
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(timeout))
+	// Linux surfaces ICMP "port unreachable" as ECONNREFUSED on a subsequent read/write.
+	if _, err := conn.Write([]byte{0}); err != nil {
+		return -1, "error", err.Error()
+	}
+	buf := make([]byte, 2048)
+	_, err = conn.Read(buf)
+	elapsed := int(time.Since(start).Milliseconds())
+	if err == nil {
+		return elapsed, "ok", ""
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return -1, "error", err.Error()
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return elapsed, "ok", ""
+	}
+	return -1, "error", err.Error()
+}
+
 func probeNodeHTTP(rawOutbound string, timeout time.Duration) (latencyMs int, status string, errMsg string) {
 	meta := parseNodeMeta(rawOutbound)
 	if meta.Server == "" || meta.ServerPort <= 0 {
@@ -631,6 +668,9 @@ func probeNode(rawOutbound, nodeType, mode string, timeout time.Duration) (laten
 	// For vmess/trojan/etc, fallback to TCP probe to avoid false negatives and noisy logs.
 	if mode == "http" && nodeType == "http" {
 		return probeNodeHTTP(rawOutbound, timeout)
+	}
+	if nodeType == "hysteria2" {
+		return probeNodeHysteria2UDP(rawOutbound, timeout)
 	}
 	return probeNodePing(rawOutbound, timeout)
 }

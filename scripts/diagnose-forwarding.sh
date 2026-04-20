@@ -78,6 +78,7 @@ else
 fi
 
 if [[ ${fail_count} -gt 0 ]]; then
+  warn "Proxy check failed: inspect sing-box logs for outbound, DNS, and routing (e.g. docker compose logs for the sing-box service)."
   echo "[diag] completed with ${fail_count} issue(s)" >&2
   exit 1
 fi

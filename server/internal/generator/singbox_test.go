@@ -460,3 +460,52 @@ func TestBuildConfigWithRuntime_BusinessGroupsKeepDirectInManualCandidates(t *te
 	}
 	t.Fatalf("expected biz-apple selector")
 }
+
+func TestBuildConfigWithRuntime_SkipsDuplicateCNRuleSetTags(t *testing.T) {
+	cfg, err := BuildConfigWithRuntime(
+		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		RoutingSettings{
+			BypassPrivateEnabled: true,
+			BypassDomains:        []string{"local"},
+			BypassCIDRs:          []string{"10.0.0.0/8"},
+		},
+		[]NodeOutbound{
+			{Tag: "n1", RawJSON: `{"type":"trojan","tag":"n1","server":"x.com","server_port":443,"password":"p"}`},
+		},
+		RoutingExtras{
+			RuleSets: []RouteRuleSetRef{
+				{Tag: "geosite-cn", SourceType: "remote", Format: "binary", URL: "https://example.com/dup-geosite.srs"},
+				{Tag: "geoip-cn", SourceType: "remote", Format: "binary", URL: "https://example.com/dup-geoip.srs"},
+				{Tag: "geosite-ads", SourceType: "remote", Format: "binary", URL: "https://example.com/ads.srs"},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("BuildConfigWithRuntime: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(cfg, &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	route, _ := parsed["route"].(map[string]any)
+	ruleSets, _ := route["rule_set"].([]any)
+	seen := map[string]int{}
+	for _, item := range ruleSets {
+		rs, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		tag, _ := rs["tag"].(string)
+		seen[tag]++
+	}
+	if seen["geosite-cn"] != 1 {
+		t.Fatalf("expected exactly one geosite-cn rule_set, got counts %#v", seen)
+	}
+	if seen["geoip-cn"] != 1 {
+		t.Fatalf("expected exactly one geoip-cn rule_set, got counts %#v", seen)
+	}
+	if seen["geosite-ads"] != 1 {
+		t.Fatalf("expected subscription geosite-ads rule_set preserved, got counts %#v", seen)
+	}
+}

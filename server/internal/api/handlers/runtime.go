@@ -949,8 +949,10 @@ func buildProxyHTTPClient(proxyType string, port int, timeout time.Duration) (*h
 		KeepAlive: 30 * time.Second,
 	}
 	transport := &http.Transport{
-		DialContext:       dialer.DialContext,
-		ForceAttemptHTTP2: true,
+		DialContext: dialer.DialContext,
+		// Local HTTP CONNECT / SOCKS inbounds (e.g. sing-box) expect HTTP/1.1; forcing H2
+		// on the client transport can cause resets or odd behavior with some proxy stacks.
+		ForceAttemptHTTP2: false,
 	}
 
 	switch proxyType {

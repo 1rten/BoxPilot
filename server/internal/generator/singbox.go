@@ -248,7 +248,24 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 			"outbound": "direct",
 		})
 	}
-	routeRuleSets = append(routeRuleSets, buildRouteRuleSets(extras.RuleSets)...)
+	// Subscriptions may ship rule_set tags "geosite-cn" / "geoip-cn"; we already inject
+	// those when BypassPrivateEnabled — duplicate tags make sing-box fatal.
+	subscriptionRuleSets := extras.RuleSets
+	if routing.BypassPrivateEnabled {
+		reserved := map[string]struct{}{
+			"geosite-cn": {},
+			"geoip-cn":   {},
+		}
+		filtered := make([]RouteRuleSetRef, 0, len(extras.RuleSets))
+		for _, rs := range extras.RuleSets {
+			if _, conflict := reserved[strings.TrimSpace(rs.Tag)]; conflict {
+				continue
+			}
+			filtered = append(filtered, rs)
+		}
+		subscriptionRuleSets = filtered
+	}
+	routeRuleSets = append(routeRuleSets, buildRouteRuleSets(subscriptionRuleSets)...)
 
 	targetMap := buildBusinessGroups(
 		&outbounds,
