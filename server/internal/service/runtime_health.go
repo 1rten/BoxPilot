@@ -23,15 +23,15 @@ const (
 	runtimeHealthWaitStep = 300 * time.Millisecond
 
 	// defaultRuntimeHealthMaxWait is used when BOXPILOT_RUNTIME_LISTENER_READY_MAX_MS
-	// is unset. sing-box may download large rule-sets before binding ports (120 × 300ms = 36s).
-	defaultRuntimeHealthMaxWait = 120 * 300 * time.Millisecond
+	// is unset. sing-box may download large rule-sets before binding ports (400 × 300ms = 120s).
+	defaultRuntimeHealthMaxWait = 400 * 300 * time.Millisecond
 )
 
 func runtimeHealthMaxWait(overrideMs int) time.Duration {
 	if overrideMs >= 5000 && overrideMs <= 300000 {
 		return time.Duration(overrideMs) * time.Millisecond
 	}
-	// 120 × 300ms = 36s by default; override for slow disks (e.g. BOXPILOT_RUNTIME_LISTENER_READY_MAX_MS=120000).
+	// 400 × 300ms = 120s by default; override for slow disks (e.g. BOXPILOT_RUNTIME_LISTENER_READY_MAX_MS=60000).
 	const minMs = 5000
 	const maxMs = 300000
 	s := strings.TrimSpace(os.Getenv("BOXPILOT_RUNTIME_LISTENER_READY_MAX_MS"))

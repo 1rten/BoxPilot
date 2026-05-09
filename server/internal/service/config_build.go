@@ -49,12 +49,13 @@ func BuildConfigFromDB(db *sql.DB, httpProxy, socksProxy generator.ProxyInbound,
 		return nil, nil, "", err
 	}
 	extras := generator.RoutingExtras{
-		RuleSets:          make([]generator.RouteRuleSetRef, 0, len(ruleSetRows)),
-		Rules:             make([]generator.RouteRule, 0, len(ruleRows)),
-		GroupSelections:   map[string]string{},
-		BusinessNodePools: map[string][]string{},
-		AutoTestURL:       generator.DefaultAutoTestURL,
-		AutoTestInterval:  BizAutoIntervalDuration(policy.BizAutoIntervalSec),
+		RuleSets:             make([]generator.RouteRuleSetRef, 0, len(ruleSetRows)),
+		Rules:                make([]generator.RouteRule, 0, len(ruleRows)),
+		GroupSelections:      map[string]string{},
+		BusinessNodePools:    map[string][]string{},
+		AutoTestURL:          generator.DefaultAutoTestURL,
+		AutoTestInterval:     BizAutoIntervalDuration(policy.BizAutoIntervalSec),
+		ResolveCachedRuleSet: CachedRuleSetPath,
 	}
 	for _, rs := range ruleSetRows {
 		extras.RuleSets = append(extras.RuleSets, generator.RouteRuleSetRef{

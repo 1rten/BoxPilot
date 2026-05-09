@@ -63,6 +63,9 @@ type RoutingExtras struct {
 	BusinessNodePools map[string][]string
 	AutoTestURL       string
 	AutoTestInterval  string
+	// ResolveCachedRuleSet returns the local path for a cached rule set file
+	// (e.g. "geosite-cn.srs"), or "" if not cached.
+	ResolveCachedRuleSet func(filename string) string
 }
 
 func DefaultRoutingSettings() RoutingSettings {
@@ -117,10 +120,17 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 		// Inject optimizations into the node outbound JSON
 		var m map[string]any
 		if err := json.Unmarshal([]byte(raw), &m); err == nil {
+			// Modern sing-box (1.12.0+) deprecates domain_strategy in outbounds.
+			// Proactively strip it from all outbounds (including those from subscriptions)
+			// to avoid FATAL "legacy domain strategy options" errors.
+			delete(m, "domain_strategy")
+			delete(m, "address_strategy")
+
 			typ := strings.ToLower(fmt.Sprintf("%v", m["type"]))
-			if typ == "vless" || typ == "vmess" || typ == "trojan" || typ == "shadowsocks" {
+			// Modern sing-box (1.12.0+) deprecates domain_strategy in outbounds.
+			// Rely on global DNS strategy or route.domain_resolver instead.
+			if typ == "vless" || typ == "vmess" || typ == "trojan" {
 				m["tcp_fast_open"] = true
-				m["domain_strategy"] = "ipv4_only"
 			}
 			if optimized, err := json.Marshal(m); err == nil {
 				outbounds = append(outbounds, json.RawMessage(optimized))
@@ -139,6 +149,17 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 			tags = append(tags, tag)
 		}
 	}
+
+	used := map[string]struct{}{
+		"direct": {},
+		"block":  {},
+		"manual": {},
+		"dns":    {},
+	}
+	for _, tag := range tags {
+		used[tag] = struct{}{}
+	}
+
 	manualMembers := make([]string, 0, len(tags)+1)
 	manualMembers = append(manualMembers, "direct")
 	manualSeen := map[string]struct{}{
@@ -172,16 +193,8 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 	manualSelectorOutbounds := append([]string{}, manualMembers...)
 	manualAutoMembers := filterExistingNodeTags(tags, manualMembers)
 	if len(manualAutoMembers) > 0 {
-		used := map[string]struct{}{
-			"direct": {},
-			"block":  {},
-			"manual": {},
-			"dns":    {},
-		}
-		for _, tag := range tags {
-			used[tag] = struct{}{}
-		}
 		manualAutoTag := resolveUniqueTag("manual-auto", used)
+		used[manualAutoTag] = struct{}{}
 		outbounds = append(outbounds, map[string]any{
 			"type":      "urltest",
 			"tag":       manualAutoTag,
@@ -202,6 +215,17 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 		"outbounds": manualSelectorOutbounds,
 		"default":   manualDefault,
 	})
+
+	targetMap := buildBusinessGroups(
+		&outbounds,
+		tags,
+		used,
+		extras.Rules,
+		extras.GroupSelections,
+		extras.BusinessNodePools,
+		extras.AutoTestURL,
+		extras.AutoTestInterval,
+	)
 	route := map[string]any{
 		"final":                   "manual",
 		"default_domain_resolver": "dns-direct",
@@ -227,22 +251,35 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 				"outbound": "direct",
 			})
 		}
-		routeRuleSets = append(routeRuleSets,
-			map[string]any{
-				"tag":            "geosite-cn",
-				"type":           "remote",
-				"format":         "binary",
-				"url":            DefaultGeoSiteCNURL,
-				"download_detour": "direct",
-			},
-			map[string]any{
-				"tag":            "geoip-cn",
-				"type":           "remote",
-				"format":         "binary",
-				"url":            DefaultGeoIPCNURL,
-				"download_detour": "direct",
-			},
-		)
+		geositeItem := map[string]any{
+			"tag":    "geosite-cn",
+			"format": "binary",
+		}
+		geoipItem := map[string]any{
+			"tag":    "geoip-cn",
+			"format": "binary",
+		}
+		if extras.ResolveCachedRuleSet != nil {
+			if p := extras.ResolveCachedRuleSet("geosite-cn.srs"); p != "" {
+				geositeItem["type"] = "local"
+				geositeItem["path"] = p
+			}
+			if p := extras.ResolveCachedRuleSet("geoip-cn.srs"); p != "" {
+				geoipItem["type"] = "local"
+				geoipItem["path"] = p
+			}
+		}
+		if _, hasType := geositeItem["type"]; !hasType {
+			geositeItem["type"] = "remote"
+			geositeItem["url"] = DefaultGeoSiteCNURL
+			geositeItem["download_detour"] = "direct"
+		}
+		if _, hasType := geoipItem["type"]; !hasType {
+			geoipItem["type"] = "remote"
+			geoipItem["url"] = DefaultGeoIPCNURL
+			geoipItem["download_detour"] = "direct"
+		}
+		routeRuleSets = append(routeRuleSets, geositeItem, geoipItem)
 		routeRules = append(routeRules, map[string]any{
 			"rule_set": []string{"geosite-cn", "geoip-cn"},
 			"outbound": "direct",
@@ -267,15 +304,6 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 	}
 	routeRuleSets = append(routeRuleSets, buildRouteRuleSets(subscriptionRuleSets)...)
 
-	targetMap := buildBusinessGroups(
-		&outbounds,
-		tags,
-		extras.Rules,
-		extras.GroupSelections,
-		extras.BusinessNodePools,
-		extras.AutoTestURL,
-		extras.AutoTestInterval,
-	)
 	availableRuleSets := make(map[string]struct{}, len(routeRuleSets))
 	for _, rs := range routeRuleSets {
 		if tag, ok := rs["tag"].(string); ok && strings.TrimSpace(tag) != "" {
@@ -325,12 +353,14 @@ func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, rou
 				"server_port": 53,
 			},
 			{
-				"tag":    "dns-tencent",
-				"type":   "udp",
-				"server": "119.29.29.29",
+				"tag":         "dns-tencent",
+				"type":        "udp",
+				"server":      "119.29.29.29",
+				"server_port": 53,
 			},
 		},
 		"strategy": "ipv4_only",
+		"final":    "dns-direct",
 	}
 
 	cfg := map[string]any{
@@ -390,6 +420,7 @@ func buildRouteRuleSets(extras []RouteRuleSetRef) []map[string]any {
 func buildBusinessGroups(
 	outbounds *[]any,
 	nodeTags []string,
+	used map[string]struct{},
 	rules []RouteRule,
 	selections map[string]string,
 	businessNodePools map[string][]string,
@@ -407,15 +438,6 @@ func buildBusinessGroups(
 	result := map[string]string{}
 	if len(targets) == 0 {
 		return result
-	}
-	used := map[string]struct{}{
-		"direct": {},
-		"block":  {},
-		"manual": {},
-		"dns":    {},
-	}
-	for _, tag := range nodeTags {
-		used[tag] = struct{}{}
 	}
 	targetList := make([]string, 0, len(targets))
 	for target := range targets {

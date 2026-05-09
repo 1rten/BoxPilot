@@ -31,6 +31,11 @@ func main() {
 	defer db.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Pre-download rule set files so sing-box doesn't have to fetch them at
+	// startup, which can cause listener binding timeouts on slow connections.
+	go service.EnsureBuiltinRuleSets()
+
 	go service.StartSubscriptionScheduler(ctx, db.DB, 30*time.Second)
 
 	addr := ":8080"

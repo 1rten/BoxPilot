@@ -1,6 +1,6 @@
 # BoxPilot
 
-[中文文档](./README.zh-CN.md)
+[中文文档](./docs/zh-CN/README.zh-CN.md)
 
 BoxPilot is a self-hosted control plane for `sing-box`. It manages subscriptions, nodes, forwarding policy, and runtime config generation in one repo.
 
