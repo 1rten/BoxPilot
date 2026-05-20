@@ -13,7 +13,7 @@ import (
 
 func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, hash string, output string, err error) {
 	startedAt := time.Now()
-	httpProxy, socksProxy, err := loadProxySettings(db)
+	ps, err := loadProxySettings(db)
 	if err != nil {
 		return 0, "", "", err
 	}
@@ -21,17 +21,16 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 	if err != nil {
 		return 0, "", "", err
 	}
-	expectedHTTPProxy := httpProxy
-	expectedSocksProxy := socksProxy
 	if !forwardingRunning {
-		expectedHTTPProxy.Enabled = false
-		expectedSocksProxy.Enabled = false
+		ps.HTTP.Enabled = false
+		ps.Socks.Enabled = false
+		ps.Redirect.Enabled = false
 	}
 	routing, _, err := LoadRoutingSettings(db)
 	if err != nil {
 		return 0, "", "", err
 	}
-	cfg, tags, h, err := BuildConfigFromDB(db, httpProxy, socksProxy, routing, forwardingRunning)
+	cfg, tags, h, err := BuildConfigFromDB(db, ps, routing, forwardingRunning)
 	if err != nil {
 		return 0, "", "", err
 	}
@@ -44,7 +43,7 @@ func Reload(ctx context.Context, db *sql.DB, configPath string) (version int, ha
 		prevHash = prevRow.ConfigHash
 	}
 
-	out, err := applyConfigWithPreflight(ctx, configPath, cfg, expectedHTTPProxy, expectedSocksProxy, routing.ListenerReadyMaxMs)
+	out, err := applyConfigWithPreflight(ctx, configPath, cfg, ps, routing.ListenerReadyMaxMs)
 	durationMs := int(time.Since(startedAt).Milliseconds())
 	if durationMs < 0 {
 		durationMs = 0
@@ -85,42 +84,53 @@ func loadForwardingRunning(db *sql.DB) (bool, error) {
 	return row.ForwardingRunning == 1, nil
 }
 
-func loadProxySettings(db *sql.DB) (generator.ProxyInbound, generator.ProxyInbound, error) {
+func loadProxySettings(db *sql.DB) (generator.ProxyInbounds, error) {
 	rows, err := repo.GetProxySettings(db)
 	if err != nil {
-		return generator.ProxyInbound{}, generator.ProxyInbound{}, err
+		return generator.ProxyInbounds{}, err
 	}
 	httpRow := rows["http"]
 	socksRow := rows["socks"]
-	httpProxy := generator.ProxyInbound{
-		Type:          "http",
-		ListenAddress: httpRow.ListenAddress,
-		Port:          httpRow.Port,
-		Enabled:       httpRow.Enabled == 1,
-		AuthMode:      httpRow.AuthMode,
-		Username:      httpRow.Username,
-		Password:      httpRow.Password,
+	redirectRow := rows["redirect"]
+	ps := generator.ProxyInbounds{
+		HTTP: generator.ProxyInbound{
+			Type:          "http",
+			ListenAddress: defaultStr(httpRow.ListenAddress, "0.0.0.0"),
+			Port:          defaultPort(httpRow.Port, 7890),
+			Enabled:       httpRow.Enabled == 1,
+			AuthMode:      httpRow.AuthMode,
+			Username:      httpRow.Username,
+			Password:      httpRow.Password,
+		},
+		Socks: generator.ProxyInbound{
+			Type:          "socks",
+			ListenAddress: defaultStr(socksRow.ListenAddress, "0.0.0.0"),
+			Port:          defaultPort(socksRow.Port, 7891),
+			Enabled:       socksRow.Enabled == 1,
+			AuthMode:      socksRow.AuthMode,
+			Username:      socksRow.Username,
+			Password:      socksRow.Password,
+		},
+		Redirect: generator.ProxyInbound{
+			Type:          "redirect",
+			ListenAddress: defaultStr(redirectRow.ListenAddress, "0.0.0.0"),
+			Port:          defaultPort(redirectRow.Port, generator.DefaultRedirectPort),
+			Enabled:       redirectRow.Enabled == 1,
+		},
 	}
-	socksProxy := generator.ProxyInbound{
-		Type:          "socks",
-		ListenAddress: socksRow.ListenAddress,
-		Port:          socksRow.Port,
-		Enabled:       socksRow.Enabled == 1,
-		AuthMode:      socksRow.AuthMode,
-		Username:      socksRow.Username,
-		Password:      socksRow.Password,
+	return ps, nil
+}
+
+func defaultStr(v, fallback string) string {
+	if v == "" {
+		return fallback
 	}
-	if httpProxy.ListenAddress == "" {
-		httpProxy.ListenAddress = "0.0.0.0"
+	return v
+}
+
+func defaultPort(v, fallback int) int {
+	if v <= 0 {
+		return fallback
 	}
-	if httpProxy.Port == 0 {
-		httpProxy.Port = 7890
-	}
-	if socksProxy.ListenAddress == "" {
-		socksProxy.ListenAddress = "0.0.0.0"
-	}
-	if socksProxy.Port == 0 {
-		socksProxy.Port = 7891
-	}
-	return httpProxy, socksProxy, nil
+	return v
 }

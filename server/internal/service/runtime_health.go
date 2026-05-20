@@ -61,9 +61,9 @@ type RuntimeHealth struct {
 	ListenerErrors []string
 }
 
-func ObserveRuntimeHealth(ctx context.Context, httpProxy, socksProxy generator.ProxyInbound) RuntimeHealth {
-	errors := make([]string, 0, 2)
-	for _, proxy := range []generator.ProxyInbound{httpProxy, socksProxy} {
+func ObserveRuntimeHealth(ctx context.Context, ps generator.ProxyInbounds) RuntimeHealth {
+	errors := make([]string, 0, 3)
+	for _, proxy := range []generator.ProxyInbound{ps.HTTP, ps.Socks, ps.Redirect} {
 		if !proxy.Enabled {
 			continue
 		}
@@ -84,13 +84,13 @@ func (h RuntimeHealth) ListenerError() error {
 	})
 }
 
-func WaitForRuntimeReady(ctx context.Context, httpProxy, socksProxy generator.ProxyInbound, overrideMs int) error {
+func WaitForRuntimeReady(ctx context.Context, ps generator.ProxyInbounds, overrideMs int) error {
 	var lastHealth RuntimeHealth
 	waitMax := runtimeHealthMaxWait(overrideMs)
 	startedAt := time.Now()
 	steps := runtimeHealthWaitSteps(overrideMs)
 	for attempt := 0; attempt < steps; attempt++ {
-		lastHealth = ObserveRuntimeHealth(ctx, httpProxy, socksProxy)
+		lastHealth = ObserveRuntimeHealth(ctx, ps)
 		if err := lastHealth.ListenerError(); err == nil {
 			return nil
 		}

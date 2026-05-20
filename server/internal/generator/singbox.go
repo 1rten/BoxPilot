@@ -16,6 +16,7 @@ const (
 	DefaultAutoTestInterval = "30m"
 	DefaultGeoSiteCNURL     = "https://ghfast.top/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/cn.srs"
 	DefaultGeoIPCNURL       = "https://ghfast.top/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/cn.srs"
+	DefaultRedirectPort     = 7892
 )
 
 type ProxyInbound struct {
@@ -26,6 +27,13 @@ type ProxyInbound struct {
 	AuthMode      string
 	Username      string
 	Password      string
+}
+
+// ProxyInbounds bundles the three inbound types into one parameter.
+type ProxyInbounds struct {
+	HTTP     ProxyInbound
+	Socks    ProxyInbound
+	Redirect ProxyInbound
 }
 
 type RoutingSettings struct {
@@ -86,25 +94,28 @@ func DefaultRoutingSettings() RoutingSettings {
 	}
 }
 
-func BuildConfig(httpProxy ProxyInbound, socksProxy ProxyInbound, routing RoutingSettings, nodeOutboundJSONs []string) ([]byte, error) {
+func BuildConfig(ps ProxyInbounds, routing RoutingSettings, nodeOutboundJSONs []string) ([]byte, error) {
 	nodes := make([]NodeOutbound, 0, len(nodeOutboundJSONs))
 	for _, raw := range nodeOutboundJSONs {
 		nodes = append(nodes, NodeOutbound{RawJSON: raw})
 	}
-	return BuildConfigWithRuntime(httpProxy, socksProxy, routing, nodes, RoutingExtras{})
+	return BuildConfigWithRuntime(ps, routing, nodes, RoutingExtras{})
 }
 
-func BuildConfigWithNodes(httpProxy ProxyInbound, socksProxy ProxyInbound, routing RoutingSettings, nodes []NodeOutbound) ([]byte, error) {
-	return BuildConfigWithRuntime(httpProxy, socksProxy, routing, nodes, RoutingExtras{})
+func BuildConfigWithNodes(ps ProxyInbounds, routing RoutingSettings, nodes []NodeOutbound) ([]byte, error) {
+	return BuildConfigWithRuntime(ps, routing, nodes, RoutingExtras{})
 }
 
-func BuildConfigWithRuntime(httpProxy ProxyInbound, socksProxy ProxyInbound, routing RoutingSettings, nodes []NodeOutbound, extras RoutingExtras) ([]byte, error) {
+func BuildConfigWithRuntime(ps ProxyInbounds, routing RoutingSettings, nodes []NodeOutbound, extras RoutingExtras) ([]byte, error) {
 	inbounds := []map[string]any{}
-	if httpProxy.Enabled {
-		inbounds = append(inbounds, buildInbound("http", "http-in", httpProxy))
+	if ps.HTTP.Enabled {
+		inbounds = append(inbounds, buildInbound("http", "http-in", ps.HTTP))
 	}
-	if socksProxy.Enabled {
-		inbounds = append(inbounds, buildInbound("socks", "socks-in", socksProxy))
+	if ps.Socks.Enabled {
+		inbounds = append(inbounds, buildInbound("socks", "socks-in", ps.Socks))
+	}
+	if ps.Redirect.Enabled {
+		inbounds = append(inbounds, buildInbound("redirect", "redirect-in", ps.Redirect))
 	}
 	outbounds := []any{
 		map[string]any{"type": "direct", "tag": "direct"},
@@ -662,7 +673,7 @@ func buildInbound(inType, tag string, p ProxyInbound) map[string]any {
 		"listen":      p.ListenAddress,
 		"listen_port": p.Port,
 	}
-	if p.AuthMode == "basic" && p.Username != "" && p.Password != "" {
+	if inType != "redirect" && p.AuthMode == "basic" && p.Username != "" && p.Password != "" {
 		inb["users"] = []map[string]any{
 			{"username": p.Username, "password": p.Password},
 		}

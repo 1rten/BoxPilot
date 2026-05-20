@@ -18,8 +18,9 @@ type ProxySettingsResponse struct {
 }
 
 type ProxySettingsData struct {
-	HTTP  ProxyConfig `json:"http"`
-	Socks ProxyConfig `json:"socks"`
+	HTTP     ProxyConfig `json:"http"`
+	Socks    ProxyConfig `json:"socks"`
+	Redirect ProxyConfig `json:"redirect"`
 }
 
 type UpdateProxySettingsRequest struct {

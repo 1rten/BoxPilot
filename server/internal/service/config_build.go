@@ -10,10 +10,11 @@ import (
 	"boxpilot/server/internal/util/errorx"
 )
 
-func BuildConfigFromDB(db *sql.DB, httpProxy, socksProxy generator.ProxyInbound, routing generator.RoutingSettings, forwardingRunning bool) ([]byte, []string, string, error) {
+func BuildConfigFromDB(db *sql.DB, ps generator.ProxyInbounds, routing generator.RoutingSettings, forwardingRunning bool) ([]byte, []string, string, error) {
 	if !forwardingRunning {
-		httpProxy.Enabled = false
-		socksProxy.Enabled = false
+		ps.HTTP.Enabled = false
+		ps.Socks.Enabled = false
+		ps.Redirect.Enabled = false
 	}
 	nodes, err := repo.ListEnabledForwardingNodes(db)
 	if err != nil {
@@ -24,7 +25,7 @@ func BuildConfigFromDB(db *sql.DB, httpProxy, socksProxy generator.ProxyInbound,
 		return nil, nil, "", err
 	}
 	nodes = FilterForwardingNodes(nodes, policy)
-	if forwardingRunning && (httpProxy.Enabled || socksProxy.Enabled) && len(nodes) == 0 {
+	if forwardingRunning && (ps.HTTP.Enabled || ps.Socks.Enabled || ps.Redirect.Enabled) && len(nodes) == 0 {
 		return nil, nil, "", errorx.New(errorx.CFGNoEnabledNodes, "no forwarding nodes enabled")
 	}
 	var outbounds []generator.NodeOutbound
@@ -90,7 +91,7 @@ func BuildConfigFromDB(db *sql.DB, httpProxy, socksProxy generator.ProxyInbound,
 	for _, s := range selectionRows {
 		extras.GroupSelections[s.GroupTag] = s.SelectedOutbound
 	}
-	cfg, err := generator.BuildConfigWithRuntime(httpProxy, socksProxy, routing, outbounds, extras)
+	cfg, err := generator.BuildConfigWithRuntime(ps, routing, outbounds, extras)
 	if err != nil {
 		return nil, nil, "", err
 	}

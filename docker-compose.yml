@@ -3,10 +3,7 @@ services:
     build: .
     image: boxpilot:latest
     container_name: boxpilot
-    ports:
-      - "${BIND_IP:-0.0.0.0}:8080:8080"
-      - "${BIND_IP:-0.0.0.0}:7890:7890"
-      - "${BIND_IP:-0.0.0.0}:7891:7891"
+    network_mode: host
     environment:
       - DATA_DIR=/data
       - DB_PATH=/data/app.db
@@ -14,6 +11,7 @@ services:
       - SINGBOX_RESTART_CMD=/app/docker/restart-singbox.sh
       - HTTP_PROXY_PORT=7890
       - SOCKS_PROXY_PORT=7891
+      - REDIRECT_PROXY_PORT=7892
       - BACKUP_KEEP=10
     volumes:
       - ./data:/data

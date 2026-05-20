@@ -24,8 +24,8 @@ export function useRuntimeStatus() {
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
-    refetchInterval: 8_000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -67,8 +67,8 @@ export function useRuntimeTraffic() {
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
-    refetchInterval: 4000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -107,8 +107,8 @@ export function useRuntimeConnections(query?: string) {
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
-    refetchInterval: 3000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -122,8 +122,8 @@ export function useRuntimeGroups() {
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
-    refetchInterval: 10_000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -241,6 +241,6 @@ export function useRuntimeLogs(params?: {
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     refetchInterval: refetchIntervalMs,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
   });
 }

@@ -258,6 +258,12 @@ export default function Dashboard() {
                 </div>
                 <div className="bp-runtime-item">
                   <span className="bp-runtime-label">
+                    {tr("dashboard.runtime.redirect_port", "Redirect Port")}
+                  </span>
+                  <span className="bp-runtime-value">{runtime.ports.redirect ?? 7892}</span>
+                </div>
+                <div className="bp-runtime-item">
+                  <span className="bp-runtime-label">
                     {tr("dashboard.runtime.last_reload", "Last Reload")}
                   </span>
                   <span className="bp-runtime-value bp-mono">

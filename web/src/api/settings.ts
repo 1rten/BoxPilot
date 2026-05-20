@@ -122,6 +122,10 @@ export function resolveProxyClientHost(
 }
 
 export function buildProxyUrl(cfg: ProxyConfig, preferredHost?: string): string {
+  if (cfg.proxy_type === "redirect") {
+    const host = resolveProxyClientHost(cfg.listen_address, preferredHost);
+    return `tproxy://${host}:${cfg.port}`;
+  }
   const scheme = cfg.proxy_type === "http" ? "http" : "socks5";
   const host = resolveProxyClientHost(cfg.listen_address, preferredHost);
   const auth =

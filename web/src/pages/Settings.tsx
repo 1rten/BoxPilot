@@ -167,6 +167,12 @@ export default function Settings() {
             data={data?.socks}
             onSaved={markPendingApply}
           />
+          <ProxySettingsCard
+            title={tr("settings.redirect.title", "Redirect (TPROXY)")}
+            proxyType="redirect"
+            data={data?.redirect}
+            onSaved={markPendingApply}
+          />
         </div>
       ) : null}
       {section === "routing" ? (
@@ -961,7 +967,7 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
 
   const onSave = async () => {
     const values = await form.validateFields();
-    if (isPublicNoAuth(values.enabled, values.listen_address, values.auth_mode)) {
+    if (isPublicNoAuth(values.enabled, values.listen_address, values.auth_mode, proxyType)) {
       const ok = await confirmPublicNoAuth(tr);
       if (!ok) {
         return;
@@ -1045,6 +1051,7 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
         enabledWatch ?? data?.enabled ?? true,
         listenAddressWatch ?? data?.listen_address ?? "0.0.0.0",
         authMode ?? data?.auth_mode ?? "none",
+        proxyType,
       ) && (
         <Alert
           type="warning"
@@ -1101,48 +1108,52 @@ function ProxySettingsCard({ title, proxyType, data, onSaved }: ProxyCardProps) 
         >
           <InputNumber min={1} max={65535} style={{ width: "100%" }} />
         </Form.Item>
-        <Form.Item name="auth_mode" label={tr("settings.proxy.auth_mode", "Auth Mode")}>
-          <Select
-            options={[
-              { value: "none", label: tr("settings.proxy.auth.none", "None") },
-              { value: "basic", label: tr("settings.proxy.auth.basic", "Basic") },
-            ]}
-            getPopupContainer={getOverlayContainer}
-            classNames={selectPopupClassNames}
-          />
-        </Form.Item>
-        {authMode === "basic" && (
+        {proxyType !== "redirect" && (
           <>
-            <Form.Item
-              name="username"
-              label={tr("settings.proxy.username", "Username")}
-              rules={[
-                {
-                  required: true,
-                  message: tr(
-                    "settings.proxy.username.required",
-                    "Username is required for Basic auth",
-                  ),
-                },
-              ]}
-            >
-              <Input />
+            <Form.Item name="auth_mode" label={tr("settings.proxy.auth_mode", "Auth Mode")}>
+              <Select
+                options={[
+                  { value: "none", label: tr("settings.proxy.auth.none", "None") },
+                  { value: "basic", label: tr("settings.proxy.auth.basic", "Basic") },
+                ]}
+                getPopupContainer={getOverlayContainer}
+                classNames={selectPopupClassNames}
+              />
             </Form.Item>
-            <Form.Item
-              name="password"
-              label={tr("settings.proxy.password", "Password")}
-              rules={[
-                {
-                  required: true,
-                  message: tr(
-                    "settings.proxy.password.required",
-                    "Password is required for Basic auth",
-                  ),
-                },
-              ]}
-            >
-              <Input.Password />
-            </Form.Item>
+            {authMode === "basic" && (
+              <>
+                <Form.Item
+                  name="username"
+                  label={tr("settings.proxy.username", "Username")}
+                  rules={[
+                    {
+                      required: true,
+                      message: tr(
+                        "settings.proxy.username.required",
+                        "Username is required for Basic auth",
+                      ),
+                    },
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+                <Form.Item
+                  name="password"
+                  label={tr("settings.proxy.password", "Password")}
+                  rules={[
+                    {
+                      required: true,
+                      message: tr(
+                        "settings.proxy.password.required",
+                        "Password is required for Basic auth",
+                      ),
+                    },
+                  ]}
+                >
+                  <Input.Password />
+                </Form.Item>
+              </>
+            )}
           </>
         )}
       </Form>
@@ -1461,7 +1472,8 @@ function ForwardingPolicyCard({ data, onSaved }: ForwardingPolicyCardProps) {
   );
 }
 
-function isPublicNoAuth(enabled: boolean, listenAddress: string, authMode: string): boolean {
+function isPublicNoAuth(enabled: boolean, listenAddress: string, authMode: string, proxyType?: string): boolean {
+  if (proxyType === "redirect") return false;
   return enabled && listenAddress === "0.0.0.0" && authMode === "none";
 }
 

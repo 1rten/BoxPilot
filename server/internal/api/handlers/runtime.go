@@ -94,6 +94,7 @@ func (h *Runtime) Status(c *gin.Context) {
 	}
 	httpPort := 7890
 	socksPort := 7891
+	redirectPort := generator.DefaultRedirectPort
 	if settings, err := repo.GetProxySettings(h.DB); err == nil {
 		if httpRow, ok := settings["http"]; ok && httpRow.Port > 0 {
 			httpPort = httpRow.Port
@@ -102,8 +103,8 @@ func (h *Runtime) Status(c *gin.Context) {
 			socksPort = socksRow.Port
 		}
 		if forwardingRunning && lastReloadError == nil {
-			httpProxy, socksProxy := runtimeProxyRowsToInbounds(settings["http"], settings["socks"])
-			if healthErr := service.ObserveRuntimeHealth(c.Request.Context(), httpProxy, socksProxy).ListenerError(); healthErr != nil {
+			ps := runtimeProxyRowsToInbounds(settings["http"], settings["socks"], settings["redirect"])
+			if healthErr := service.ObserveRuntimeHealth(c.Request.Context(), ps).ListenerError(); healthErr != nil {
 				msg := healthErr.Error()
 				lastReloadError = &msg
 			}
@@ -122,7 +123,7 @@ func (h *Runtime) Status(c *gin.Context) {
 			LastApplySuccess:  lastApplySuccess,
 			LastReloadAt:      lastReloadAt,
 			LastReloadError:   lastReloadError,
-			Ports:             dto.RuntimePorts{HTTP: httpPort, Socks: socksPort},
+			Ports:             dto.RuntimePorts{HTTP: httpPort, Socks: socksPort, Redirect: redirectPort},
 		},
 	})
 }
@@ -613,46 +614,43 @@ func (h *Runtime) ProxyCheck(c *gin.Context) {
 	})
 }
 
-func runtimeProxyRowsToInbounds(httpRow, socksRow repo.ProxySettingsRow) (generator.ProxyInbound, generator.ProxyInbound) {
-	httpProxy := generator.ProxyInbound{
-		Type:          "http",
-		ListenAddress: httpRow.ListenAddress,
-		Port:          httpRow.Port,
-		Enabled:       httpRow.Enabled == 1,
-		AuthMode:      httpRow.AuthMode,
-		Username:      httpRow.Username,
-		Password:      httpRow.Password,
+func runtimeProxyRowsToInbounds(httpRow, socksRow, redirectRow repo.ProxySettingsRow) generator.ProxyInbounds {
+	ps := generator.ProxyInbounds{
+		HTTP: generator.ProxyInbound{
+			Type:          "http",
+			ListenAddress: defaultListenAddr(httpRow.ListenAddress),
+			Port:          defaultPortIfZero(httpRow.Port, 7890),
+			Enabled:       httpRow.Enabled == 1,
+			AuthMode:      httpRow.AuthMode,
+			Username:      httpRow.Username,
+			Password:      httpRow.Password,
+		},
+		Socks: generator.ProxyInbound{
+			Type:          "socks",
+			ListenAddress: defaultListenAddr(socksRow.ListenAddress),
+			Port:          defaultPortIfZero(socksRow.Port, 7891),
+			Enabled:       socksRow.Enabled == 1,
+			AuthMode:      socksRow.AuthMode,
+			Username:      socksRow.Username,
+			Password:      socksRow.Password,
+		},
+		Redirect: generator.ProxyInbound{
+			Type:          "redirect",
+			ListenAddress: defaultListenAddr(redirectRow.ListenAddress),
+			Port:          defaultPortIfZero(redirectRow.Port, generator.DefaultRedirectPort),
+			Enabled:       redirectRow.Enabled == 1,
+		},
 	}
-	socksProxy := generator.ProxyInbound{
-		Type:          "socks",
-		ListenAddress: socksRow.ListenAddress,
-		Port:          socksRow.Port,
-		Enabled:       socksRow.Enabled == 1,
-		AuthMode:      socksRow.AuthMode,
-		Username:      socksRow.Username,
-		Password:      socksRow.Password,
-	}
-	if httpProxy.ListenAddress == "" {
-		httpProxy.ListenAddress = "0.0.0.0"
-	}
-	if httpProxy.Port == 0 {
-		httpProxy.Port = 7890
-	}
-	if socksProxy.ListenAddress == "" {
-		socksProxy.ListenAddress = "0.0.0.0"
-	}
-	if socksProxy.Port == 0 {
-		socksProxy.Port = 7891
-	}
-	return httpProxy, socksProxy
+	return ps
 }
+
 
 func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool, applyForwardingPolicy bool, requireForwardingNodes bool) ([]byte, []string, error) {
 	settings, err := repo.GetProxySettings(h.DB)
 	if err != nil {
 		return nil, nil, errorx.New(errorx.DBError, "get proxy settings")
 	}
-	httpProxy, socksProxy := runtimeProxyRowsToInbounds(settings["http"], settings["socks"])
+	ps := runtimeProxyRowsToInbounds(settings["http"], settings["socks"], settings["redirect"])
 
 	row, err := repo.GetRuntimeState(h.DB)
 	if err != nil {
@@ -660,8 +658,9 @@ func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool, applyForwardingP
 	}
 	forwardingRunning := row != nil && row.ForwardingRunning == 1
 	if !forwardingRunning {
-		httpProxy.Enabled = false
-		socksProxy.Enabled = false
+		ps.HTTP.Enabled = false
+		ps.Socks.Enabled = false
+		ps.Redirect.Enabled = false
 	}
 
 	nodes := []repo.NodeRow{}
@@ -681,7 +680,7 @@ func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool, applyForwardingP
 		nodes = service.FilterForwardingNodes(nodes, policy)
 	}
 
-	if requireForwardingNodes && forwardingRunning && (httpProxy.Enabled || socksProxy.Enabled) && len(nodes) == 0 {
+	if requireForwardingNodes && forwardingRunning && (ps.HTTP.Enabled || ps.Socks.Enabled || ps.Redirect.Enabled) && len(nodes) == 0 {
 		return nil, nil, errorx.New(errorx.CFGNoEnabledNodes, "no forwarding nodes enabled")
 	}
 
@@ -755,7 +754,7 @@ func (h *Runtime) buildRuntimeConfig(includeDisabledNodes bool, applyForwardingP
 		extras.GroupSelections[s.GroupTag] = s.SelectedOutbound
 	}
 
-	cfg, err := generator.BuildConfigWithRuntime(httpProxy, socksProxy, routing, outbounds, extras)
+	cfg, err := generator.BuildConfigWithRuntime(ps, routing, outbounds, extras)
 	if err != nil {
 		return nil, nil, errorx.New(errorx.CFGBuildFailed, "build runtime config")
 	}

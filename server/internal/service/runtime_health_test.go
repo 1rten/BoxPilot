@@ -28,8 +28,9 @@ func TestObserveRuntimeHealth_AcceptsWildcardListenerViaLoopback(t *testing.T) {
 	}
 
 	health := ObserveRuntimeHealth(context.Background(),
-		generator.ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: port, Enabled: true},
-		generator.ProxyInbound{},
+		generator.ProxyInbounds{
+			HTTP: generator.ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: port, Enabled: true},
+		},
 	)
 	if err := health.ListenerError(); err != nil {
 		t.Fatalf("expected healthy listener, got %v", err)
@@ -38,8 +39,10 @@ func TestObserveRuntimeHealth_AcceptsWildcardListenerViaLoopback(t *testing.T) {
 
 func TestObserveRuntimeHealth_ReportsUnreachableEnabledListeners(t *testing.T) {
 	health := ObserveRuntimeHealth(context.Background(),
-		generator.ProxyInbound{Type: "http", ListenAddress: "127.0.0.1", Port: 1, Enabled: true},
-		generator.ProxyInbound{Type: "socks", ListenAddress: "127.0.0.1", Port: 2, Enabled: true},
+		generator.ProxyInbounds{
+			HTTP:  generator.ProxyInbound{Type: "http", ListenAddress: "127.0.0.1", Port: 1, Enabled: true},
+			Socks: generator.ProxyInbound{Type: "socks", ListenAddress: "127.0.0.1", Port: 2, Enabled: true},
+		},
 	)
 
 	err := health.ListenerError()

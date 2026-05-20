@@ -81,7 +81,8 @@ CREATE TABLE IF NOT EXISTS proxy_settings (
 INSERT OR IGNORE INTO proxy_settings (proxy_type, enabled, listen_address, port, auth_mode, username, password, updated_at)
 VALUES
   ('http', 1, '0.0.0.0', 7890, 'none', '', '', ''),
-  ('socks', 1, '0.0.0.0', 7891, 'none', '', '', '');
+  ('socks', 1, '0.0.0.0', 7891, 'none', '', '', ''),
+  ('redirect', 1, '0.0.0.0', 7892, 'none', '', '', '');
 
 CREATE TABLE IF NOT EXISTS node_proxy_overrides (
   id TEXT PRIMARY KEY,

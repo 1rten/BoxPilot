@@ -78,7 +78,7 @@ export type RuntimeStatusData = {
   last_apply_success_at?: string | null;
   last_reload_at?: string | null;
   last_reload_error?: string | null;
-  ports: { http: number; socks: number };
+  ports: { http: number; socks: number; redirect?: number };
   runtime_mode?: string;
   singbox_container?: string;
 };
@@ -190,7 +190,7 @@ export type RoutingSummaryData = {
   notes?: string[];
 };
 
-export type ProxyType = "http" | "socks";
+export type ProxyType = "http" | "socks" | "redirect";
 
 export type ProxyConfig = {
   proxy_type: string;
@@ -208,6 +208,7 @@ export type ProxyConfig = {
 export type ProxySettingsData = {
   http: ProxyConfig;
   socks: ProxyConfig;
+  redirect: ProxyConfig;
 };
 
 export type ForwardingRuntimeStatus = {

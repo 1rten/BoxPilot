@@ -8,8 +8,11 @@ import (
 
 func TestBuildConfig_WithBypassRules(t *testing.T) {
 	cfg, err := BuildConfig(
-		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
-		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		ProxyInbounds{
+			HTTP:     ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+			Socks:    ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+			Redirect: ProxyInbound{Type: "redirect", ListenAddress: "0.0.0.0", Port: 7892, Enabled: false},
+		},
 		RoutingSettings{
 			BypassPrivateEnabled: true,
 			BypassDomains:        []string{"localhost", "local"},
@@ -91,8 +94,11 @@ func TestBuildConfig_WithBypassRules(t *testing.T) {
 
 func TestBuildConfig_WithoutBypassRules(t *testing.T) {
 	cfg, err := BuildConfig(
-		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
-		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		ProxyInbounds{
+			HTTP:     ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+			Socks:    ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+			Redirect: ProxyInbound{Type: "redirect", ListenAddress: "0.0.0.0", Port: 7892, Enabled: false},
+		},
 		RoutingSettings{
 			BypassPrivateEnabled: false,
 			BypassDomains:        []string{"localhost"},
@@ -121,8 +127,11 @@ func TestBuildConfig_WithoutBypassRules(t *testing.T) {
 
 func TestBuildConfigWithNodes_UsesProvidedTags(t *testing.T) {
 	cfg, err := BuildConfigWithNodes(
-		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
-		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		ProxyInbounds{
+			HTTP:     ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+			Socks:    ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+			Redirect: ProxyInbound{Type: "redirect", ListenAddress: "0.0.0.0", Port: 7892, Enabled: false},
+		},
 		RoutingSettings{BypassPrivateEnabled: false},
 		[]NodeOutbound{
 			{
@@ -171,8 +180,11 @@ func TestBuildConfigWithNodes_UsesProvidedTags(t *testing.T) {
 
 func TestBuildConfigWithRuntime_BusinessGroups(t *testing.T) {
 	cfg, err := BuildConfigWithRuntime(
-		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
-		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		ProxyInbounds{
+			HTTP:     ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+			Socks:    ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+			Redirect: ProxyInbound{Type: "redirect", ListenAddress: "0.0.0.0", Port: 7892, Enabled: false},
+		},
 		RoutingSettings{BypassPrivateEnabled: true},
 		[]NodeOutbound{
 			{
@@ -277,8 +289,11 @@ func TestBuildConfigWithRuntime_BusinessGroups(t *testing.T) {
 
 func TestBuildConfigWithRuntime_BusinessGroupsWithoutPool(t *testing.T) {
 	cfg, err := BuildConfigWithRuntime(
-		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
-		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		ProxyInbounds{
+			HTTP:     ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+			Socks:    ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+			Redirect: ProxyInbound{Type: "redirect", ListenAddress: "0.0.0.0", Port: 7892, Enabled: false},
+		},
 		RoutingSettings{BypassPrivateEnabled: true},
 		[]NodeOutbound{
 			{
@@ -340,8 +355,11 @@ func TestBuildConfigWithRuntime_BusinessGroupsWithoutPool(t *testing.T) {
 
 func TestBuildConfigWithRuntime_BusinessGroupsDefaultNodeWhenToggleOff(t *testing.T) {
 	cfg, err := BuildConfigWithRuntime(
-		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
-		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		ProxyInbounds{
+			HTTP:     ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+			Socks:    ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+			Redirect: ProxyInbound{Type: "redirect", ListenAddress: "0.0.0.0", Port: 7892, Enabled: false},
+		},
 		RoutingSettings{BypassPrivateEnabled: true},
 		[]NodeOutbound{
 			{
@@ -402,8 +420,11 @@ func TestBuildConfigWithRuntime_BusinessGroupsDefaultNodeWhenToggleOff(t *testin
 
 func TestBuildConfigWithRuntime_BusinessGroupsKeepDirectInManualCandidates(t *testing.T) {
 	cfg, err := BuildConfigWithRuntime(
-		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
-		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		ProxyInbounds{
+			HTTP:     ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+			Socks:    ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+			Redirect: ProxyInbound{Type: "redirect", ListenAddress: "0.0.0.0", Port: 7892, Enabled: false},
+		},
 		RoutingSettings{BypassPrivateEnabled: true},
 		[]NodeOutbound{
 			{
@@ -463,8 +484,11 @@ func TestBuildConfigWithRuntime_BusinessGroupsKeepDirectInManualCandidates(t *te
 
 func TestBuildConfigWithRuntime_SkipsDuplicateCNRuleSetTags(t *testing.T) {
 	cfg, err := BuildConfigWithRuntime(
-		ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
-		ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+		ProxyInbounds{
+			HTTP:     ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: true},
+			Socks:    ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: true},
+			Redirect: ProxyInbound{Type: "redirect", ListenAddress: "0.0.0.0", Port: 7892, Enabled: false},
+		},
 		RoutingSettings{
 			BypassPrivateEnabled: true,
 			BypassDomains:        []string{"local"},
@@ -507,5 +531,51 @@ func TestBuildConfigWithRuntime_SkipsDuplicateCNRuleSetTags(t *testing.T) {
 	}
 	if seen["geosite-ads"] != 1 {
 		t.Fatalf("expected subscription geosite-ads rule_set preserved, got counts %#v", seen)
+	}
+}
+
+func TestBuildConfig_WithRedirectInbound(t *testing.T) {
+	cfg, err := BuildConfig(
+		ProxyInbounds{
+			HTTP:     ProxyInbound{Type: "http", ListenAddress: "0.0.0.0", Port: 7890, Enabled: false},
+			Socks:    ProxyInbound{Type: "socks", ListenAddress: "0.0.0.0", Port: 7891, Enabled: false},
+			Redirect: ProxyInbound{Type: "redirect", ListenAddress: "0.0.0.0", Port: 7892, Enabled: true},
+		},
+		RoutingSettings{BypassPrivateEnabled: false},
+		[]string{`{"type":"trojan","tag":"node-a","server":"example.com","server_port":443,"password":"p"}`},
+	)
+	if err != nil {
+		t.Fatalf("BuildConfig returned error: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(cfg, &parsed); err != nil {
+		t.Fatalf("unmarshal config: %v", err)
+	}
+
+	inbounds, ok := parsed["inbounds"].([]any)
+	if !ok {
+		t.Fatalf("missing inbounds")
+	}
+	if len(inbounds) != 1 {
+		t.Fatalf("expected 1 inbound (redirect only), got %d", len(inbounds))
+	}
+
+	redirectInb, ok := inbounds[0].(map[string]any)
+	if !ok {
+		t.Fatalf("invalid inbound type")
+	}
+	if got := redirectInb["type"]; got != "redirect" {
+		t.Fatalf("expected redirect inbound, got %v", got)
+	}
+	if got := redirectInb["tag"]; got != "redirect-in" {
+		t.Fatalf("expected tag redirect-in, got %v", got)
+	}
+	if got := redirectInb["listen_port"]; got != float64(7892) {
+		t.Fatalf("expected port 7892, got %v", got)
+	}
+	// Redirect inbounds must not have users/auth
+	if _, hasUsers := redirectInb["users"]; hasUsers {
+		t.Fatalf("redirect inbound should not have users/auth block")
 	}
 }

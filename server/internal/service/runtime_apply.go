@@ -21,8 +21,7 @@ func applyConfigWithPreflight(
 	ctx context.Context,
 	configPath string,
 	cfg []byte,
-	httpProxy generator.ProxyInbound,
-	socksProxy generator.ProxyInbound,
+	ps generator.ProxyInbounds,
 	listenerReadyMaxMs int,
 ) ([]byte, error) {
 	configPath = strings.TrimSpace(configPath)
@@ -76,7 +75,7 @@ func applyConfigWithPreflight(
 
 	restartOut, restartErr := runtime.Restart(ctx, configPath)
 	if restartErr == nil {
-		restartErr = WaitForRuntimeReady(ctx, httpProxy, socksProxy, listenerReadyMaxMs)
+		restartErr = WaitForRuntimeReady(ctx, ps, listenerReadyMaxMs)
 	}
 	if restartErr == nil {
 		_ = saveLastKnownGoodConfig(configPath, cfg)
@@ -108,7 +107,7 @@ func applyConfigWithPreflight(
 
 	rollbackOut, rollbackErr := runtime.Restart(ctx, configPath)
 	if rollbackErr == nil {
-		rollbackErr = WaitForRuntimeReady(ctx, httpProxy, socksProxy, listenerReadyMaxMs)
+		rollbackErr = WaitForRuntimeReady(ctx, ps, listenerReadyMaxMs)
 	}
 	if rollbackErr != nil {
 		details := map[string]any{

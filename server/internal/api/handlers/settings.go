@@ -21,18 +21,12 @@ type Settings struct {
 }
 
 func (h *Settings) GetProxySettings(c *gin.Context) {
-	settings, err := repo.GetProxySettings(h.DB)
-	if err != nil {
-		writeError(c, errorx.New(errorx.DBError, "get proxy settings"))
-		return
-	}
-	httpRow := settings["http"]
-	socksRow := settings["socks"]
 	_, status, errMsg := runtimeStatus(h.DB)
 	c.JSON(http.StatusOK, dto.ProxySettingsResponse{
 		Data: dto.ProxySettingsData{
-			HTTP:  proxyRowToDTO(httpRow, status, errMsg, "global"),
-			Socks: proxyRowToDTO(socksRow, status, errMsg, "global"),
+			HTTP:     proxyRowToDTO(mustGetProxy(h.DB, "http"), status, errMsg, "global"),
+			Socks:    proxyRowToDTO(mustGetProxy(h.DB, "socks"), status, errMsg, "global"),
+			Redirect: proxyRowToDTO(mustGetProxy(h.DB, "redirect"), status, errMsg, "global"),
 		},
 	})
 }
@@ -43,7 +37,7 @@ func (h *Settings) UpdateProxySettings(c *gin.Context) {
 		writeError(c, errorx.New(errorx.REQValidationFailed, "invalid body"))
 		return
 	}
-	if req.ProxyType != "http" && req.ProxyType != "socks" {
+	if req.ProxyType != "http" && req.ProxyType != "socks" && req.ProxyType != "redirect" {
 		writeError(c, errorx.New(errorx.REQInvalidField, "invalid proxy_type"))
 		return
 	}
@@ -59,6 +53,12 @@ func (h *Settings) UpdateProxySettings(c *gin.Context) {
 		writeError(c, errorx.New(errorx.REQInvalidField, "port must be between 1 and 65535"))
 		return
 	}
+	// Redirect inbounds have no auth in sing-box.
+	if req.ProxyType == "redirect" {
+		req.AuthMode = "none"
+		req.Username = ""
+		req.Password = ""
+	}
 	if req.AuthMode != "none" && req.AuthMode != "basic" {
 		writeError(c, errorx.New(errorx.REQInvalidField, "invalid auth_mode"))
 		return
@@ -68,20 +68,22 @@ func (h *Settings) UpdateProxySettings(c *gin.Context) {
 		return
 	}
 
-	otherType := "http"
-	if req.ProxyType == "http" {
-		otherType = "socks"
-	}
-	other, err := repo.GetProxySetting(h.DB, otherType)
+	// Check port conflicts with all other inbound types.
+	allSettings, err := repo.GetProxySettings(h.DB)
 	if err != nil {
 		writeError(c, errorx.New(errorx.DBError, "get proxy settings"))
 		return
 	}
-	if other != nil && *req.Enabled && other.Enabled == 1 && other.Port == req.Port {
-		sameInterface := other.ListenAddress == req.ListenAddress || other.ListenAddress == "0.0.0.0" || req.ListenAddress == "0.0.0.0"
-		if sameInterface {
-			writeError(c, errorx.New(errorx.REQInvalidField, "HTTP and SOCKS ports conflict on "+req.ListenAddress+":"+itoa(req.Port)))
-			return
+	for otherType, other := range allSettings {
+		if otherType == req.ProxyType {
+			continue
+		}
+		if other.Enabled == 1 && *req.Enabled && other.Port == req.Port {
+			sameInterface := other.ListenAddress == req.ListenAddress || other.ListenAddress == "0.0.0.0" || req.ListenAddress == "0.0.0.0"
+			if sameInterface {
+				writeError(c, errorx.New(errorx.REQInvalidField, "port conflicts with "+otherType+" on "+req.ListenAddress+":"+itoa(req.Port)))
+				return
+			}
 		}
 	}
 
@@ -102,8 +104,9 @@ func (h *Settings) UpdateProxySettings(c *gin.Context) {
 	_, status, errMsg := runtimeStatus(h.DB)
 	c.JSON(http.StatusOK, dto.ProxySettingsResponse{
 		Data: dto.ProxySettingsData{
-			HTTP:  proxyRowToDTO(mustGetProxy(h.DB, "http"), status, errMsg, "global"),
-			Socks: proxyRowToDTO(mustGetProxy(h.DB, "socks"), status, errMsg, "global"),
+			HTTP:     proxyRowToDTO(mustGetProxy(h.DB, "http"), status, errMsg, "global"),
+			Socks:    proxyRowToDTO(mustGetProxy(h.DB, "socks"), status, errMsg, "global"),
+			Redirect: proxyRowToDTO(mustGetProxy(h.DB, "redirect"), status, errMsg, "global"),
 		},
 	})
 }
@@ -360,7 +363,8 @@ func (h *Settings) StartForwarding(c *gin.Context) {
 	}
 	httpRow := settings["http"]
 	socksRow := settings["socks"]
-	if httpRow.Enabled != 1 && socksRow.Enabled != 1 {
+	redirectRow := settings["redirect"]
+	if httpRow.Enabled != 1 && socksRow.Enabled != 1 && redirectRow.Enabled != 1 {
 		writeError(c, errorx.New(errorx.REQInvalidField, "no proxy inbound enabled"))
 		return
 	}
@@ -459,31 +463,41 @@ func observedListenerError(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return errorx.New(errorx.DBError, "proxy settings unavailable; unable to verify runtime listeners")
 	}
-	httpProxy := generator.ProxyInbound{
-		Type:          "http",
-		ListenAddress: settings["http"].ListenAddress,
-		Port:          settings["http"].Port,
-		Enabled:       settings["http"].Enabled == 1,
+	ps := generator.ProxyInbounds{
+		HTTP: generator.ProxyInbound{
+			Type:          "http",
+			ListenAddress: defaultListenAddr(settings["http"].ListenAddress),
+			Port:          defaultPortIfZero(settings["http"].Port, 7890),
+			Enabled:       settings["http"].Enabled == 1,
+		},
+		Socks: generator.ProxyInbound{
+			Type:          "socks",
+			ListenAddress: defaultListenAddr(settings["socks"].ListenAddress),
+			Port:          defaultPortIfZero(settings["socks"].Port, 7891),
+			Enabled:       settings["socks"].Enabled == 1,
+		},
+		Redirect: generator.ProxyInbound{
+			Type:          "redirect",
+			ListenAddress: defaultListenAddr(settings["redirect"].ListenAddress),
+			Port:          defaultPortIfZero(settings["redirect"].Port, generator.DefaultRedirectPort),
+			Enabled:       settings["redirect"].Enabled == 1,
+		},
 	}
-	socksProxy := generator.ProxyInbound{
-		Type:          "socks",
-		ListenAddress: settings["socks"].ListenAddress,
-		Port:          settings["socks"].Port,
-		Enabled:       settings["socks"].Enabled == 1,
+	return service.ObserveRuntimeHealth(ctx, ps).ListenerError()
+}
+
+func defaultListenAddr(addr string) string {
+	if addr == "" {
+		return "0.0.0.0"
 	}
-	if httpProxy.ListenAddress == "" {
-		httpProxy.ListenAddress = "0.0.0.0"
+	return addr
+}
+
+func defaultPortIfZero(port, fallback int) int {
+	if port <= 0 {
+		return fallback
 	}
-	if httpProxy.Port == 0 {
-		httpProxy.Port = 7890
-	}
-	if socksProxy.ListenAddress == "" {
-		socksProxy.ListenAddress = "0.0.0.0"
-	}
-	if socksProxy.Port == 0 {
-		socksProxy.Port = 7891
-	}
-	return service.ObserveRuntimeHealth(ctx, httpProxy, socksProxy).ListenerError()
+	return port
 }
 
 func forwardingPolicyToDTO(p service.ForwardingPolicy) dto.ForwardingPolicyData {
@@ -503,7 +517,7 @@ func mustGetProxy(db *sql.DB, proxyType string) repo.ProxySettingsRow {
 	if err != nil || row == nil {
 		return repo.ProxySettingsRow{
 			ProxyType:     proxyType,
-			Enabled:       0,
+			Enabled:       1,
 			ListenAddress: "0.0.0.0",
 			Port:          defaultPort(proxyType),
 			AuthMode:      "none",
@@ -513,10 +527,14 @@ func mustGetProxy(db *sql.DB, proxyType string) repo.ProxySettingsRow {
 }
 
 func defaultPort(proxyType string) int {
-	if proxyType == "socks" {
+	switch proxyType {
+	case "socks":
 		return 7891
+	case "redirect":
+		return generator.DefaultRedirectPort
+	default:
+		return 7890
 	}
-	return 7890
 }
 
 func boolToInt(v bool) int {

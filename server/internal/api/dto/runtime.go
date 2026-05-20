@@ -17,8 +17,9 @@ type RuntimeStatusData struct {
 }
 
 type RuntimePorts struct {
-	HTTP  int `json:"http"`
-	Socks int `json:"socks"`
+	HTTP     int `json:"http"`
+	Socks    int `json:"socks"`
+	Redirect int `json:"redirect"`
 }
 
 type RuntimePlanRequest struct {

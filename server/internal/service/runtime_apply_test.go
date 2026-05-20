@@ -28,8 +28,7 @@ func TestApplyConfigWithPreflight_CheckFailedNoWrite(t *testing.T) {
 		context.Background(),
 		configPath,
 		[]byte(`{"mode":"new"}`),
-		generator.ProxyInbound{},
-		generator.ProxyInbound{},
+		generator.ProxyInbounds{},
 		0,
 	)
 	assertAppErrorCode(t, err, errorx.CFGCheckFailed)
@@ -61,8 +60,7 @@ func TestApplyConfigWithPreflight_RestartFailedRollbackSucceeded(t *testing.T) {
 		context.Background(),
 		configPath,
 		[]byte(`{"mode":"new"}`),
-		generator.ProxyInbound{},
-		generator.ProxyInbound{},
+		generator.ProxyInbounds{},
 		0,
 	)
 	assertAppErrorCode(t, err, errorx.RTRestartFailed)
@@ -94,8 +92,7 @@ func TestApplyConfigWithPreflight_SavesLastKnownGoodOnSuccess(t *testing.T) {
 		context.Background(),
 		configPath,
 		[]byte(`{"mode":"stable"}`),
-		generator.ProxyInbound{},
-		generator.ProxyInbound{},
+		generator.ProxyInbounds{},
 		0,
 	)
 	if err != nil {
@@ -123,19 +120,20 @@ func TestApplyConfigWithPreflight_HealthCheckFailureRollsBack(t *testing.T) {
 	t.Setenv("SINGBOX_CHECK_CMD", `test -s "$SINGBOX_CONFIG"`)
 	t.Setenv("SINGBOX_RESTART_CMD", `echo restarted`)
 
-	httpProxy := generator.ProxyInbound{
-		Type:          "http",
-		ListenAddress: "127.0.0.1",
-		Port:          1,
-		Enabled:       true,
+	ps := generator.ProxyInbounds{
+		HTTP: generator.ProxyInbound{
+			Type:          "http",
+			ListenAddress: "127.0.0.1",
+			Port:          1,
+			Enabled:       true,
+		},
 	}
 
 	out, err := applyConfigWithPreflight(
 		context.Background(),
 		configPath,
 		[]byte(`{"mode":"new"}`),
-		httpProxy,
-		generator.ProxyInbound{},
+		ps,
 		0,
 	)
 	assertAppErrorCode(t, err, errorx.CFGRollbackFailed)

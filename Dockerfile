@@ -32,5 +32,5 @@ ENV ADDR=:8080 \
     WEB_ROOT=/app/web/dist \
     SINGBOX_CONFIG=/data/sing-box.json \
     SINGBOX_RESTART_CMD=/app/docker/restart-singbox.sh
-EXPOSE 8080 7890 7891
+EXPOSE 8080 7890 7891 7892
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
